@@ -52,8 +52,8 @@
                             </thead>
                             <tbody>
                                 @foreach ($permisos->groupBy('grupo') as $grupo => $items)
-                                <tr class="table-danger" wire:key="grupo-{{ $grupo }}-{{ $componentKey }}">
-                                    <td class="fw-bold text-danger text-uppercase">
+                                <tr class="table-primary" wire:key="grupo-{{ $grupo }}-{{ $componentKey }}">
+                                    <td class="fw-bold text-primary text-uppercase">
                                         {{ $grupo }}
                                     </td>
                                     <td class="text-center">

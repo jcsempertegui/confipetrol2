@@ -34,13 +34,8 @@ class LogsController extends Component
     {
         $query = Log::with('user');
 
-        $query->where(function($q) {
-            $q->where('user_id', '!=', 1)
-              ->orWhereNull('user_id');
-        });
-
         if (!empty($this->searchTerm)) {
-            $query->where(function($subQuery) {
+            $query->where(function ($subQuery) {
                 $subQuery->where('evento', 'like', '%' . $this->searchTerm . '%')
                     ->orWhereHas('user', function ($q) {
                         $q->where('login', 'like', '%' . $this->searchTerm . '%');

@@ -8,7 +8,6 @@
             'businessName' => (!empty($setting) && !empty($setting->business)) ? $setting->business : 'MASTEC POS',
             'enableSizeColor' => $branch ? $branch->enable_size_color : 0,
             'invoiceType' => $branch ? $branch->invoice_type : 'ninguno',
-            'posType' => $branch ? $branch->pos_type : 1,
         ];
     });
 
@@ -16,12 +15,10 @@
     $businessName = $sidebarCache['businessName'];
     $enableSizeColor = $sidebarCache['enableSizeColor'];
     $invoiceType = $sidebarCache['invoiceType'];
-    $posType = $sidebarCache['posType'];
 @endphp
 <div class="sidebar-wrapper" data-simplebar="true" x-data="{
     enableSizeColor: {{ $enableSizeColor }},
     invoiceType: '{{ $invoiceType }}',
-    posType: parseInt({{ $posType ?? 1 }}),
     businessName: '{{ addslashes($businessName) }}',
     logoImage: '{{ $logoImage }}'
 }" @update-sidebar.window="
@@ -30,7 +27,6 @@
     if(data.invoiceType !== undefined) invoiceType = data.invoiceType;
     if(data.businessName !== undefined) businessName = data.businessName;
     if(data.logoImage !== undefined) logoImage = data.logoImage;
-    if(data.posType !== undefined) posType = parseInt(data.posType);
 ">
     <div class="sidebar-header">
         <div>
@@ -70,7 +66,6 @@
                     @can('ver-ajustes')
                         <li><a href="{{ url('settings') }}"><i class="bx bx-radio-circle"></i> Ajustes</a></li>
                     @endcan
-                    <li><a href="{{ url('general_movements') }}"><i class="bx bx-radio-circle"></i> Tesorería</a></li>
                     @can('ver-sucursales')
                         <li><a href="{{ url('branches') }}"><i class="bx bx-radio-circle"></i> Sucursales</a></li>
                         <li><a href="{{ url('warehouses') }}"><i class="bx bx-radio-circle"></i> Almacenes</a></li>
@@ -98,7 +93,6 @@
                     @can('ver-unidades')
                         <li><a href="{{ url('units') }}"><i class="bx bx-radio-circle"></i> Unidad de Medida</a></li>
                     @endcan
-
                     @can('ver-marcas')
                         <li><a href="{{ url('brands') }}"><i class="bx bx-radio-circle"></i> Marcas</a></li>
                     @endcan
@@ -132,7 +126,7 @@
         @endcan
 
         @canany(['nuevas-ventas', 'listar-ventas', 'cuentas-cobrar'])
-            <li x-show="posType === 1" style="display: {{ ((int) $posType === 1) ? 'list-item' : 'none' }}">
+            <li>
                 <a href="javascript:;" class="has-arrow">
                     <div class="parent-icon"><i class="bx bx-cart"></i></div>
                     <div class="menu-title">Ventas</div>
@@ -146,43 +140,6 @@
                     @endcan
                     @can('cuentas-cobrar')
                         <li><a href="{{ url('receivables') }}"><i class="bx bx-radio-circle"></i> Cuentas por Cobrar</a></li>
-                    @endcan
-                </ul>
-            </li>
-        @endcanany
-
-        @canany(['nuevas-ventas', 'listar-ventas', 'cuentas-cobrar'])
-            <li x-show="posType === 2" style="display: {{ ((int) $posType === 2) ? 'list-item' : 'none' }}">
-                <a href="javascript:;" class="has-arrow">
-                    <div class="parent-icon"><i class="bx bx-cart"></i></div>
-                    <div class="menu-title">Ventas</div>
-                </a>
-                <ul>
-                    @can('nuevas-ventas')
-                        <li><a href="{{ url('sales_interface') }}"><i class="bx bx-radio-circle"></i> Nueva Venta</a></li>
-                    @endcan
-                    @can('listar-ventas')
-                        <li><a href="{{ url('sales_lists') }}"><i class="bx bx-radio-circle"></i> Listar Venta</a></li>
-                    @endcan
-                    @can('cuentas-cobrar')
-                        <li><a href="{{ url('receivables') }}"><i class="bx bx-radio-circle"></i> Cuentas por Cobrar</a></li>
-                    @endcan
-                </ul>
-            </li>
-        @endcanany
-
-        @canany(['nuevas-ventas', 'listar-ventas'])
-            <li x-show="posType === 4" style="display: {{ ((int) $posType === 4) ? 'list-item' : 'none' }}">
-                <a href="javascript:;" class="has-arrow">
-                    <div class="parent-icon"><i class="bx bx-cart"></i></div>
-                    <div class="menu-title">Ventas</div>
-                </a>
-                <ul>
-                    @can('nuevas-ventas')
-                        <li><a href="{{ url('tables_view') }}"><i class="bx bx-radio-circle"></i> Nueva Venta</a></li>
-                    @endcan
-                    @can('listar-ventas')
-                        <li><a href="{{ url('orders_lists') }}"><i class="bx bx-radio-circle"></i> Listar Ordenes</a></li>
                     @endcan
                 </ul>
             </li>
@@ -215,31 +172,24 @@
                     @can('ver-reporteventa')
                         <li><a href="{{ url('sale_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Ventas</a></li>
                     @endcan
-                    <li><a href="{{ url('reservation_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                            Reservas</a></li>
+                    <li><a href="{{ url('reservation_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Reservas</a></li>
                     @can('ver-reporteingreso')
-                        <li><a href="{{ url('cash_transaction_reports') }}"><i class="bx bx-radio-circle"></i> Rep. de
-                                Ingreso/Egreso</a></li>
+                        <li><a href="{{ url('cash_transaction_reports') }}"><i class="bx bx-radio-circle"></i> Rep. de Ingreso/Egreso</a></li>
                     @endcan
                     @can('ver-reporteganancias')
-                        <li><a href="{{ url('global_earnings_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Ganancias
-                                Global</a></li>
+                        <li><a href="{{ url('global_earnings_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Ganancias Global</a></li>
                     @endcan
                     @can('ver-reporteestado')
-                        <li><a href="{{ url('income_statement_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Estado de
-                                Resultados</a></li>
+                        <li><a href="{{ url('income_statement_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Estado de Resultados</a></li>
                     @endcan
                     @can('ver-reportevencimiento')
-                        <li><a href="{{ url('expiration_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                                Vencimiento</a></li>
+                        <li><a href="{{ url('expiration_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Vencimiento</a></li>
                     @endcan
                     @can('ver-reportecompra')
-                        <li><a href="{{ url('purchase_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Compras</a>
-                        </li>
+                        <li><a href="{{ url('purchase_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Compras</a></li>
                     @endcan
                     @can('ver-reportecomision')
-                        <li><a href="{{ url('commission_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                                Comisiones</a></li>
+                        <li><a href="{{ url('commission_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Comisiones</a></li>
                     @endcan
                 </ul>
             </li>

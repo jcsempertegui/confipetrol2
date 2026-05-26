@@ -17,12 +17,6 @@ class Setting extends Model
         'image',
         'message',
         'branch_id',
-        'license_plan',
-        'payment_type',
-        'license_start_date',
-        'license_end_date',
-        'months_paid',
-        'years_paid',
     ];
 
     public function branch()

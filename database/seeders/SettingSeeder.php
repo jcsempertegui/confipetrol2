@@ -24,13 +24,6 @@ class SettingSeeder extends Seeder
             'message' => '<p><strong>Gracias por su Compra!!! Vuelva Pronto.</strong></p>',
             'branch_id' => 1,
             
-            // ============ DATOS DE LICENCIA (GENERAL) ============
-            'license_plan' => 'estandar', // emprendedor, estandar, pyme
-            'payment_type' => 'mensual', // mensual, anual
-            'license_start_date' => Carbon::now()->format('Y-m-d'),
-            'license_end_date' => Carbon::now()->addMonths(1)->format('Y-m-d'), // 1 mes por defecto
-            'months_paid' => 1,
-            'years_paid' => 0,
         ]);
        
     }
