@@ -96,6 +96,12 @@
                     @can('ver-marcas')
                         <li><a href="{{ url('brands') }}"><i class="bx bx-radio-circle"></i> Marcas</a></li>
                     @endcan
+                    @can('ver-tallas')
+                        <li><a href="{{ url('sizes') }}"><i class="bx bx-radio-circle"></i> Tallas</a></li>
+                    @endcan
+                    @can('ver-colores')
+                        <li><a href="{{ url('colors') }}"><i class="bx bx-radio-circle"></i> Colores</a></li>
+                    @endcan
                 </ul>
             </li>
         @endcanany
@@ -145,6 +151,17 @@
             </li>
         @endcanany
 
+        <li>
+            <a href="javascript:;" class="has-arrow">
+                <div class="parent-icon"><i class="bx bx-cart"></i></div>
+                <div class="menu-title">Entregas</div>
+            </a>
+            <ul>
+                <li><a href="{{ url('deliveries') }}"><i class="bx bx-radio-circle"></i> Nueva Entrega</a></li>
+                <li><a href="{{ url('delivery_lists') }}"><i class="bx bx-radio-circle"></i> Listar Entregas</a></li>
+            </ul>
+        </li>
+
         @canany(['ver-stock', 'ver-kardex'])
             <li>
                 <a href="javascript:;" class="has-arrow">
@@ -172,24 +189,31 @@
                     @can('ver-reporteventa')
                         <li><a href="{{ url('sale_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Ventas</a></li>
                     @endcan
-                    <li><a href="{{ url('reservation_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Reservas</a></li>
+                    <li><a href="{{ url('reservation_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
+                            Reservas</a></li>
                     @can('ver-reporteingreso')
-                        <li><a href="{{ url('cash_transaction_reports') }}"><i class="bx bx-radio-circle"></i> Rep. de Ingreso/Egreso</a></li>
+                        <li><a href="{{ url('cash_transaction_reports') }}"><i class="bx bx-radio-circle"></i> Rep. de
+                                Ingreso/Egreso</a></li>
                     @endcan
                     @can('ver-reporteganancias')
-                        <li><a href="{{ url('global_earnings_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Ganancias Global</a></li>
+                        <li><a href="{{ url('global_earnings_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Ganancias
+                                Global</a></li>
                     @endcan
                     @can('ver-reporteestado')
-                        <li><a href="{{ url('income_statement_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Estado de Resultados</a></li>
+                        <li><a href="{{ url('income_statement_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Estado de
+                                Resultados</a></li>
                     @endcan
                     @can('ver-reportevencimiento')
-                        <li><a href="{{ url('expiration_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Vencimiento</a></li>
+                        <li><a href="{{ url('expiration_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
+                                Vencimiento</a></li>
                     @endcan
                     @can('ver-reportecompra')
-                        <li><a href="{{ url('purchase_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Compras</a></li>
+                        <li><a href="{{ url('purchase_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Compras</a>
+                        </li>
                     @endcan
                     @can('ver-reportecomision')
-                        <li><a href="{{ url('commission_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Comisiones</a></li>
+                        <li><a href="{{ url('commission_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
+                                Comisiones</a></li>
                     @endcan
                 </ul>
             </li>

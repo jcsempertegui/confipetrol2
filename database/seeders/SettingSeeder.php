@@ -16,7 +16,7 @@ class SettingSeeder extends Seeder
     public function run(): void
     {
         Setting::create([
-            'business' => 'MASTEC POS',
+            'business' => 'CONFIPETROL',
             'owner' => '',
             'nit' => '000000',
             'email' => 'correo@gmail.com',

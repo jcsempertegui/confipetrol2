@@ -24,13 +24,13 @@ return new class extends Migration {
             //FIN RESTAURANTES
 
             $table->tinyInteger('status')->default(1);
-            $table->foreignId('worker_id')->constrained('workers')->onDelete('cascade');
+            $table->foreignId('customer_id')->constrained('customers')->onDelete('cascade');
             $table->foreignId('branch_id')->constrained('branches')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
             $table->timestamps();
 
             // Índices adicionales para consultas frecuentes
-            $table->index('worker_id');
+            $table->index('customer_id');
             $table->index('branch_id');
             $table->index('waiter_id');
             $table->index('status');

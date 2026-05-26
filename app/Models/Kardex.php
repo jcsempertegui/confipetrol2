@@ -18,6 +18,7 @@ class Kardex extends Model
         'price',
         'total',
         'product_id',
+        'lot_id',
         'user_id',
         'warehouse_id',
         'transaction_id',
@@ -32,6 +33,10 @@ class Kardex extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+    public function lot()
+    {
+        return $this->belongsTo(Lot::class);
     }
     public function warehouse()
     {

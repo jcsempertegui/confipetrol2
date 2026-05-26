@@ -481,8 +481,6 @@
             </div>
         </div>
 
-        @include('livewire.common.payment_modal')
-
         <div wire:ignore.self class="modal fade" id="skuModal" tabindex="-1" aria-labelledby="skuModal" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
                 <div class="modal-content" style="max-height: 90vh;">

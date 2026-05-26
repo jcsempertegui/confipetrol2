@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\BranchController;
+use App\Livewire\ColorsController;
 use App\Livewire\HomeController;
 use App\Livewire\KardexsController;
 use App\Livewire\ProfilesController;
@@ -9,6 +10,7 @@ use App\Livewire\Reports\CashTransactionReportsController;
 use App\Livewire\Reports\CommissionReportsController;
 use App\Livewire\Reports\IncomeStatementReportsController;
 use App\Livewire\RolesController;
+use App\Livewire\SizesController;
 use App\Livewire\UsersController;
 use App\Livewire\SettingsController;
 use App\Livewire\BranchesController;
@@ -22,6 +24,8 @@ use App\Livewire\CustomersController;
 use App\Livewire\WorkersController;
 use App\Livewire\SalesController;
 use App\Livewire\SaleListsController;
+use App\Livewire\DeliveriesController;
+use App\Livewire\DeliveryListsController;
 use App\Livewire\InventoriesController;
 use App\Livewire\Reports\ExpirationReportsController;
 use App\Livewire\Reports\SaleReportsController;
@@ -57,16 +61,19 @@ Route::middleware(['auth'])->group(function () {
     Route::get('sales', SalesController::class)->name('sales');
     Route::get('sales_lists', SaleListsController::class)->name('sales_lists');
 
+    Route::get('deliveries', DeliveriesController::class)->name('deliveries');
+    Route::get('delivery_lists', DeliveryListsController::class)->name('delivery_lists');
+
 
     Route::get('inventories', InventoriesController::class)->middleware('permission:ver-stock')->name('inventories');
     Route::get('kardexs', KardexsController::class)->middleware('permission:ver-kardex')->name('kardexs');
     Route::get('/sale_lists/salePdf/{id},{branch_id}', [SaleListsController::class, 'salePdf'])->name('sale_lists.salePdf');
-   
-    
+
+
     Route::get('expiration_reports', ExpirationReportsController::class)->middleware('permission:ver-reportevencimiento')->name('expiration_reports');
     Route::get('sale_reports', SaleReportsController::class)->middleware('permission:ver-reporteventa')->name('sale_reports');
     Route::get('global_earnings_reports', GlobalEarningReportsController::class)->middleware('permission:ver-reporteganancias')->name('global_earnings_reports');
-    
+
     Route::get('/global_earnings_reports/exportToPdf/{fromDate}/{toDate}', [GlobalEarningReportsController::class, 'exportToPdf'])->name('global_earnings_reports.exportToPdf');
 
     Route::get('order_reports', OrderReportsController::class)->name('order_reports');
@@ -75,13 +82,16 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/sale_reports/saleReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [SaleReportsController::class, 'saleReportPdf'])->name('sale_reports.saleReportPdf');
     Route::get('/order_reports/orderReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [OrderReportsController::class, 'orderReportPdf'])->name('order_reports.orderReportPdf');
-   
+
     Route::get('commission_reports', CommissionReportsController::class)->middleware('permission:ver-reportecomision')->name('commission_reports');
     Route::get('/commission_reports/pdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [CommissionReportsController::class, 'commissionReportPdf'])->name('commission_reports.pdf');
 
     Route::get('cash_transaction_reports', CashTransactionReportsController::class)->name('cash_transaction_reports');
     Route::get('/cash_transaction_reports/cashTransactionReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}/{type}', [CashTransactionReportsController::class, 'cashTransactionReportPdf'])->name('cash_transaction_reports.cashTransactionReportPdf');
 
+    /////////////TALLAS Y COLORES
+    Route::get('sizes', SizesController::class)->middleware('permission:ver-tallas')->name('sizes');
+    Route::get('colors', ColorsController::class)->middleware('permission:ver-colores')->name('colors');
 });
 
 Route::get('/401', function () {

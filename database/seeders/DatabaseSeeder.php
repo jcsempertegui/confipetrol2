@@ -3,17 +3,12 @@
 namespace Database\Seeders;
 
 use App\Models\User;
-// use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
-use Illuminate\Database\Setting;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Carbon;
 
 class DatabaseSeeder extends Seeder
 {
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
         $this->call(PermissionSeeder::class);
@@ -70,9 +65,27 @@ class DatabaseSeeder extends Seeder
             ]
         ]);
 
-        /* $this->call(ProductSeeder::class);*/
+        DB::table('colors')->insert([
+            ['name' => 'SIN COLOR', 'status' => 1],
+            ['name' => 'NEGRO',     'status' => 1],
+            ['name' => 'BLANCO',    'status' => 1],
+            ['name' => 'ROJO',      'status' => 1],
+            ['name' => 'AZUL',      'status' => 1],
+            ['name' => 'VERDE',     'status' => 1],
+            ['name' => 'AMARILLO',  'status' => 1],
+            ['name' => 'GRIS',      'status' => 1],
+        ]);
+
+        DB::table('sizes')->insert([
+            ['name' => 'SIN TALLA', 'status' => 1],
+            ['name' => 'XS',        'status' => 1],
+            ['name' => 'S',         'status' => 1],
+            ['name' => 'M',         'status' => 1],
+            ['name' => 'L',         'status' => 1],
+            ['name' => 'XL',        'status' => 1],
+            ['name' => 'XXL',       'status' => 1],
+        ]);
+
         $this->call(UserSeeder::class);
-
-
     }
 }
