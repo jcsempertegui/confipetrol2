@@ -2,7 +2,6 @@
 
 namespace App\Livewire;
 
-use App\Traits\PaymentLogic;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use App\Models\Product;
@@ -26,7 +25,6 @@ include_once(base_path('public/assets/plugins/literal.php'));
 class SalesController extends Component
 {
     use WithPagination;
-    use PaymentLogic;
 
     public $searchType = 'name';
     public $products = [], $search, $searchTerm;
