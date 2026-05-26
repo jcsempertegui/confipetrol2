@@ -1,0 +1,251 @@
+/*.pace {
+    -webkit-pointer-events: none;
+    pointer-events: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+}
+.pace-inactive {
+    display: none;
+}
+.pace .pace-progress {
+    background: #fc0038;
+    position: fixed;
+    z-index: 2000;
+    top: 0;
+    right: 100%;
+    width: 100%;
+    height: 3px;
+}
+.pace .pace-progress-inner {
+    display: block;
+    position: absolute;
+    right: 0;
+    width: 100px;
+    height: 100%;
+    box-shadow: 0 0 10px #fc0038, 0 0 5px #fc0038;
+    opacity: 1;
+    -webkit-transform: rotate(3deg) translate(0, -4px);
+    -moz-transform: rotate(3deg) translate(0, -4px);
+    -ms-transform: rotate(3deg) translate(0, -4px);
+    -o-transform: rotate(3deg) translate(0, -4px);
+    transform: rotate(3deg) translate(0, -4px);
+}
+.pace .pace-activity {
+    display: block;
+    position: fixed;
+    z-index: 2000;
+    top: 15px;
+    right: 15px;
+    width: 20px;
+    height: 20px;
+    border: solid 3px transparent;
+    border-top-color: #fc0038;
+    border-left-color: #fc0038;
+    border-radius: 10px;
+    -webkit-animation: pace-spinner 0.4s linear infinite;
+    -moz-animation: pace-spinner 0.4s linear infinite;
+    -ms-animation: pace-spinner 0.4s linear infinite;
+    -o-animation: pace-spinner 0.4s linear infinite;
+    animation: pace-spinner 0.4s linear infinite;
+}
+@-webkit-keyframes pace-spinner {
+    0% {
+        -webkit-transform: rotate(0);
+        transform: rotate(0);
+    }
+    100% {
+        -webkit-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+@-moz-keyframes pace-spinner {
+    0% {
+        -moz-transform: rotate(0);
+        transform: rotate(0);
+    }
+    100% {
+        -moz-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+@-o-keyframes pace-spinner {
+    0% {
+        -o-transform: rotate(0);
+        transform: rotate(0);
+    }
+    100% {
+        -o-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+@-ms-keyframes pace-spinner {
+    0% {
+        -ms-transform: rotate(0);
+        transform: rotate(0);
+    }
+    100% {
+        -ms-transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+@keyframes pace-spinner {
+    0% {
+        transform: rotate(0);
+        transform: rotate(0);
+    }
+    100% {
+        transform: rotate(360deg);
+        transform: rotate(360deg);
+    }
+}
+
+ CAGAR TODA LA PAGINA
+*/
+/* Fondo general de la pantalla de carga */
+/* --- CSS LOADER MEJORADO --- */
+
+.pace {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: radial-gradient(
+        ellipse at center,
+        rgba(20, 20, 30, 0.7) 0%,
+        rgba(10, 10, 15, 0.85) 100%
+    );
+    background: radial-gradient(
+        ellipse at center,
+        rgba(20, 20, 30, 0.6) 0%,
+        rgba(10, 10, 15, 0.75) 100%
+    );
+    backdrop-filter: blur(30px) saturate(180%);
+    -webkit-backdrop-filter: blur(30px) saturate(180%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition:
+        opacity 0.3s ease-in-out,
+        visibility 0.3s ease-in-out;
+}
+
+/* Solo se muestra si tiene esta clase específica */
+.pace.pace-active {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all; /* Bloquea clicks mientras carga */
+}
+
+/* --- Elementos internos --- */
+.pace .pace-activity {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    background-image: url("/assets/images/logo.png"); /* Verifica tu ruta */
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 70%;
+    z-index: 10;
+    animation: pace-logo-pulse 2s ease-in-out infinite;
+    filter: drop-shadow(0 0 20px rgba(255, 59, 59, 0.4));
+}
+
+@keyframes pace-logo-pulse {
+    0%,
+    100% {
+        transform: scale(1);
+        filter: drop-shadow(0 0 20px rgba(255, 59, 59, 0.4));
+    }
+    50% {
+        transform: scale(1.05);
+        filter: drop-shadow(0 0 30px rgba(255, 59, 59, 0.6));
+    }
+}
+
+.pace .pace-activity::before {
+    content: "";
+    position: absolute;
+    inset: -20px;
+    border: 5px solid transparent;
+    border-top: 5px solid #ff3b3b;
+    border-right: 5px solid rgba(255, 59, 59, 0.3);
+    border-radius: 50%;
+    z-index: -1;
+    animation: pace-spin-fast 1.2s cubic-bezier(0.68, -0.55, 0.265, 1.55)
+        infinite;
+}
+
+.pace .pace-activity::after {
+    content: "";
+    position: absolute;
+    inset: -10px;
+    border: 3px solid transparent;
+    border-bottom: 3px solid rgba(255, 255, 255, 0.4);
+    border-left: 3px solid rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    z-index: -2;
+    animation: pace-spin-medium 2s linear infinite reverse;
+}
+
+.pace::after {
+    content: "CARGANDO";
+    color: rgba(255, 255, 255, 0.9);
+    font-family:
+        system-ui,
+        -apple-system,
+        sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 6px;
+    margin-top: 60px;
+    animation: pace-text-glow 2s ease-in-out infinite;
+}
+
+@keyframes pace-spin-fast {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+@keyframes pace-spin-medium {
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
+}
+@keyframes pace-text-glow {
+    0%,
+    100% {
+        opacity: 0.6;
+        letter-spacing: 6px;
+    }
+    50% {
+        opacity: 1;
+        letter-spacing: 7px;
+        text-shadow: 0 0 20px rgba(255, 59, 59, 0.5);
+    }
+}
+
+/* Responsivo */
+@media (max-width: 768px) {
+    .pace .pace-activity {
+        width: 100px;
+        height: 100px;
+    }
+    .pace .pace-activity::before {
+        inset: -15px;
+    }
+}

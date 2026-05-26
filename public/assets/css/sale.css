@@ -1,0 +1,190 @@
+* {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 13px;
+}
+
+.titulos {
+    font-size: 15px;
+    text-transform: uppercase;
+}
+
+.div-1Header,
+.div-1Datos {
+    width: 100%;
+}
+
+.logotd {
+    max-width: 110px;
+    max-height: 80px;
+    width: auto;
+    height: auto;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    object-fit: contain;
+    display: block;
+}
+
+.datos-grales-td,
+.receptor {
+    width: 50%;
+}
+
+.datos-grales p {
+    margin: 3px 0;
+    line-height: 1.2;
+}
+
+.table_h_factura {
+    width: 50%;
+    height: 150px;
+    background-color: #fff;
+    width: 100%;
+    margin: 0px;
+    padding: 0px;
+}
+
+.headerDatosh {
+    text-align: right;
+    color: #fff;
+    padding: 5px;
+    background-color: rgb(24, 140, 207);
+}
+
+.table_h_factura tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: right;
+    padding-right: 5px;
+}
+
+.table_receptor,
+.table_datos {
+    width: 42%;
+    height: 100px;
+    background-color: rgba(243, 243, 243, 0.521);
+    width: 100%;
+    margin: 0px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.table_receptor tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+.table_datos tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+.table_materiales {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.table_materiales thead tr td {
+    padding: 5px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.table_materiales thead tr th {
+    background-color: rgb(72, 72, 72);
+    color: #fff;
+    padding: 7px 0px;
+}
+
+.table_materiales tr td {
+    text-align: center;
+    padding: 5px;
+    border-bottom: 1px solid rgba(20, 20, 20, 0.096);
+}
+
+.table_datosFtxt {
+    width: 70%;
+    height: 100px;
+    width: 100%;
+    margin: 0px;
+}
+
+.datosFinales {
+    width: 30%;
+}
+
+.datosFinales .table_datosfinales {
+    width: 50%;
+    margin: 0px;
+    padding: 10px;
+    border: 1px solid rgba(20, 20, 20, 0.096);
+    border-radius: 10px;
+}
+
+.datosFinales .table_datosfinales tr td p {
+    font-size: 13px;
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+.totales-container {
+    display: table;
+    width: 100%;
+    margin-top: 15px;
+    margin-bottom: 15px;
+}
+
+.son-container {
+    display: table-cell;
+    width: 70%;
+    vertical-align: middle;
+    text-align: left;
+}
+
+.total-container {
+    display: table-cell;
+    width: 30%;
+    vertical-align: middle;
+    text-align: right;
+}
+
+.total-container p {
+    margin: 0;
+    font-weight: bold;
+}
+
+.son-container p {
+    margin: 0;
+    font-weight: bold;
+}
+
+.footer {
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+}
+
+.observaciones-container {
+    margin-top: 20px;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.observaciones-label {
+    margin: 0 0 5px 0;
+    font-size: 13px;
+    font-weight: bold;
+    color: #333;
+}
+
+.observaciones-text {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: #333;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+}

@@ -1,0 +1,85 @@
+//EJECUTAR POR PRIMERA VEZ
+composer i
+php artisan migrate
+php artisan db:seed
+php artisan serve
+
+//REFRESH MIGRACION Y SEEDER
+php artisan migrate:refresh
+php artisan migrate:refresh --seed
+
+//ELIMINAR LAS TABLAS
+***************
+php artisan db:wipe
+****************
+
+//CREAR COMPONENTE
+php artisan make:livewire Settings
+
+//CREAR MODELO y migracion -m 
+php artisan make:model Setting -m
+
+//CREAR UN SEEDERS
+php artisan make:seeder SettingSeeder
+
+//CONEXION BASE DE DATOS MYSQL
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=mastec_digital
+DB_USERNAME=root
+DB_PASSWORD=lsmSantander76
+
+//CONEXION BASE DE DATOS PGADMIN
+DB_CONNECTION=pgsql
+DB_HOST=127.0.0.1
+DB_PORT=5432
+DB_DATABASE=mastec_digital
+DB_USERNAME=postgres
+DB_PASSWORD=lsmSantander76
+
+//CORREO ENVIO
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=465
+MAIL_USERNAME=luissantander2002@gmail.com
+MAIL_PASSWORD=fyulgseunjugpotb
+MAIL_ENCRYPTION=ssl
+MAIL_FROM_ADDRESS=luissantander2002@gmail.com
+MAIL_FROM_NAME="Sistema Logistic"
+
+
+//INSTALL
+composer require barryvdh/laravel-dompdf
+
+//////////////////////////////////////////
+//DEPLOY
+//////////////////////////////////////////
+//LIMPIAR ANTES DE SUBIR
+php artisan cache:clear
+php artisan view:clear
+php artisan config:clear
+php artisan route:clear
+
+
+////////////////
+IMAGENES
+///////////////
+php artisan storage:link
+
+
+////////////////
+IMPRESORA IMPRIMIR
+///////////////
+composer require mike42/escpos-php
+
+
+//CREAR ARCHIVO .htaccess  
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(.*)$ public/$1 [L]
+</IfModule>
+
+
+//QUITAR GIT HUB
+Remove-Item -Recurse -Force .git

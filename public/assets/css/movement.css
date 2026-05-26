@@ -1,0 +1,131 @@
+/*ESTILOS GRALES*/
+* {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 12px;
+}
+
+.titulos {
+    font-size: 15px;
+    text-transform: uppercase;
+}
+
+/*HEADER*/
+.div-1Header,
+.div-1Datos {
+    width: 100%;
+}
+
+.logotd {
+    width: 50%;
+    height: auto;
+}
+
+.datos-grales-td,
+.receptor {
+    width: 50%;
+}
+
+.table_h_factura {
+    width: 50%;
+    height: 150px;
+    background-color: #fff;
+    width: 100%;
+    margin: 0px;
+    padding: 0px;
+}
+
+.headerDatosh {
+    text-align: right;
+    color: #fff;
+    padding: 5px;
+    background-color: rgb(24, 140, 207);
+}
+
+.table_h_factura tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: right;
+    padding-right: 5px;
+}
+
+/*DATOS*/
+.table_receptor,
+.table_datos {
+    width: 42%;
+    height: 100px;
+    background-color: rgba(243, 243, 243, 0.521);
+    width: 100%;
+    margin: 0px;
+    padding: 10px;
+    border-radius: 5px;
+}
+
+.table_receptor tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+.table_datos tr td p {
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+/*MATERIALES*/
+.table_materiales {
+    width: 100%;
+    margin-top: 10px;
+    margin-bottom: 10px;
+}
+
+.table_materiales thead tr {
+    background-color: rgb(72, 72, 72);
+    color: #fff;
+}
+
+.table_materiales thead tr td {
+    padding: 5px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.table_materiales tr td {
+    text-align: center;
+    padding: 5px;
+    border-bottom: 1px solid rgba(20, 20, 20, 0.096);
+}
+
+/*DATOS FINALES*/
+.table_datosFtxt {
+    width: 70%;
+    height: 100px;
+    width: 100%;
+    margin: 0px;
+}
+
+.datosFinales {
+    width: 30%;
+}
+
+.datosFinales .table_datosfinales {
+    width: 50%;
+    margin: 0px;
+    padding: 10px;
+    border: 1px solid rgba(20, 20, 20, 0.096);
+    border-radius: 10px;
+}
+
+.datosFinales .table_datosfinales tr td p {
+    font-size: 13px;
+    margin: 0px;
+    padding: 2px;
+    text-align: left;
+}
+
+/*FOOTER*/
+.footer {
+    width: 100%;
+    text-align: center;
+    font-size: 14px;
+}

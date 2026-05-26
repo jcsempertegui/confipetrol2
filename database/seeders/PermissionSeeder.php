@@ -1,0 +1,163 @@
+<?php
+
+namespace Database\Seeders;
+
+use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\PermissionRegistrar;
+
+class PermissionSeeder extends Seeder
+{
+    public function run(): void
+    {
+        app()[PermissionRegistrar::class]->forgetCachedPermissions();
+
+        $permisos = [
+            ['name' => 'ver-ajustes', 'grupo' => 'Administracion'],
+            ['name' => 'ver-ajustesadicionales', 'grupo' => 'Administracion'],
+            ['name' => 'ver-log', 'grupo' => 'Administracion'],
+            ['name' => 'ver-sucursales', 'grupo' => 'Administracion'],
+            ['name' => 'crear-sucursal', 'grupo' => 'Administracion'],
+            ['name' => 'editar-sucursal', 'grupo' => 'Administracion'],
+            ['name' => 'eliminar-sucursal', 'grupo' => 'Administracion'],
+
+            ['name' => 'ver-planillas', 'grupo' => 'Planillas'],
+
+            ['name' => 'ver-usuario', 'grupo' => 'Usuarios'],
+            ['name' => 'crear-usuario', 'grupo' => 'Usuarios'],
+            ['name' => 'editar-usuario', 'grupo' => 'Usuarios'],
+            ['name' => 'eliminar-usuario', 'grupo' => 'Usuarios'],
+            ['name' => 'restaurar-usuario', 'grupo' => 'Usuarios'],
+            ['name' => 'ver-rol', 'grupo' => 'Roles'],
+            ['name' => 'crear-rol', 'grupo' => 'Roles'],
+            ['name' => 'editar-rol', 'grupo' => 'Roles'],
+            ['name' => 'eliminar-rol', 'grupo' => 'Roles'],
+            ['name' => 'restaurar-rol', 'grupo' => 'Roles'],
+            ['name' => 'ver-zonas', 'grupo' => 'Zonas'],
+            ['name' => 'crear-zonas', 'grupo' => 'Zonas'],
+            ['name' => 'editar-zonas', 'grupo' => 'Zonas'],
+            ['name' => 'eliminar-zonas', 'grupo' => 'Zonas'],
+            ['name' => 'restaurar-zonas', 'grupo' => 'Zonas'],
+            ['name' => 'ver-cajas', 'grupo' => 'Cajas'],
+            ['name' => 'listar-cajas', 'grupo' => 'Cajas'],
+            ['name' => 'apertura-caja', 'grupo' => 'Cajas'],
+            ['name' => 'movimiento-caja', 'grupo' => 'Cajas'],
+            ['name' => 'editar-cajas', 'grupo' => 'Cajas'],
+            ['name' => 'eliminar-cajas', 'grupo' => 'Cajas'],
+            ['name' => 'ver-productos', 'grupo' => 'Productos'],
+            ['name' => 'importar-productos', 'grupo' => 'Productos'],
+            ['name' => 'crear-productos', 'grupo' => 'Productos'],
+            ['name' => 'editar-productos', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-productos', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-productos', 'grupo' => 'Productos'],
+            // ✅ FALTABAN ESTOS TRES
+            ['name' => 'ver-unidades', 'grupo' => 'Productos'],
+            ['name' => 'crear-unidades', 'grupo' => 'Productos'],
+            ['name' => 'editar-unidades', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-unidades', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-unidades', 'grupo' => 'Productos'],
+            ['name' => 'ver-variantes', 'grupo' => 'Productos'],
+            ['name' => 'crear-variantes', 'grupo' => 'Productos'],
+            ['name' => 'editar-variantes', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-variantes', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-variantes', 'grupo' => 'Productos'],
+            ['name' => 'ver-adicionales', 'grupo' => 'Productos'],
+            ['name' => 'crear-adicionales', 'grupo' => 'Productos'],
+            ['name' => 'editar-adicionales', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-adicionales', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-adicionales', 'grupo' => 'Productos'],
+            ['name' => 'ver-tallas', 'grupo' => 'Productos'],
+            ['name' => 'crear-tallas', 'grupo' => 'Productos'],
+            ['name' => 'editar-tallas', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-tallas', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-tallas', 'grupo' => 'Productos'],
+            ['name' => 'ver-colores', 'grupo' => 'Productos'],
+            ['name' => 'crear-colores', 'grupo' => 'Productos'],
+            ['name' => 'editar-colores', 'grupo' => 'Productos'],
+            ['name' => 'eliminar-colores', 'grupo' => 'Productos'],
+            ['name' => 'restaurar-colores', 'grupo' => 'Productos'],
+            // ✅ FIN AGREGADOS
+            ['name' => 'ver-categorias', 'grupo' => 'Categorias'],
+            ['name' => 'crear-categorias', 'grupo' => 'Categorias'],
+            ['name' => 'editar-categorias', 'grupo' => 'Categorias'],
+            ['name' => 'eliminar-categorias', 'grupo' => 'Categorias'],
+            ['name' => 'restaurar-categorias', 'grupo' => 'Categorias'],
+            ['name' => 'ver-marcas', 'grupo' => 'Marcas'],
+            ['name' => 'crear-marcas', 'grupo' => 'Marcas'],
+            ['name' => 'editar-marcas', 'grupo' => 'Marcas'],
+            ['name' => 'eliminar-marcas', 'grupo' => 'Marcas'],
+            ['name' => 'restaurar-marcas', 'grupo' => 'Marcas'],
+            ['name' => 'nuevo-traspaso', 'grupo' => 'Inventario'],
+            ['name' => 'listar-traspaso', 'grupo' => 'Inventario'],
+            ['name' => 'eliminar-traspaso', 'grupo' => 'Inventario'],
+            ['name' => 'nuevo-ajuste-inv', 'grupo' => 'Inventario'],
+            ['name' => 'listar-ajuste-inv', 'grupo' => 'Inventario'],
+            ['name' => 'ver-stock', 'grupo' => 'Inventario'],
+            ['name' => 'ver-kardex', 'grupo' => 'Inventario'],
+            ['name' => 'nuevas-ventas', 'grupo' => 'Ventas'],
+            ['name' => 'editar-ventas', 'grupo' => 'Ventas'],
+            ['name' => 'listar-ventas', 'grupo' => 'Ventas'],
+            ['name' => 'cuentas-cobrar', 'grupo' => 'Ventas'],
+            ['name' => 'cambiar-sucursal', 'grupo' => 'Ventas'],
+            ['name' => 'eliminar-ventas', 'grupo' => 'Ventas'],
+            ['name' => 'abonar-ventas', 'grupo' => 'Ventas'],
+            ['name' => 'nueva-cotizacion', 'grupo' => 'Cotizaciones'],
+            ['name' => 'listar-cotizacion', 'grupo' => 'Cotizaciones'],
+            ['name' => 'editar-cotizacion', 'grupo' => 'Cotizaciones'],
+            ['name' => 'eliminar-cotizacion', 'grupo' => 'Cotizaciones'],
+            ['name' => 'convertir-venta', 'grupo' => 'Cotizaciones'],
+            ['name' => 'importar-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'ver-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'crear-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'editar-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'eliminar-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'restaurar-clientes', 'grupo' => 'Clientes'],
+            ['name' => 'ver-trabajadores', 'grupo' => 'Trabajadores'],
+            ['name' => 'crear-trabajadores', 'grupo' => 'Trabajadores'],
+            ['name' => 'editar-trabajadores', 'grupo' => 'Trabajadores'],
+            ['name' => 'eliminar-trabajadores', 'grupo' => 'Trabajadores'],
+            ['name' => 'restaurar-trabajadores', 'grupo' => 'Trabajadores'],
+            ['name' => 'nuevas-compras', 'grupo' => 'Compras'],
+            ['name' => 'editar-compras', 'grupo' => 'Compras'],
+            ['name' => 'listar-compras', 'grupo' => 'Compras'],
+            ['name' => 'cuentas-pagar', 'grupo' => 'Compras'],
+            ['name' => 'abonar-compras', 'grupo' => 'Compras'],
+            ['name' => 'eliminar-compras', 'grupo' => 'Compras'],
+            ['name' => 'ver-proveedores', 'grupo' => 'Proveedores'],
+            ['name' => 'crear-proveedores', 'grupo' => 'Proveedores'],
+            ['name' => 'editar-proveedores', 'grupo' => 'Proveedores'],
+            ['name' => 'eliminar-proveedores', 'grupo' => 'Proveedores'],
+            ['name' => 'restaurar-proveedores', 'grupo' => 'Proveedores'],
+            ['name' => 'ver-ingresos', 'grupo' => 'Ingresos Extras'],
+            ['name' => 'crear-ingresos', 'grupo' => 'Ingresos Extras'],
+            ['name' => 'editar-ingresos', 'grupo' => 'Ingresos Extras'],
+            ['name' => 'eliminar-ingresos', 'grupo' => 'Ingresos Extras'],
+            ['name' => 'ver-egresos', 'grupo' => 'Egresos Extras'],
+            ['name' => 'crear-egresos', 'grupo' => 'Egresos Extras'],
+            ['name' => 'editar-egresos', 'grupo' => 'Egresos Extras'],
+            ['name' => 'eliminar-egresos', 'grupo' => 'Egresos Extras'],
+
+            ['name' => 'nueva-reserva', 'grupo' => 'Reservas'],
+            ['name' => 'listar-reserva', 'grupo' => 'Reservas'],
+            ['name' => 'editar-reserva', 'grupo' => 'Reservas'],
+            ['name' => 'eliminar-reserva', 'grupo' => 'Reservas'],
+
+            ['name' => 'ver-reporteventa', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reporteingreso', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reporteganancias', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reporteestado', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reportecompra', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reportevencimiento', 'grupo' => 'Reportes'],
+            ['name' => 'ver-reportestockmin', 'grupo' => 'Reportes'],
+
+            ['name' => 'ver-reportecomision', 'grupo' => 'Reportes'],
+        ];
+
+        foreach ($permisos as $permiso) {
+            Permission::firstOrCreate(
+                ['name' => $permiso['name'], 'guard_name' => 'web'],
+                ['grupo' => $permiso['grupo']]
+            );
+        }
+    }
+}
