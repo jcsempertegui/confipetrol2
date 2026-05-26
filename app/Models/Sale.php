@@ -19,16 +19,14 @@ class Sale extends Model
         'total',
         'discount',
         'status',
-        'customer_id',
-        'cash_box_id',
+        'worker_id',
         'branch_id',
         'user_id',
-        'table_id',      
         'waiter_id',
         'created_at',
         'updated_at',
     ];
-    
+
     public function user()
     {
         return $this->belongsTo(User::class);
@@ -39,29 +37,24 @@ class Sale extends Model
         return $this->belongsTo(Branche::class);
     }
 
-    public function customer()
+    public function worker()
     {
-        return $this->belongsTo(Customer::class);
+        return $this->belongsTo(Worker::class);
     }
-    
+
     public function saleDetails()
     {
         return $this->hasMany(SaleDetail::class);
     }
-    
+
     public function payments()
     {
         return $this->hasMany(Payment::class, 'transaction_id', 'id');
     }
-    
+
     public function details()
     {
         return $this->hasMany(SaleDetail::class);
-    }
-
-    public function table()
-    {
-        return $this->belongsTo(Table::class);
     }
 
     public function waiter()

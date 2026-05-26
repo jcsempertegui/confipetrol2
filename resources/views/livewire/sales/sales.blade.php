@@ -350,65 +350,50 @@
                 </div>
                 <div class="card-body d-flex flex-column px-3 py-3 flex-grow-1 overflow-hidden">
                         <div class="row g-2">
-                            <div class="col-12 position-relative" x-data="{ openSearch: false, openMenu: false }" @click.outside="openSearch = false; openMenu = false; $wire.clearCustomerSearch()">
+                            <div class="col-12 position-relative" x-data="{ openSearch: false, openMenu: false }" @click.outside="openSearch = false; openMenu = false; $wire.clearWorkerSearch()">
                                 <div class="ct-search-container mb-0">
                                     <div class="ct-search-wrapper">
                                         <input type="text" class="ct-search-input search-input"
-                                            wire:model.live.debounce.300ms="customerSearchTerm"
-                                            @focus="openSearch = true; $wire.set('showCustomerDropdown', true); $el.select()"
-                                            placeholder="Buscar cliente por NIT/CI o Nombre..." autocomplete="off">
+                                            wire:model.live.debounce.300ms="workerSearchTerm"
+                                            @focus="openSearch = true; $wire.set('showWorkerDropdown', true); $el.select()"
+                                            placeholder="Buscar trabajador por documento o nombre..." autocomplete="off">
 
                                         <div class="ct-search-actions">
-                                            @if($customers_id && $customers_id != 1)
-                                                <button class="ct-action-btn ct-clear" type="button" wire:click="setDefaultCustomer" title="Quitar">
+                                            @if($workers_id && $workers_id != 1)
+                                                <button class="ct-action-btn ct-clear" type="button" wire:click="clearWorkerSelection" title="Quitar">
                                                     <i class="bx bx-x"></i>
                                                 </button>
                                                 <div class="ct-divider"></div>
                                             @endif
 
                                             <div class="position-relative">
-                                                <button class="ct-search-icon-btn" type="button"
-                                                    @click.stop="openMenu = !openMenu"
+                                                <a class="ct-search-icon-btn" 
                                                     title="Opciones">
                                                     <i class="bx bx-user-circle"></i>
-                                                </button>
-                                                <ul class="ct-options-menu" :class="{ 'ct-show': openMenu }" @click.outside="openMenu = false">
-                                                    <li>
-                                                        <a href="#" data-bs-toggle="modal" data-bs-target="#customerModal" @click="openMenu = false" wire:click="resetInputCustomer">
-                                                            <i class="bx bx-plus-circle text-danger"></i> Nuevo
-                                                        </a>
-                                                    </li>
-                                                    @if($customers_id && $customers_id != 1)
-                                                    <li>
-                                                        <a href="#" data-bs-toggle="modal" data-bs-target="#customerModal" @click="openMenu = false" wire:click="editCustomer({{ $customers_id }})">
-                                                            <i class="bx bx-edit text-primary"></i> Editar
-                                                        </a>
-                                                    </li>
-                                                    @endif
-                                                </ul>
+                                                </a>
+                                                
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                @if($showCustomerDropdown && count($customerResults) > 0)
-                                    <ul class="ct-customer-dropdown" x-show="openSearch">
-                                        @foreach($customerResults as $result)
+                               @if($showWorkerDropdown && count($workerResults) > 0)
+                                <ul class="ct-customer-dropdown" x-show="openSearch">
+                                    @foreach($workerResults as $result)
                                             <li class="ct-list-item"
-                                                wire:click="selectCustomer({{ $result->id }})"
+                                                wire:click="selectWorker({{ $result->id }})"
                                                 @click="openSearch = false">
                                                 <div>
-                                                    <span class="ct-item-name">{{ $result->name }}</span>
+                                                    <span class="ct-item-name">{{ $result->name }} {{ $result->last_name }}</span>
                                                     <span class="ct-item-doc">Doc: {{ $result->document }}</span>
                                                 </div>
-                                                <i class="bx bx-check text-success {{ $customers_id == $result->id ? '' : 'd-none' }}"></i>
+                                                <i class="bx bx-check text-success {{ $workers_id == $result->id ? '' : 'd-none' }}"></i>
                                             </li>
                                         @endforeach
                                     </ul>
-                                @elseif($showCustomerDropdown && strlen($customerSearchTerm) >= 1)
+                                @elseif($showWorkerDropdown && strlen($workerSearchTerm) >= 1)
                                     <ul class="ct-customer-dropdown" x-show="openSearch">
                                         <li class="ct-list-item-empty"
-                                            wire:click="setDefaultCustomer()"
                                             @click="openSearch = false">
                                             No se encontraron resultados
                                         </li>
@@ -416,51 +401,7 @@
                                 @endif
                             </div>
 
-                            @if($loyalty_program == 1 && $customers_id && $customers_id != 1 && !empty($loyalty_summary))
-                            <div class="col-12 mt-2">
-                                <div class="loyalty-section">
-                                    <div class="loyalty-grid {{ count($loyalty_summary) > 1 ? 'multi' : '' }}">
-                                        @foreach($loyalty_summary as $key => $loyalty)
-                                            @php $hasFree = $loyalty['free_available'] > 0; @endphp
-                                            <div class="loyalty-glass {{ $hasFree ? 'has-free' : '' }}" wire:key="loyalty-{{ $key }}">
-                                                <div class="loy-icon">
-                                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
-                                                        <path d="M20 12v9H4v-9" stroke="{{ $hasFree ? '#16a34a' : '#dc2626' }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                                        <path d="M22 7H2v5h20V7z" stroke="{{ $hasFree ? '#16a34a' : '#dc2626' }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                                        <path d="M12 22V7M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7zM12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z" stroke="{{ $hasFree ? '#16a34a' : '#dc2626' }}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" />
-                                                    </svg>
-                                                </div>
-                                                <div class="loy-body">
-                                                    <div class="loy-row1">
-                                                        <span class="loy-name">{{ $loyalty['name'] }}</span>
-                                                        @if($hasFree)
-                                                            <span class="loy-pill free">¡{{ $loyalty['free_available'] }} GRATIS!</span>
-                                                        @else
-                                                            <span class="loy-pill normal">{{ $loyalty['req_qty'] + 1 }}to GRATIS</span>
-                                                        @endif
-                                                    </div>
-                                                    <div class="loy-stars">
-                                                        @for($i = 1; $i <= $loyalty['req_qty']; $i++)
-                                                            <svg class="loy-star {{ $i <= $loyalty['progress'] ? 'on' : 'off' }}" viewBox="0 0 24 24">
-                                                                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                                                            </svg>
-                                                        @endfor
-                                                    </div>
-                                                    <p class="loy-meta">
-                                                        Acum: <b>{{ $loyalty['past_qty'] }}</b> ·
-                                                        @if($hasFree)
-                                                            <b>¡Premio listo!</b>
-                                                        @else
-                                                            Faltan <b>{{ $loyalty['req_qty'] - $loyalty['progress'] }}</b> para regalo
-                                                        @endif
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            </div>
-                            @endif
+                           
 
                             <div class="col-lg-12 col-sm-6 mb-2 mt-2">
                                 <label class="form-label mb-1" style="font-size: 0.85rem;">Fecha de Venta</label>
@@ -540,65 +481,7 @@
             </div>
         </div>
 
-        @include('livewire.sales.form')
         @include('livewire.common.payment_modal')
-
-
-        <div wire:ignore.self class="modal fade" id="lotModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-dialog-centered">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bx bx-list-check"></i> Seleccionar Lote Principal</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body p-0" style="max-height: 350px; overflow-y: auto;">
-                        @if($activeLotCartKey && isset($cart[$activeLotCartKey]))
-                            <div class="list-group list-group-flush">
-                                @foreach($cart[$activeLotCartKey]['available_lots'] as $al)
-                                    @php
-                                        $isPrimary = isset($cart[$activeLotCartKey]['lot_info']['lot_id']) && $cart[$activeLotCartKey]['lot_info']['lot_id'] == $al['id'];
-                                        
-                                        $isAllocated = false;
-                                        $allocatedQty = 0;
-                                        if(isset($cart[$activeLotCartKey]['allocated_lots'])) {
-                                            foreach($cart[$activeLotCartKey]['allocated_lots'] as $alloc) {
-                                                if($alloc['id'] == $al['id']) {
-                                                    $isAllocated = true;
-                                                    $allocatedQty = $alloc['quantity'];
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        
-                                        $modalLotStock = \App\Models\Lot::where('id', $al['id'])->value('quantity') ?? 0;
-                                    @endphp
-                                    <button type="button" class="lot-modal-item {{ $isAllocated ? 'lot-modal-item-active' : '' }}" wire:click="setPrimaryLot('{{ $activeLotCartKey }}', {{ $al['id'] }})" wire:key="lot-modal-{{ $al['id'] }}">
-                                        <div class="lot-modal-item-info">
-                                            <div class="lot-modal-item-number">
-                                                <i class="bx bx-package me-1"></i>{{ $al['lot_number'] }}
-                                                @if($isPrimary)
-                                                    <span class="badge bg-danger ms-1" style="font-size: 0.65rem;">Prioridad</span>
-                                                @endif
-                                                @if($isAllocated)
-                                                    <span class="badge bg-success ms-1" style="font-size: 0.65rem;">Usando: {{ $allocatedQty }}</span>
-                                                @endif
-                                            </div>
-                                            <div class="lot-modal-item-meta">
-                                                <span><i class="bx bx-calendar me-1"></i>Vence: {{ $al['expiration_date'] ? \Carbon\Carbon::parse($al['expiration_date'])->format('d/m/Y') : 'N/A' }}</span>
-                                                <span class="lot-modal-stock-badge"><i class="bx bx-layer me-1"></i>Stock: {{ $modalLotStock }}</span>
-                                            </div>
-                                        </div>
-                                        @if($isAllocated)
-                                            <i class="bx bx-check-circle lot-modal-check text-success"></i>
-                                        @endif
-                                    </button>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-        </div>
 
         <div wire:ignore.self class="modal fade" id="skuModal" tabindex="-1" aria-labelledby="skuModal" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
             <div class="modal-dialog modal-dialog-centered modal-lg" role="document">
@@ -620,37 +503,7 @@
                             </div>
                         </div>
 
-                        @if (count($listSkus) > 0)
-                            <div class="recipe-section">
-                                <h6 class="recipe-section-title">
-                                    <i class="bx bx-list-ul me-2"></i>Selecciona una Talla y Color
-                                </h6>
-                                @error('selectedSku')
-                                    <span class="text-danger d-block mb-2">{{ $message }}</span>
-                                @enderror
-                                <div class="row row-cols-2 row-cols-md-3 g-3">
-                                    @foreach ($listSkus as $sku)
-                                        <div class="col" wire:key="sku-item-{{ $sku->id }}">
-                                            <div class="recipe-variant-card {{ $selectedSku == $sku->id ? 'recipe-variant-selected' : '' }}"
-                                                wire:click="$set('selectedSku', {{ $sku->id }})">
-                                                <div class="recipe-variant-radio">
-                                                    <input class="form-check-input" type="radio" value="{{ $sku->id }}" wire:model="selectedSku">
-                                                </div>
-                                                <div class="recipe-variant-content">
-                                                    <h6 class="recipe-variant-name">
-                                                        {{ $sku->size ? $sku->size->name : '' }}
-                                                        {{ $sku->color ? ' - ' . $sku->color->name : '' }}
-                                                    </h6>
-                                                    <p class="recipe-variant-price" style="font-size: 0.85rem; color: #6c757d;">
-                                                        Bs. {{ number_format($sku->price ?? $selectedProduct->inventories->sale_price ?? 0, 2) }} | Stock: {{ $sku->stock }}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                </div>
-                            </div>
-                        @endif
+                       
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -682,40 +535,7 @@
                             </div>
                         </div>
 
-                        @if (count($listProductUnits) > 0)
-                            <div class="table-responsive">
-                                @error('selectedProductUnit')
-                                    <span class="text-danger d-block mb-2">{{ $message }}</span>
-                                @enderror
-                                <table class="table align-middle table-striped table-hover nowrap" style="width: 100%;">
-                                    <thead>
-                                        <tr>
-                                            <th></th>
-                                            <th>UNIDAD DE MEDIDA</th>
-                                            <th>FACTOR</th>
-                                            <th class="text-center">CANT. DISP.</th>
-                                            <th>P.U</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @foreach ($listProductUnits as $pu)
-                                            <tr wire:click="$set('selectedProductUnit', {{ $pu['id'] }})"
-                                                style="cursor: pointer;"
-                                                class="{{ $selectedProductUnit == $pu['id'] ? 'table-active' : '' }}"
-                                                wire:key="pu-item-{{ $pu['id'] }}">
-                                                <td>
-                                                    <input class="form-check-input" type="radio" value="{{ $pu['id'] }}" wire:model="selectedProductUnit">
-                                                </td>
-                                                <td>{{ mb_strtoupper($pu['name']) }}</td>
-                                                <td>{{ $pu['factor'] ?? '1' }}</td>
-                                                <td class="text-center">{{ $pu['stock'] ?? 0 }}</td>
-                                                <td>{{ number_format($pu['price'], 2) }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        @endif
+                        
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -774,41 +594,6 @@
                                 </table>
                             </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div wire:ignore.self class="modal fade" id="theModal" tabindex="-1" aria-labelledby="theModalLabel" aria-hidden="true">
-            <div class="modal-dialog" role="document">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="theModalLabel">
-                            <i class="bx bx-receipt"></i>
-                            REGISTRAR CAJA
-                        </h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="row mb-2 p-2">
-                            <div class="col-lg-12 col-sm-6 mb-2">
-                                <label>Monto Inicial</label>
-                                <div class="position-relative input-icon">
-                                    <input type="text" class="form-control text-end" wire:model="initial_amount" placeholder="0.00" inputmode="decimal" oninput="this.value = this.value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1'); let parts = this.value.split('.'); if(parts[0] && parts[0].length > 8) { parts[0] = parts[0].substring(0, 8); } if(parts[1] && parts[1].length > 2) { parts[1] = parts[1].substring(0, 2); } this.value = parts.join('.');">
-                                    <span class="position-absolute top-50 translate-middle-y">Bs</span>
-                                </div>
-                                @error('initial_amount')
-                                    <span class="text-danger er">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cerrar</button>
-                        <button type="button" wire:click.prevent="openCashBox()" class="btn btn-danger" wire:loading.attr="disabled" wire:target="openCashBox">
-                            <span wire:loading.remove wire:target="openCashBox">Guardar</span>
-                            <span wire:loading wire:target="openCashBox"><i class="bx bx-spin bx-loader"></i> Procesando...</span>
-                        </button>
                     </div>
                 </div>
             </div>

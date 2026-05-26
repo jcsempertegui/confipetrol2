@@ -110,7 +110,7 @@
                             <th>SUBTOTAL</th>
                             <th>DESCUENTO</th>
                             <th>TOTAL</th>
-                            <th>CLIENTE</th>
+                            <th>TRABAJADOR</th>
                             <th>SUCURSAL</th>
                             <th>USUARIO</th>
                             <th>FECHA</th>
@@ -138,7 +138,7 @@
                                     <td>{{ number_format($sale->total + $sale->discount, 2) }}</td>
                                     <td>{{ number_format($sale->discount, 2) }}</td>
                                     <td>{{ number_format($sale->total, 2) }}</td>
-                                    <td>{{ $sale->customer->name ?? 'N/A' }}</td>
+                                    <td>{{ $sale->worker ? $sale->worker->name . ' ' . $sale->worker->last_name : 'N/A' }}</td>
                                     <td>{{ $sale->branch->name ?? 'N/A' }}</td>
                                     <td>{{ $sale->user->login ?? $sale->user->name ?? 'N/A' }}</td>
                                     <td>{{ $sale->created_at ?: 'S/N' }}</td>
@@ -159,14 +159,14 @@
                                                 data-bs-toggle="modal" data-bs-target="#theModal" class="btn-action-primary"><i
                                                     class="bx bx-list-ul"></i></a>
 
-                                            @if($sale->status != 0 && (!isset($sale->cash_box_is_open) || $sale->cash_box_is_open == 1))
+                                            @if($sale->status != 0)
                                                 @can('eliminar-ventas')
                                                     <a href="javascript:;" onclick="confirmDelete({{ $sale->id }}, 'delete')"
                                                         class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
                                                 @endcan
                                             @endif
 
-                                            @if($sale->status != 0 && (!isset($sale->cash_box_is_open) || $sale->cash_box_is_open == 1))
+                                            @if($sale->status != 0)
                                                 @can('editar-ventas')
                                                     @if(isset($sale->branch) && $sale->branch->pos_type == 2)
                                                         <a href="{{ route('sales_interface.edit', ['sale_id' => $sale->id]) }}"
@@ -182,8 +182,7 @@
                                                 @endcan
                                             @endif
 
-                                            <a href="{{ route('printSalePdf', ['id' => Crypt::encrypt($sale->id), 'branch_id' => $branch_id]) }}?type={{ $defaultPrinterType }}"
-                                                target="_blank" class="btn-action-secondary ms-1"><i
+                                            <a href="javascript:;" class="btn-action-secondary ms-1" title="Imprimir no disponible"><i
                                                     class="bx bxs-file"></i></a>
                                         </div>
                                     </td>
@@ -232,10 +231,10 @@
                                 <div class="row mb-2 p-1">
 
                                     <div class="col-md-6 col-sm-6 mb-2">
-                                        <label>Cliente</label>
+                                        <label>Trabajador</label>
                                         <div class="input-group">
-                                            <input type="text" class="form-control" placeholder="Cliente"
-                                                value="{{ $customer }}" readonly>
+                                            <input type="text" class="form-control" placeholder="Trabajador"
+                                                value="{{ $worker }}" readonly>
                                         </div>
                                     </div>
 
@@ -312,7 +311,6 @@
                                             <tr>
                                                 <th>PRODUCTO</th>
                                                 <th>CANTIDAD</th>
-                                                <th style="min-width: 150px;">LOTE / VENCIMIENTO</th>
                                                 <th>PRECIO VENTA</th>
                                                 <th>SUBTOTAL</th>
                                             </tr>
@@ -323,40 +321,10 @@
                                                     <td>
                                                         {{ $detail->product->name ?? 'Producto Eliminado' }}
                                                         @if($detail->unit)
-                                                            <br><small
-                                                                class="text-muted fw-bold">{{ $detail->unit->name }}</small>
-                                                        @endif
-                                                        @if($detail->detailSkus && $detail->detailSkus->count() > 0)
-                                                            @foreach($detail->detailSkus as $ds)
-                                                                @if($ds->productSku)
-                                                                    <small
-                                                                        class="text-muted fw-bold">{{ $ds->productSku->color->name ?? 'S/C' }}
-                                                                        - {{ $ds->productSku->size->name ?? 'S/T' }}</small>
-                                                                @endif
-                                                            @endforeach
+                                                            <br><small class="text-muted fw-bold">{{ $detail->unit->name }}</small>
                                                         @endif
                                                     </td>
                                                     <td>{{ $detail->quantity }}</td>
-                                                    <td>
-                                                        @if($detail->detailLots->count() > 0)
-                                                            @foreach($detail->detailLots as $dl)
-                                                                <div style="font-size: 11px;">
-                                                                    <span
-                                                                        class="text-primary fw-bold">{{ $dl->lot->lot_number ?? 'N/A' }}</span>
-                                                                    <span class="text-muted mx-1">|</span>
-                                                                    <span class="text-danger" style="font-size: 10px;">
-                                                                        {{ optional($dl->lot)->expiration_date ? \Carbon\Carbon::parse($dl->lot->expiration_date)->format('d/m/Y') : 'S/F' }}
-                                                                    </span>
-                                                                    <span class="badge bg-secondary ms-1">{{ $dl->quantity }}
-                                                                        un.</span>
-                                                                </div>
-                                                                @if(!$loop->last)
-                                                                <hr class="m-0 p-0 my-1 dashed"> @endif
-                                                            @endforeach
-                                                        @else
-                                                            <span class="text-muted small">Sin Lote</span>
-                                                        @endif
-                                                    </td>
                                                     <td>
                                                         <div>
                                                             @if ($detail->price_type == 'wholesale')
@@ -411,15 +379,15 @@
                                         </tbody>
                                         <tfoot>
                                             <tr>
-                                                <td colspan="4" class="text-end">SUBTOTAL:</td>
+                                                <td colspan="3" class="text-end">SUBTOTAL:</td>
                                                 <td>Bs. {{ number_format($total + $discount, 2) }}</td>
                                             </tr>
                                             <tr>
-                                                <td colspan="4" class="text-end">DESCUENTO:</td>
+                                                <td colspan="3" class="text-end">DESCUENTO:</td>
                                                 <td>Bs. {{ number_format($discount, 2) }}</td>
                                             </tr>
                                             <tr>
-                                                <td colspan="4" class="text-end">TOTAL A PAGAR:</td>
+                                                <td colspan="3" class="text-end">TOTAL A PAGAR:</td>
                                                 <td>Bs. {{ number_format($total, 2) }}</td>
                                             </tr>
                                         </tfoot>
