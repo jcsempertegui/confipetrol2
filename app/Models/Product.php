@@ -23,7 +23,6 @@ class Product extends Model
         'categorie_id',
         'brand_id',
         'unit_id',
-        'production_area_id',
     ];
 
     public function categories()
@@ -41,27 +40,9 @@ class Product extends Model
         return $this->belongsTo(Unit::class, 'unit_id');
     }
 
-    public function productionArea()
-    {
-        return $this->belongsTo(ProductionArea::class, 'production_area_id');
-    }
-
     public function inventories()
     {
-        return $this->hasOne(Inventorie::class);
+        return $this->hasMany(Inventorie::class);
     }
 
-    public function images()
-    {
-        return $this->hasMany(ProductImage::class);
-    }
-
-    public function skus()
-    {
-        return $this->hasMany(ProductSku::class);
-    }
-    public function prices()
-    {
-        return $this->hasMany(ProductPrice::class);
-    }
 }

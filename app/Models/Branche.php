@@ -36,7 +36,10 @@ class Branche extends Model
         'default_currency',
         'email_notifications',
         'sms_notifications',
-        'low_stock_alerts'
+        'low_stock_alerts',
+        'ambiente',
+        'codigo_sistema',
+        'token',
     ];
 
     public function inventories()
