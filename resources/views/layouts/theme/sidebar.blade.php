@@ -122,15 +122,6 @@
                 </a>
             </li>
         @endcan
-        @can('ver-proveedores')
-            <li>
-                <a href="{{ url('suppliers') }}">
-                    <div class="parent-icon"><i class='bx bx-user'></i></div>
-                    <div class="menu-title">Proveedores</div>
-                </a>
-            </li>
-        @endcan
-
         @canany(['nuevas-ventas', 'listar-ventas', 'cuentas-cobrar'])
             <li>
                 <a href="javascript:;" class="has-arrow">
@@ -186,35 +177,9 @@
                     <div class="menu-title">Reportes</div>
                 </a>
                 <ul>
-                    @can('ver-reporteventa')
-                        <li><a href="{{ url('sale_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Ventas</a></li>
-                    @endcan
-                    <li><a href="{{ url('reservation_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                            Reservas</a></li>
-                    @can('ver-reporteingreso')
-                        <li><a href="{{ url('cash_transaction_reports') }}"><i class="bx bx-radio-circle"></i> Rep. de
-                                Ingreso/Egreso</a></li>
-                    @endcan
-                    @can('ver-reporteganancias')
-                        <li><a href="{{ url('global_earnings_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Ganancias
-                                Global</a></li>
-                    @endcan
-                    @can('ver-reporteestado')
-                        <li><a href="{{ url('income_statement_reports') }}"><i class="bx bx-radio-circle"></i> Rep. Estado de
-                                Resultados</a></li>
-                    @endcan
-                    @can('ver-reportevencimiento')
-                        <li><a href="{{ url('expiration_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                                Vencimiento</a></li>
-                    @endcan
-                    @can('ver-reportecompra')
-                        <li><a href="{{ url('purchase_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Compras</a>
-                        </li>
-                    @endcan
-                    @can('ver-reportecomision')
-                        <li><a href="{{ url('commission_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de
-                                Comisiones</a></li>
-                    @endcan
+                    <li><a href="{{ url('delivery_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Entregas</a>
+                    </li>
+
                 </ul>
             </li>
         @endcanany

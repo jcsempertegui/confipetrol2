@@ -52,19 +52,6 @@ class DatabaseSeeder extends Seeder
             ]
         ]);
 
-        DB::table('suppliers')->insert([
-            [
-                'name' => 'PROVEEDOR GENERAL',
-                'contact_person' => 'SIN CONTACTO',
-                'document' => '000',
-                'phone' => null,
-                'address' => 'SIN DIRECCIÓN',
-                'status' => 1,
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]
-        ]);
-
         DB::table('colors')->insert([
             ['name' => 'SIN COLOR', 'status' => 1],
             ['name' => 'NEGRO',     'status' => 1],

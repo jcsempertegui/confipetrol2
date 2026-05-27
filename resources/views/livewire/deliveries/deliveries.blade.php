@@ -1,4 +1,4 @@
-@push('title', 'Entregas EPP')
+@push('title', 'Entregas')
 
 <div class="page-content d-flex flex-column" style="height: calc(100vh - 90px);">
 

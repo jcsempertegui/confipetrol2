@@ -19,7 +19,6 @@ use App\Livewire\BrandsController;
 use App\Livewire\CategoriesController;
 use App\Livewire\UnitsController;
 use App\Livewire\ProductsController;
-use App\Livewire\SuppliersController;
 use App\Livewire\CustomersController;
 use App\Livewire\WorkersController;
 use App\Livewire\SalesController;
@@ -29,6 +28,7 @@ use App\Livewire\DeliveryListsController;
 use App\Livewire\InventoriesController;
 use App\Livewire\Reports\ExpirationReportsController;
 use App\Livewire\Reports\SaleReportsController;
+use App\Livewire\Reports\DeliveryReportsController;
 use App\Livewire\Reports\GlobalEarningReportsController;
 use App\Livewire\Reports\OrderReportsController;
 use Illuminate\Support\Facades\Route;
@@ -54,7 +54,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('brands', BrandsController::class)->middleware('permission:ver-marcas')->name('brands');
     Route::get('products', ProductsController::class)->middleware('permission:ver-productos')->name('products');
     Route::get('inventoryPdf/{branch_id}', [ProductsController::class, 'inventoryPdf'])->name('inventoryPdf');
-    Route::get('suppliers', SuppliersController::class)->middleware('permission:ver-proveedores')->name('suppliers');
     Route::get('customers', CustomersController::class)->middleware('permission:ver-clientes')->name('customers');
     Route::get('workers', WorkersController::class)->middleware('permission:ver-trabajadores')->name('workers');
     Route::get('sales/edit/{sale_id}', SalesController::class)->name('sales.edit');
@@ -63,6 +62,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('deliveries', DeliveriesController::class)->name('deliveries');
     Route::get('delivery_lists', DeliveryListsController::class)->name('delivery_lists');
+    Route::get('delivery_reports', DeliveryReportsController::class)->name('delivery_reports');
+    Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->name('delivery_reports.deliveryReportPdf');
 
 
     Route::get('inventories', InventoriesController::class)->middleware('permission:ver-stock')->name('inventories');

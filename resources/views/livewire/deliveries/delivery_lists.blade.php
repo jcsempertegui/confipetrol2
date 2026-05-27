@@ -1,10 +1,10 @@
-@push('title', 'Listar Entregas EPP')
+@push('title', 'Listar Entregas')
 
 <div class="page-content template-page-wrapper">
     <div class="row align-items-center mb-2 px-2 template-shrink-none">
         <div class="col-12 d-flex justify-content-between align-items-center">
             <ol class="breadcrumb mb-0 d-flex align-items-center">
-                <li class="breadcrumb-item text-danger">Entregas EPP</li>
+                <li class="breadcrumb-item text-primary">Entregas</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Listar Entregas</li>
             </ol>
         </div>
