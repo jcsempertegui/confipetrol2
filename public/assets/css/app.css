@@ -154,16 +154,17 @@ a {
 
 .logo-text {
     font-size: 22px;
+    font-weight: 600;
     margin-left: 8px;
     margin-bottom: 0;
-    color: white;
+    color: #ff6f00;
 }
 
 .toggle-icon {
     margin-left: 20px;
     font-size: 22px;
     cursor: pointer;
-    color: white;
+    color: #ff6f00;
 }
 
 .topbar {
@@ -2263,14 +2264,14 @@ form select.error:focus {
 }
 
 .btn-action-primary {
-    color: #0d6efd;
-    border: 1px solid #0d6efd;
+    color: #0057a7;
+    border: 1px solid #0057a7;
     box-shadow: 0 5px 10px rgba(13, 110, 253, 0.25) !important;
 }
 
 .btn-action-primary:hover {
     color: white;
-    background-color: #0d6efd;
+    background-color: #0057a7;
 }
 
 .btn-action-secondary {
@@ -3743,7 +3744,7 @@ input[type="radio"]:checked ~ .payment-method .imgName .name {
 /* MARCA - Azul Elegante */
 .tag-brand {
     background: rgba(13, 110, 253, 0.12);
-    color: #0d6efd;
+    color: #0057a7;
     border: 1px solid rgba(13, 110, 253, 0.2);
 }
 
@@ -4455,7 +4456,7 @@ input[type="radio"]:checked ~ .payment-method .imgName .name {
 }
 
 .table-type-option:hover {
-    border-color: #0d6efd;
+    border-color: #0057a7;
     background-color: #f8f9fa;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -7561,7 +7562,7 @@ body.dark-mode .ct-options-menu li a:hover {
     background: rgba(25, 135, 84, 0.1);
 }
 .pos-context-item.edit-action {
-    color: #0d6efd;
+    color: #0057a7;
 }
 .pos-context-item.edit-action:hover {
     background: rgba(13, 110, 253, 0.1);

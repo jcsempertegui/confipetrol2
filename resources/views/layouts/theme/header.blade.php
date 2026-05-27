@@ -10,14 +10,7 @@
 
             <div class="top-menu ms-auto">
                 <ul class="navbar-nav align-items-center gap-0">
-                    
-                    <li class="nav-item dark-mode">
-                        <a class="nav-link dark-mode-icon" href="javascript:;" id="darkModeBtn" onclick="toggleDarkMode()">
-                            <i class='bx bx-moon'></i>
-                        </a>
-                    </li>
-
-                    <livewire:header-notifications />
+                
                 </ul>
             </div>
 

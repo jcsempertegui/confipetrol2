@@ -106,14 +106,6 @@
             </li>
         @endcanany
 
-        @can('ver-clientes')
-            <li>
-                <a href="{{ url('customers') }}">
-                    <div class="parent-icon"><i class="bx bx-group"></i></div>
-                    <div class="menu-title">Clientes</div>
-                </a>
-            </li>
-        @endcan
         @can('ver-trabajadores')
             <li>
                 <a href="{{ url('workers') }}">
@@ -122,25 +114,7 @@
                 </a>
             </li>
         @endcan
-        @canany(['nuevas-ventas', 'listar-ventas', 'cuentas-cobrar'])
-            <li>
-                <a href="javascript:;" class="has-arrow">
-                    <div class="parent-icon"><i class="bx bx-cart"></i></div>
-                    <div class="menu-title">Ventas</div>
-                </a>
-                <ul>
-                    @can('nuevas-ventas')
-                        <li><a href="{{ url('sales') }}"><i class="bx bx-radio-circle"></i> Nueva Venta</a></li>
-                    @endcan
-                    @can('listar-ventas')
-                        <li><a href="{{ url('sales_lists') }}"><i class="bx bx-radio-circle"></i> Listar Venta</a></li>
-                    @endcan
-                    @can('cuentas-cobrar')
-                        <li><a href="{{ url('receivables') }}"><i class="bx bx-radio-circle"></i> Cuentas por Cobrar</a></li>
-                    @endcan
-                </ul>
-            </li>
-        @endcanany
+       
 
         <li>
             <a href="javascript:;" class="has-arrow">

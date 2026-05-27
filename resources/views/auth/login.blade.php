@@ -530,7 +530,7 @@
         <div class="login-card">
             <div class="logo-container">
                 <img src="assets/images/login.png" class="logo" width="60" alt="" />
-                <h1 class="brand-name">Mastec POS</h1>
+                <h1 class="brand-name">CONFIPETROL</h1>
                 <p class="brand-subtitle">Inicia sesión en tu cuenta</p>
             </div>
 
@@ -574,14 +574,7 @@
                     @enderror
                 </div>
 
-                <div class="forgot-password">
-                    @if (Route::has('password.request'))
-                    <a href="{{ route('password.request') }}">
-                        ¿Has olvidado tu contraseña?
-                    </a>
-                    @endif
-                </div>
-
+    
                 <button type="submit" class="login-button" id="loginBtn">
                     <span>Iniciar sesión</span>
                     <div class="loading" id="loading"></div>

@@ -42,16 +42,6 @@ class DatabaseSeeder extends Seeder
             ]
         ]);
 
-        DB::table('customers')->insert([
-            [
-                'name' => 'PUBLICO GENERAL',
-                'document_type' => 'CI',
-                'document' => '000',
-                'created_at' => Carbon::now(),
-                'updated_at' => Carbon::now(),
-            ]
-        ]);
-
         DB::table('colors')->insert([
             ['name' => 'SIN COLOR', 'status' => 1],
             ['name' => 'NEGRO',     'status' => 1],
