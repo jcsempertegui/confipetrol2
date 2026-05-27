@@ -164,7 +164,8 @@
                 <ul>
                     <li><a href="{{ url('delivery_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Entregas</a>
                     </li>
-
+                    <li><a href="{{ url('remito_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Remitos</a>
+                    </li>
                 </ul>
             </li>
         @endcanany
