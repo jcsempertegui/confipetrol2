@@ -127,6 +127,17 @@
             </ul>
         </li>
 
+        <li>
+            <a href="javascript:;" class="has-arrow">
+                <div class="parent-icon"><i class="bx bx-receipt"></i></div>
+                <div class="menu-title">Remitos</div>
+            </a>
+            <ul>
+                <li><a href="{{ url('remitos') }}"><i class="bx bx-radio-circle"></i> Nuevo Remito</a></li>
+                <li><a href="{{ url('remito_lists') }}"><i class="bx bx-radio-circle"></i> Listar Remitos</a></li>
+            </ul>
+        </li>
+
         @canany(['ver-stock', 'ver-kardex'])
             <li>
                 <a href="javascript:;" class="has-arrow">

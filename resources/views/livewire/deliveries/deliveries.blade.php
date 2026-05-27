@@ -7,7 +7,7 @@
         <div class="col-12 col-lg-8 d-flex flex-column h-100">
             <div class="card mb-0 w-100 flex-grow-1 d-flex flex-column overflow-hidden template-flex-card">
                 <div class="card-header px-3 py-2 flex-shrink-0">
-                    <i class="bx bx-hard-hat me-2"></i>
+                    <i class="bx bx-shopping-bag me-2"></i>
                     BUSCAR PRODUCTOS
                 </div>
                 <div class="card-body d-flex flex-column px-2 py-2 flex-grow-1 overflow-hidden template-flex-body">
@@ -71,7 +71,7 @@
                                                                     </span>
                                                                 @endif
                                                                 <span class="tag tag-brand" style="background:#fde68a; color:#92400e;">
-                                                                    <i class='bx bx-hard-hat'></i> EPP
+                                                                    <i class='bx bx-hard-hat'></i> Producto
                                                                 </span>
                                                             </div>
                                                         </div>
@@ -86,7 +86,7 @@
                                             @empty
                                                 <li class="listsearch-empty">
                                                     <i class='bx bx-search-alt'></i>
-                                                    No hay EPPs disponibles
+                                                    No hay productos disponibles
                                                 </li>
                                             @endforelse
                                         </ul>
@@ -117,7 +117,7 @@
                                         <td>
                                             <div class="fw-semibold">{{ $item['name'] }}</div>
                                             @if(!empty($item['sku_name']))
-                                                <small class="text-primary fw-bold d-block">
+                                                <small class="text-primary  d-block">
                                                     <i class="bx bx-customize me-1"></i>{{ $item['sku_name'] }}
                                                 </small>
                                             @endif
@@ -131,7 +131,7 @@
                                                     wire:loading.attr="disabled"
                                                     wire:target="updateQty('{{ $cartKey }}', {{ $item['quantity'] - 1 }})"
                                                     @if($item['quantity'] <= 1) disabled @endif>
-                                                    <i class="bx bx-minus fw-bold"></i>
+                                                    <i class="bx bx-minus "></i>
                                                 </button>
 
                                                 <input type="text" class="form-control text-center"
@@ -146,7 +146,7 @@
                                                     wire:click.prevent="updateQty('{{ $cartKey }}', {{ $item['quantity'] + 1 }})"
                                                     wire:loading.attr="disabled"
                                                     wire:target="updateQty('{{ $cartKey }}', {{ $item['quantity'] + 1 }})">
-                                                    <i class="bx bx-plus fw-bold"></i>
+                                                    <i class="bx bx-plus "></i>
                                                 </button>
                                             </div>
                                         </td>
@@ -163,7 +163,7 @@
                                     </tr>
                                 @empty
                                     <tr class="text-center">
-                                        <td colspan="4" class="text-muted py-4">Busca un EPP arriba para agregarlo a la entrega</td>
+                                        <td colspan="4" class="text-muted py-4">Busca un producto arriba para agregarlo a la entrega</td>
                                     </tr>
                                 @endforelse
                                 <tr class="template-tr-spacer">
@@ -172,8 +172,8 @@
                             </tbody>
                             <tfoot class="template-sticky-tfoot">
                                 <tr>
-                                    <td colspan="2" class="text-start fw-bold">ARTÍCULOS: {{ $total_items }} (ítems)</td>
-                                    <td colspan="2" class="fw-bold text-end">TOTAL UNIDADES: {{ collect($cart)->sum('quantity') }}</td>
+                                    <td colspan="2" class="text-start ">ARTÍCULOS: {{ $total_items }} (ítems)</td>
+                                    <td colspan="2" class=" text-end">TOTAL CANTIDAD: {{ collect($cart)->sum('quantity') }}</td>
                                 </tr>
                             </tfoot>
                         </table>
@@ -187,7 +187,7 @@
             <div class="card mb-0 w-100 flex-grow-1 d-flex flex-column overflow-hidden">
                 <div class="card-header px-3 py-2 flex-shrink-0">
                     <i class="bx bx-receipt me-2"></i>
-                    RESUMEN DE ENTREGA EPP
+                    RESUMEN DE ENTREGA 
                 </div>
                 <div class="card-body d-flex flex-column px-3 py-3 flex-grow-1 overflow-hidden">
 
@@ -274,12 +274,12 @@
                                 <div class="card-body p-2">
                                     <div class="row text-center align-items-center g-1">
                                         <div class="col-6">
-                                            <small class="text-muted fw-bold d-block" style="font-size: 0.70rem;">ÍTEMS</small>
-                                            <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ $total_items }}</span>
+                                            <small class="text-muted  d-block" style="font-size: 0.70rem;">ÍTEMS</small>
+                                            <span class=" text-dark" style="font-size: 0.95rem;">{{ $total_items }}</span>
                                         </div>
                                         <div class="col-6">
-                                            <small class="text-muted fw-bold d-block" style="font-size: 0.70rem;">UNIDADES TOTALES</small>
-                                            <span class="fw-bold text-dark" style="font-size: 0.95rem;">{{ collect($cart)->sum('quantity') }}</span>
+                                            <small class="text-muted  d-block" style="font-size: 0.70rem;">UNIDADES TOTALES</small>
+                                            <span class=" text-dark" style="font-size: 0.95rem;">{{ collect($cart)->sum('quantity') }}</span>
                                         </div>
                                     </div>
                                 </div>
@@ -289,7 +289,7 @@
 
                     <div class="mt-auto pt-3 flex-shrink-0 border-top">
                         <div class="d-flex justify-content-between flex-wrap gap-2">
-                            <button class="btn btn-success btnIcon flex-grow-1 py-2 fw-bold"
+                            <button class="btn btn-success btnIcon flex-grow-1 py-2 "
                                 wire:loading.attr="disabled"
                                 wire:click="confirmDelivery"
                                 wire:target="confirmDelivery">
@@ -300,7 +300,7 @@
                                     <i class="bx bx-spin bx-loader align-middle me-1"></i> PROCESANDO...
                                 </span>
                             </button>
-                            <button class="btn btn-danger btnIcon flex-grow-1 py-2 fw-bold"
+                            <button class="btn btn-danger btnIcon flex-grow-1 py-2 "
                                 wire:click.prevent="clearDeliveries"
                                 wire:loading.attr="disabled"
                                 wire:target="clearDeliveries"
@@ -376,9 +376,9 @@
                                             <p class="recipe-variant-price">
                                                 Stock:
                                                 @if(($sku['stock'] ?? 0) > 0)
-                                                    <span class="text-success fw-bold">{{ $sku['stock'] }}</span>
+                                                    <span class="text-success ">{{ $sku['stock'] }}</span>
                                                 @else
-                                                    <span class="text-danger fw-bold">Sin stock</span>
+                                                    <span class="text-danger ">Sin stock</span>
                                                 @endif
                                             </p>
                                         </div>

@@ -19,6 +19,8 @@ use App\Livewire\ProductsController;
 use App\Livewire\WorkersController;
 use App\Livewire\DeliveriesController;
 use App\Livewire\DeliveryListsController;
+use App\Livewire\RemitosController;
+use App\Livewire\RemitoListsController;
 use App\Livewire\InventoriesController;
 use App\Livewire\Reports\DeliveryReportsController;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +52,9 @@ Route::middleware(['auth'])->group(function () {
     Route::get('delivery_lists', DeliveryListsController::class)->name('delivery_lists');
     Route::get('delivery_reports', DeliveryReportsController::class)->name('delivery_reports');
     Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->name('delivery_reports.deliveryReportPdf');
+
+    Route::get('remitos', RemitosController::class)->name('remitos');
+    Route::get('remito_lists', RemitoListsController::class)->name('remito_lists');
 
 
     Route::get('inventories', InventoriesController::class)->middleware('permission:ver-stock')->name('inventories');
