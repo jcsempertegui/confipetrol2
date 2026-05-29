@@ -18,7 +18,6 @@ class Kardex extends Model
         'price',
         'total',
         'product_id',
-        'lot_id',
         'user_id',
         'warehouse_id',
         'transaction_id',

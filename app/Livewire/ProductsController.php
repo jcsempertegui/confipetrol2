@@ -348,16 +348,14 @@ class ProductsController extends Component
                 if ($totalInitialStock > 0) {
                     $invToUpdate = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
                     if ($invToUpdate) {
-                        $lot_id = null;
                         if ($this->lote && $this->type == 0) {
                             $invToUpdate->stock_lot += $totalInitialStock;
-                            $lot = Lot::create([
+                            Lot::create([
                                 'lot_number' => 'INIT-' . ($product->code ?? time()),
                                 'quantity' => $totalInitialStock,
                                 'product_id' => $product->id,
                                 'branch_id' => $this->branch_id,
                             ]);
-                            $lot_id = $lot->id;
                         } else {
                             $invToUpdate->stock_nolot += $totalInitialStock;
                         }
@@ -371,7 +369,6 @@ class ProductsController extends Component
                             'price' => $this->purchase_price ?: 0,
                             'total' => $totalInitialStock * ($this->purchase_price ?: 0),
                             'product_id' => $product->id,
-                            'lot_id' => $lot_id,
                             'user_id' => auth()->id(),
                             'warehouse_id' => $warehouseId,
                             'transaction_type' => 'initial_stock',
