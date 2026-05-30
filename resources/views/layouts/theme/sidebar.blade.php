@@ -73,6 +73,9 @@
                     @can('ver-log')
                         <li><a href="{{ url('logs') }}"><i class="bx bx-radio-circle"></i> Log de Acceso</a></li>
                     @endcan
+                    @can('ver-ajustes')
+                        <li><a href="{{ url('backups') }}"><i class="bx bx-radio-circle"></i> Backups BD</a></li>
+                    @endcan
                 </ul>
             </li>
         @endcanany

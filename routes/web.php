@@ -22,6 +22,7 @@ use App\Livewire\DeliveryListsController;
 use App\Livewire\RemitosController;
 use App\Livewire\RemitoListsController;
 use App\Livewire\InventoriesController;
+use App\Livewire\BackupsController;
 use App\Livewire\Reports\DeliveryReportsController;
 use App\Livewire\Reports\RemitoReportsController;
 use Illuminate\Support\Facades\Route;
@@ -66,6 +67,10 @@ Route::middleware(['auth'])->group(function () {
     /////////////TALLAS Y COLORES
     Route::get('sizes', SizesController::class)->middleware('permission:ver-tallas')->name('sizes');
     Route::get('colors', ColorsController::class)->middleware('permission:ver-colores')->name('colors');
+
+    /////////////BACKUPS
+    Route::get('backups', BackupsController::class)->middleware('permission:ver-ajustes')->name('backups');
+    Route::get('backup/download/{filename}', [BackupsController::class, 'download'])->middleware('permission:ver-ajustes')->name('backup.download');
 });
 
 Route::get('/401', function () {
