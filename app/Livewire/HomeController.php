@@ -1,31 +1,26 @@
 <?php
 namespace App\Livewire;
 
-use App\Models\Lot;
-use App\Models\Movement;
+use App\Models\Remito;
+use App\Models\Delivery;
+use App\Models\Product;
+use App\Models\Worker;
+use App\Models\Warehouse;
 use Livewire\Component;
 use Carbon\Carbon;
-use App\Models\Sale;
-use App\Models\Product;
-use App\Models\Purchase;
-use App\Models\Customer;
-use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
 class HomeController extends Component
 {
-    public $totalSales, $totalPurchase, $totalPurchaseCredit, $totalSalesCredit, $totalProduct, $totalCustomers, $totalOrders;
-    public $mountSales, $mountPurchase, $mountOrders;
+    public $totalRemitos, $totalDeliveries, $totalProducts, $totalWorkers;
+    public $totalRemitoItems, $totalDeliveryItems, $totalWarehouses, $totalLowStock;
     public $fromDate, $branch_id;
-    public $sales_purchases = [];
-    public $topProducts = [];
-    public $lowProducts = [];
-    public $topSellers = [];
-    public $topCustomers = [];
-    public $totalIncomes, $totalExpenses, $totalExpiredLots;
-    public $dailySalesData = [];
-    public $categorySalesData = [];
-    public $incomeExpenseData = [];
+    public $remitos_deliveries = [];
+    public $topProductsRemito = [];
+    public $topProductsDelivery = [];
+    public $topWorkers = [];
+    public $dailyRemitosData = [];
+    public $remitosByType = [];
 
     public function mount()
     {
@@ -44,131 +39,60 @@ class HomeController extends Component
         $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
     }
 
-    public function getTopProducts()
+    public function totalesByDate()
     {
         $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
         $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
 
-        $topProducts = DB::table('sale_details')
-            ->join('sales', 'sale_details.sale_id', '=', 'sales.id')
-            ->join('products', 'sale_details.product_id', '=', 'products.id')
-            ->select(
-                'products.name',
-                'products.code',
-                DB::raw('SUM(sale_details.quantity) as total_vendido'),
-                DB::raw('SUM(sale_details.subtotal) as total_ingresos')
-            )
-            ->where('sales.branch_id', $this->branch_id)
-            ->where('sales.status', 1)
-            ->whereBetween('sales.created_at', [$startOfMonth, $endOfMonth])
-            ->groupBy('sale_details.product_id', 'products.name', 'products.code')
-            ->orderBy('total_vendido', 'DESC')
-            ->limit(5)
-            ->get();
+        $this->totalRemitos = Remito::where('branch_id', $this->branch_id)
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->count();
 
-        $this->topProducts = $topProducts->toArray();
-        $this->dispatch('topProductsUpdated', $this->topProducts);
+        $this->totalDeliveries = Delivery::where('branch_id', $this->branch_id)
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->count();
+
+        $this->totalRemitoItems = DB::table('remito_details')
+            ->join('remitos', 'remito_details.remito_id', '=', 'remitos.id')
+            ->where('remitos.branch_id', $this->branch_id)
+            ->whereBetween('remitos.created_at', [$startOfMonth, $endOfMonth])
+            ->sum('remito_details.quantity');
+
+        $this->totalDeliveryItems = DB::table('delivery_details')
+            ->join('deliveries', 'delivery_details.delivery_id', '=', 'deliveries.id')
+            ->where('deliveries.branch_id', $this->branch_id)
+            ->whereBetween('deliveries.created_at', [$startOfMonth, $endOfMonth])
+            ->sum('delivery_details.quantity');
+
+        $this->totalProducts = Product::where('status', 1)->count();
+        $this->totalWorkers = Worker::where('status', 1)->count();
+        $this->totalWarehouses = Warehouse::where('branch_id', $this->branch_id)->where('status', 1)->count();
+
+        $this->totalLowStock = DB::table('inventories')
+            ->join('products', 'products.id', '=', 'inventories.product_id')
+            ->whereRaw('(inventories.stock_lot + inventories.stock_nolot) <= products.minimum_stock')
+            ->where('products.status', 1)
+            ->count();
+
+        $this->getRemitosAndDeliveriesByMonth();
+        $this->getDailyRemitos();
+        $this->getRemitosByType();
+        $this->getTopProductsRemito();
+        $this->getTopProductsDelivery();
+        $this->getTopWorkers();
     }
 
-    public function getLowProducts()
+    public function getRemitosAndDeliveriesByMonth()
     {
-        $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
-        $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
-
-        $lowProducts = DB::table('sale_details')
-            ->join('sales', 'sale_details.sale_id', '=', 'sales.id')
-            ->join('products', 'sale_details.product_id', '=', 'products.id')
-            ->select(
-                'products.name',
-                'products.code',
-                DB::raw('SUM(sale_details.quantity) as total_vendido'),
-                DB::raw('SUM(sale_details.subtotal) as total_ingresos')
-            )
-            ->where('sales.branch_id', $this->branch_id)
-            ->where('sales.status', 1)
-            ->whereBetween('sales.created_at', [$startOfMonth, $endOfMonth])
-            ->groupBy('sale_details.product_id', 'products.name', 'products.code')
-            ->orderBy('total_vendido', 'ASC')
-            ->limit(5)
-            ->get();
-
-        $this->lowProducts = $lowProducts->toArray();
-        $this->dispatch('lowProductsUpdated', $this->lowProducts);
-    }
-
-    public function getTopSellers()
-    {
-        $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
-        $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
-
-        $topSellers = DB::table('sales')
-            ->join('users', 'sales.user_id', '=', 'users.id')
-            ->select(
-                'users.name',
-                'users.email',
-                DB::raw('COUNT(sales.id) as total_ventas_count'),
-                DB::raw('SUM(sales.total) as total_ventas'),
-                DB::raw('AVG(sales.total) as promedio_venta')
-            )
-            ->where('sales.branch_id', $this->branch_id)
-            ->where('sales.status', 1)
-            ->whereBetween('sales.created_at', [$startOfMonth, $endOfMonth])
-            ->groupBy('sales.user_id', 'users.name', 'users.email')
-            ->orderBy('total_ventas', 'DESC')
-            ->limit(5)
-            ->get();
-
-        $this->topSellers = $topSellers->toArray();
-        $this->dispatch('topSellersUpdated', $this->topSellers);
-    }
-
-    public function getTopCustomers()
-    {
-        $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
-        $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
-
-        $topCustomers = DB::table('sales')
-            ->join('customers', 'sales.customer_id', '=', 'customers.id')
-            ->select(
-                'customers.name',
-                'customers.email',
-                'customers.phone',
-                DB::raw('COUNT(sales.id) as total_compras_count'),
-                DB::raw('SUM(sales.total) as total'),
-                DB::raw('AVG(sales.total) as promedio_compra')
-            )
-            ->where('sales.branch_id', $this->branch_id)
-            ->where('sales.status', 1)
-            ->whereBetween('sales.created_at', [$startOfMonth, $endOfMonth])
-            ->groupBy('sales.customer_id', 'customers.name', 'customers.email', 'customers.phone')
-            ->orderBy('total', 'DESC')
-            ->limit(5)
-            ->get();
-
-        $this->topCustomers = $topCustomers->toArray();
-        $this->dispatch('topCustomersUpdated', $this->topCustomers);
-    }
-
-    public function getSalesAndPurchasesByMonth()
-    {
-        $sales = DB::table('sales')
-            ->select(DB::raw('MONTH(created_at) as month'), DB::raw('SUM(total) as total'))
+        $remitos = DB::table('remitos')
+            ->select(DB::raw('MONTH(created_at) as month'), DB::raw('COUNT(*) as total'))
             ->where('branch_id', $this->branch_id)
-            ->where('status', 1)
             ->groupBy('month')
             ->orderBy('month')
             ->pluck('total', 'month');
 
-        $purchases = DB::table('purchases')
-            ->select(DB::raw('MONTH(created_at) as month'), DB::raw('SUM(total) as total'))
-            ->where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->groupBy('month')
-            ->orderBy('month')
-            ->pluck('total', 'month');
-
-        $orders = DB::table('sales')
-            ->select(DB::raw('MONTH(created_at) as month'), DB::raw('SUM(total) as total'))
+        $deliveries = DB::table('deliveries')
+            ->select(DB::raw('MONTH(created_at) as month'), DB::raw('COUNT(*) as total'))
             ->where('branch_id', $this->branch_id)
             ->groupBy('month')
             ->orderBy('month')
@@ -180,39 +104,34 @@ class HomeController extends Component
             9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dic'
         ];
 
-        $months = range(1, 12);
-        $salesTotal = [];
-        $purchasesTotals = [];
-        $ordersTotals = [];
+        $remitosTotals = [];
+        $deliveriesTotals = [];
         $labels = [];
 
-        foreach ($months as $month) {
-            $salesTotal[] = $sales->get($month, 0);
-            $purchasesTotals[] = $purchases->get($month, 0);
-            $ordersTotals[] = $orders->get($month, 0);
+        foreach (range(1, 12) as $month) {
+            $remitosTotals[] = $remitos->get($month, 0);
+            $deliveriesTotals[] = $deliveries->get($month, 0);
             $labels[] = $monthNames[$month];
         }
 
-        $this->sales_purchases = [
-            'salesTotal' => $salesTotal,
-            'purchasesTotals' => $purchasesTotals,
-            'ordersTotals' => $ordersTotals,
-            'months' => $labels
+        $this->remitos_deliveries = [
+            'remitosTotals' => $remitosTotals,
+            'deliveriesTotals' => $deliveriesTotals,
+            'months' => $labels,
         ];
 
-        $this->dispatch('dataUpdated', $this->sales_purchases);
+        $this->dispatch('dataUpdated', $this->remitos_deliveries);
     }
 
-    public function getDailySales()
+    public function getDailyRemitos()
     {
         $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
         $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
 
-        $sales = DB::table('sales')
+        $remitos = DB::table('remitos')
             ->where('branch_id', $this->branch_id)
-            ->where('status', 1)
             ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->select(DB::raw('DAY(created_at) as day'), DB::raw('SUM(total) as total'))
+            ->select(DB::raw('DAY(created_at) as day'), DB::raw('COUNT(*) as total'))
             ->groupBy('day')
             ->pluck('total', 'day');
 
@@ -222,128 +141,88 @@ class HomeController extends Component
 
         for ($i = 1; $i <= $daysInMonth; $i++) {
             $labels[] = $i;
-            $data[] = $sales->get($i, 0);
+            $data[] = $remitos->get($i, 0);
         }
 
-        $this->dailySalesData = [
-            'labels' => $labels,
-            'data' => $data
-        ];
-
-        $this->dispatch('dailySalesUpdated', $this->dailySalesData);
+        $this->dailyRemitosData = ['labels' => $labels, 'data' => $data];
+        $this->dispatch('dailyRemitosUpdated', $this->dailyRemitosData);
     }
 
-    public function getSalesByCategory()
+    public function getRemitosByType()
     {
         $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
         $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
 
-        $categories = DB::table('sale_details')
-            ->join('sales', 'sale_details.sale_id', '=', 'sales.id')
-            ->join('products', 'sale_details.product_id', '=', 'products.id')
-            ->join('categories', 'products.categorie_id', '=', 'categories.id')
-            ->where('sales.branch_id', $this->branch_id)
-            ->where('sales.status', 1)
-            ->whereBetween('sales.created_at', [$startOfMonth, $endOfMonth])
-            ->select('categories.name', DB::raw('SUM(sale_details.subtotal) as total'))
-            ->groupBy('categories.id', 'categories.name')
-            ->orderBy('total', 'DESC')
+        $tipos = DB::table('remitos')
+            ->where('branch_id', $this->branch_id)
+            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
+            ->select('tipo', DB::raw('COUNT(*) as total'))
+            ->groupBy('tipo')
+            ->get();
+
+        $this->remitosByType = $tipos->toArray();
+        $this->dispatch('remitosByTypeUpdated', $this->remitosByType);
+    }
+
+    public function getTopProductsRemito()
+    {
+        $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
+        $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
+
+        $top = DB::table('remito_details')
+            ->join('remitos', 'remito_details.remito_id', '=', 'remitos.id')
+            ->join('products', 'remito_details.product_id', '=', 'products.id')
+            ->select('products.name', 'products.code', DB::raw('SUM(remito_details.quantity) as total_despachado'))
+            ->where('remitos.branch_id', $this->branch_id)
+            ->whereBetween('remitos.created_at', [$startOfMonth, $endOfMonth])
+            ->groupBy('remito_details.product_id', 'products.name', 'products.code')
+            ->orderBy('total_despachado', 'DESC')
             ->limit(5)
             ->get();
 
-        $this->categorySalesData = $categories->toArray();
-        $this->dispatch('categorySalesUpdated', $this->categorySalesData);
+        $this->topProductsRemito = $top->toArray();
+        $this->dispatch('topProductsRemitoUpdated', $this->topProductsRemito);
     }
 
-    public function getIncomeVsExpense()
+    public function getTopProductsDelivery()
     {
         $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
         $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
 
-        $ingresos = DB::table('cash_transactions')
-            ->where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->where('type', 'INGRESO')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
+        $top = DB::table('delivery_details')
+            ->join('deliveries', 'delivery_details.delivery_id', '=', 'deliveries.id')
+            ->join('products', 'delivery_details.product_id', '=', 'products.id')
+            ->select('products.name', 'products.code', DB::raw('SUM(delivery_details.quantity) as total_entregado'))
+            ->where('deliveries.branch_id', $this->branch_id)
+            ->whereBetween('deliveries.created_at', [$startOfMonth, $endOfMonth])
+            ->groupBy('delivery_details.product_id', 'products.name', 'products.code')
+            ->orderBy('total_entregado', 'DESC')
+            ->limit(5)
+            ->get();
 
-        $egresos = DB::table('cash_transactions')
-            ->where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->where('type', 'EGRESO')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('amount');
-
-        $this->incomeExpenseData = [
-            'ingresos' => $ingresos,
-            'egresos' => $egresos
-        ];
-
-        $this->dispatch('incomeExpenseUpdated', $this->incomeExpenseData);
+        $this->topProductsDelivery = $top->toArray();
+        $this->dispatch('topProductsDeliveryUpdated', $this->topProductsDelivery);
     }
 
-    public function totalesByDate()
+    public function getTopWorkers()
     {
         $startOfMonth = Carbon::parse($this->fromDate)->startOfMonth();
         $endOfMonth = Carbon::parse($this->fromDate)->endOfMonth();
 
-        $this->totalOrders = Sale::where('branch_id', $this->branch_id)
-            ->where('status', 0)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->count();
+        $top = DB::table('deliveries')
+            ->join('workers', 'deliveries.worker_id', '=', 'workers.id')
+            ->select(
+                DB::raw("CONCAT(workers.name, ' ', workers.last_name) as name"),
+                DB::raw('COUNT(deliveries.id) as total_entregas')
+            )
+            ->where('deliveries.branch_id', $this->branch_id)
+            ->whereBetween('deliveries.created_at', [$startOfMonth, $endOfMonth])
+            ->groupBy('deliveries.worker_id', 'workers.name', 'workers.last_name')
+            ->orderBy('total_entregas', 'DESC')
+            ->limit(5)
+            ->get();
 
-        $this->totalSales = Sale::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->count();
-
-        $this->totalPurchase = Purchase::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->count();
-
-        $this->totalIncomes = Movement::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->where('transaction_type', 'income')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->count();
-
-        $this->totalExpenses = Movement::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->where('transaction_type', 'expense')
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->count();
-
-        $this->totalProduct = Product::where('status', 1)->count();
-        $this->totalCustomers = Customer::where('status', 1)->count();
-
-        $this->mountSales = Sale::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('total');
-
-        $this->mountPurchase = Purchase::where('branch_id', $this->branch_id)
-            ->where('status', 1)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('total');
-
-        $this->mountOrders = Sale::where('branch_id', $this->branch_id)
-            ->where('status', 0)
-            ->whereBetween('created_at', [$startOfMonth, $endOfMonth])
-            ->sum('total');
-
-        $this->totalExpiredLots = Lot::where('branch_id', $this->branch_id)
-            ->whereDate('expiration_date', '<=', Carbon::today())
-            ->count();
-
-        $this->getSalesAndPurchasesByMonth();
-        $this->getDailySales();
-        $this->getSalesByCategory();
-        $this->getTopProducts();
-        $this->getLowProducts();
-        $this->getTopSellers();
-        $this->getTopCustomers();
-        $this->getIncomeVsExpense();
+        $this->topWorkers = $top->toArray();
+        $this->dispatch('topWorkersUpdated', $this->topWorkers);
     }
 }
-?>
