@@ -6,6 +6,7 @@ use App\Models\Warehouse;
 use App\Models\Branche;
 use App\Models\Product;
 use App\Models\Inventorie;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
@@ -13,7 +14,7 @@ use Illuminate\Support\Facades\Log;
 
 class WarehousesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
 
     protected $paginationTheme = 'bootstrap';
 
@@ -164,7 +165,16 @@ class WarehousesController extends Component
 
             DB::commit();
 
-            $message = $this->isEditMode ? 'ALMACÉN ACTUALIZADO EXITOSAMENTE.' : 'ALMACÉN CREADO CON ÉXITO.';
+            $isEdit = $this->isEditMode;
+            $this->logActivity(
+                'ALMACENES', $isEdit ? 'EDITAR' : 'CREAR',
+                ($isEdit ? 'Editó' : 'Creó') . " almacén: {$warehouse->name}",
+                $warehouse->id,
+                null,
+                ['name' => $warehouse->name, 'branch_id' => $warehouse->branch_id, 'is_default' => $warehouse->is_default]
+            );
+
+            $message = $isEdit ? 'ALMACÉN ACTUALIZADO EXITOSAMENTE.' : 'ALMACÉN CREADO CON ÉXITO.';
             $this->resetInputFields();
             $this->dispatch('warehouseStoreOrUpdate', $message);
 
@@ -228,6 +238,11 @@ class WarehousesController extends Component
         if ($warehouse) {
             $newStatus = $warehouse->status == 1 ? 0 : 1;
             $warehouse->update(['status' => $newStatus]);
+            $this->logActivity(
+                'ALMACENES', $newStatus == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                ($newStatus == 1 ? 'Restauró' : 'Eliminó') . " almacén: {$warehouse->name}",
+                $warehouse->id
+            );
             $message = $newStatus == 1 ? 'ALMACÉN RESTAURADO EXITOSAMENTE.' : 'ALMACÉN ELIMINADO EXITOSAMENTE.';
             $this->dispatch('warehouseDeleted', $message);
         } else {

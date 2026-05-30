@@ -12,6 +12,7 @@ use App\Models\Inventorie;
 use App\Models\Kardex;
 use App\Models\Branche;
 use App\Models\Warehouse;
+use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
 use Exception;
@@ -20,7 +21,7 @@ include_once(base_path('public/assets/plugins/literal.php'));
 
 class RemitosController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
 
     public $search = '';
     public $products = [];
@@ -30,12 +31,10 @@ class RemitosController extends Component
 
     public $branch_id;
 
-    // SKU modal state
     public $selectedProductData = null;
     public $productSkus = [];
     public $selectedSkuId = null;
 
-    // Campos del Remito
     public $tipo = 'EGRESO';
     public $contrato = '';
     public $senores = '';
@@ -89,8 +88,6 @@ class RemitosController extends Component
         ])->extends('layouts.theme.app');
     }
 
-    // ── Cambio de tipo: limpiar carrito ───────────────────────────────────────
-
     public function updatedTipo()
     {
         $cartSessionKey = 'remitos_cart_' . $this->branch_id;
@@ -99,8 +96,6 @@ class RemitosController extends Component
             $this->dispatch('alert', 'TIPO CAMBIADO — CARRITO LIMPIADO', 'info');
         }
     }
-
-    // ── Búsqueda de productos (todos los tipos) ───────────────────────────────
 
     public function updatedSearch()
     {
@@ -139,8 +134,6 @@ class RemitosController extends Component
             ->limit(7)
             ->get();
     }
-
-    // ── Operaciones del carrito ───────────────────────────────────────────────
 
     public function AddOrUpdate($product_id)
     {
@@ -218,7 +211,6 @@ class RemitosController extends Component
             return;
         }
 
-        // Solo validar stock en EGRESO
         if ($this->tipo === 'EGRESO' && $sku->stock <= 0) {
             $this->dispatch('alert', 'SIN STOCK PARA ESTA VARIANTE', 'error');
             return;
@@ -269,7 +261,6 @@ class RemitosController extends Component
         $warehouseId = $defaultWarehouse ? $defaultWarehouse->id : 1;
         $inventory = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
 
-        // Solo validar stock en EGRESO
         if ($this->tipo === 'EGRESO') {
             $availableStock = 0;
             if ($inventory) {
@@ -332,7 +323,6 @@ class RemitosController extends Component
         $item = $cart[$cartKey];
         $previousQty = $item['quantity'];
 
-        // Solo validar stock en EGRESO
         if ($this->tipo === 'EGRESO') {
             if ($item['sku_id']) {
                 $sku = ProductSku::find($item['sku_id']);
@@ -372,8 +362,6 @@ class RemitosController extends Component
         $this->dispatch('alert', 'PRODUCTO ELIMINADO DEL CARRITO', 'success');
         $this->dispatch('focusRemitoSearchInput');
     }
-
-    // ── Guardar Remito ────────────────────────────────────────────────────────
 
     public function confirmRemito()
     {
@@ -508,7 +496,6 @@ class RemitosController extends Component
                     }
                 }
 
-                // Kardex
                 $lastKardex = Kardex::where('product_id', $item['id'])
                     ->where('warehouse_id', $warehouseId)
                     ->orderBy('created_at', 'desc')
@@ -535,6 +522,15 @@ class RemitosController extends Component
             }
 
             DB::commit();
+
+            $totalItems = collect($this->cart)->sum('quantity');
+            $this->logActivity(
+                'REMITOS', 'CREAR',
+                "Registró remito {$this->tipo}: {$remitoNumber} ({$totalItems} ítems)",
+                $remito->id,
+                null,
+                ['remito_number' => $remitoNumber, 'tipo' => $this->tipo, 'branch_id' => $this->branch_id, 'items' => $totalItems]
+            );
 
             $this->clearRemito();
             $this->remito_date = now()->format('Y-m-d');

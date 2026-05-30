@@ -15,46 +15,87 @@ class LogsController extends Component
     public $searchTerm;
     public $fromDate;
     public $toDate;
+    public $filter_modulo = '';
+    public $filter_accion = '';
 
     public $perPage = 20;
     public $perPageOptions = [20, 50, 100];
 
+    public $moduloOptions = [
+        '' => 'TODOS LOS MÓDULOS',
+        'ACCESO' => 'ACCESO',
+        'USUARIOS' => 'USUARIOS',
+        'ROLES' => 'ROLES',
+        'TRABAJADORES' => 'TRABAJADORES',
+        'PRODUCTOS' => 'PRODUCTOS',
+        'CATEGORIAS' => 'CATEGORÍAS',
+        'MARCAS' => 'MARCAS',
+        'UNIDADES' => 'UNIDADES',
+        'TALLAS' => 'TALLAS',
+        'COLORES' => 'COLORES',
+        'REMITOS' => 'REMITOS',
+        'ALMACENES' => 'ALMACENES',
+        'SUCURSALES' => 'SUCURSALES',
+        'CONFIGURACION' => 'CONFIGURACIÓN',
+    ];
+
+    public $accionOptions = [
+        '' => 'TODAS LAS ACCIONES',
+        'INICIO_SESION' => 'INICIO SESIÓN',
+        'CIERRE_SESION' => 'CIERRE SESIÓN',
+        'CREAR' => 'CREAR',
+        'EDITAR' => 'EDITAR',
+        'ELIMINAR' => 'ELIMINAR',
+        'RESTAURAR' => 'RESTAURAR',
+        'ANULAR' => 'ANULAR',
+        'CAMBIO_CONTRASENA' => 'CAMBIO CONTRASEÑA',
+    ];
+
     public function mount()
     {
         $this->fromDate = now()->format('Y-m-d');
-        $this->toDate = now()->format('Y-m-d');
+        $this->toDate   = now()->format('Y-m-d');
     }
 
-    public function updatedPerPage()
-    {
-        $this->resetPage();
-    }
+    public function updatedPerPage() { $this->resetPage(); }
+    public function updatedFilterModulo() { $this->resetPage(); }
+    public function updatedFilterAccion() { $this->resetPage(); }
 
     public function render()
     {
         $query = Log::with('user');
 
         if (!empty($this->searchTerm)) {
-            $query->where(function ($subQuery) {
-                $subQuery->where('evento', 'like', '%' . $this->searchTerm . '%')
+            $query->where(function ($sub) {
+                $sub->where('descripcion', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('modulo', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('accion', 'like', '%' . $this->searchTerm . '%')
                     ->orWhereHas('user', function ($q) {
-                        $q->where('login', 'like', '%' . $this->searchTerm . '%');
+                        $q->where('login', 'like', '%' . $this->searchTerm . '%')
+                          ->orWhere('name', 'like', '%' . $this->searchTerm . '%');
                     });
             });
         }
 
+        if (!empty($this->filter_modulo)) {
+            $query->where('modulo', $this->filter_modulo);
+        }
+
+        if (!empty($this->filter_accion)) {
+            $query->where('accion', $this->filter_accion);
+        }
+
         if (!empty($this->fromDate) && !empty($this->toDate)) {
             $fromDate = Carbon::parse($this->fromDate)->startOfDay();
-            $toDate = Carbon::parse($this->toDate)->endOfDay();
+            $toDate   = Carbon::parse($this->toDate)->endOfDay();
             $query->whereBetween('created_at', [$fromDate, $toDate]);
         }
 
         $logs = $query->orderBy('id', 'desc')->paginate($this->perPage);
 
         return view('livewire.logs.logs', [
-            'logs' => $logs,
-            'startCount' => $logs->total() - ($logs->currentPage() - 1) * $logs->perPage()
-
+            'logs'       => $logs,
+            'startCount' => $logs->total() - ($logs->currentPage() - 1) * $logs->perPage(),
         ])->extends('layouts.theme.app');
     }
 

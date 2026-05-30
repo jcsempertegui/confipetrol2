@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Models\Branche;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
@@ -11,7 +12,7 @@ use Illuminate\Support\Facades\Hash;
 
 class UsersController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $login, $name, $lastname, $document, $email, $phone, $role, $status, $user_id, $branch_id;
@@ -184,16 +185,36 @@ class UsersController extends Component
             // $userData['max_sessions'] = $branchConfig->max_sessions ?? 1; 
         }
 
+        $isEdit = $this->isEditMode;
+        $oldUser = $isEdit ? User::find($this->user_id) : null;
+
         $user = User::updateOrCreate(
             ['id' => $this->user_id],
             $userData
         );
         $user->syncRoles([$this->role]);
 
-        $message = $this->isEditMode ? 'USUARIO ACTUALIZADO EXITOSAMENTE.' : 'USUARIO CREADO CON ÉXITO.';
+        if ($isEdit) {
+            $this->logActivity(
+                'USUARIOS', 'EDITAR',
+                "Editó usuario: {$user->login} ({$user->name} {$user->lastname})",
+                $user->id,
+                $oldUser ? ['login' => $oldUser->login, 'name' => $oldUser->name, 'email' => $oldUser->email, 'branch_id' => $oldUser->branch_id] : null,
+                ['login' => $user->login, 'name' => $user->name, 'email' => $user->email, 'branch_id' => $user->branch_id]
+            );
+        } else {
+            $this->logActivity(
+                'USUARIOS', 'CREAR',
+                "Creó usuario: {$user->login} ({$user->name} {$user->lastname})",
+                $user->id,
+                null,
+                ['login' => $user->login, 'name' => $user->name, 'email' => $user->email, 'branch_id' => $user->branch_id]
+            );
+        }
+
+        $message = $isEdit ? 'USUARIO ACTUALIZADO EXITOSAMENTE.' : 'USUARIO CREADO CON ÉXITO.';
 
         $this->resetInputFields();
-        // Pasamos el tipo 'success' explícitamente
         $this->dispatch('userStoreOrUpdate', $message, 'success');
     }
 
@@ -221,6 +242,12 @@ class UsersController extends Component
         $user->update([
             'password' => Hash::make($this->new_password)
         ]);
+
+        $this->logActivity(
+            'USUARIOS', 'CAMBIO_CONTRASENA',
+            "Cambió contraseña del usuario: {$user->login} ({$user->name} {$user->lastname})",
+            $user->id
+        );
 
         $this->resetPasswordFields();
         $this->dispatch('passwordChanged', 'CONTRASEÑA ACTUALIZADA EXITOSAMENTE.', 'success');
@@ -282,10 +309,19 @@ class UsersController extends Component
 
         if ($user) {
             $newEstado = $user->status == 1 ? 0 : 1;
-            $user->update([
-                'status' => $newEstado
-            ]);
+            $user->update(['status' => $newEstado]);
+
+            $accion = $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR';
             $message = $newEstado == 1 ? 'USUARIO RESTAURADO EXITOSAMENTE.' : 'USUARIO ELIMINADO EXITOSAMENTE.';
+
+            $this->logActivity(
+                'USUARIOS', $accion,
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " usuario: {$user->login} ({$user->name} {$user->lastname})",
+                $user->id,
+                ['status' => $newEstado == 1 ? 0 : 1],
+                ['status' => $newEstado]
+            );
+
             $this->dispatch('userDeleted', $message, 'success');
         } else {
             session()->flash('message', 'USUARIO NO ENCONTRADO.');

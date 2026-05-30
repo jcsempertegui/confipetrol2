@@ -68,6 +68,14 @@
                                                             <span class="listsearch-code">{{ $item->code }}</span>
                                                             <span class="listsearch-name">{{ Str::limit($item->name, 45) }}</span>
                                                             <div class="listsearch-tags">
+                                                                @php
+                                                                    $typeLabels = [0 => 'Producto', 1 => 'Activo', 2 => 'Consumible', 3 => 'EPPS'];
+                                                                    $typeClasses = [0 => 'tag-type-producto', 1 => 'tag-type-activo', 2 => 'tag-type-consumible', 3 => 'tag-type-epps'];
+                                                                @endphp
+                                                                <span class="tag {{ $typeClasses[$item->type] ?? 'tag-brand' }}">
+                                                                    <i class='bx bx-cube'></i>
+                                                                    {{ $typeLabels[$item->type] ?? 'Otro' }}
+                                                                </span>
                                                                 @if ($item->brands)
                                                                     <span class="tag tag-brand">
                                                                         <i class='bx bxs-purchase-tag'></i>
@@ -204,7 +212,7 @@
 
                         {{-- Tipo de Remito --}}
                         <div class="col-12 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem; font-weight: 600;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-transfer me-1"></i>Tipo de Remito
                             </label>
                             <select class="form-select 
@@ -218,20 +226,20 @@
 
                         {{-- Fecha --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-calendar me-1"></i>Fecha
                             </label>
                             <input type="date" class="form-control"
                                 wire:model.lazy="remito_date"
                                 max="{{ date('Y-m-d') }}">
                             @error('remito_date')
-                                <span class="text-danger" style="font-size:0.78rem;">{{ $message }}</span>
+                                <span class="text-danger">{{ $message }}</span>
                             @enderror
                         </div>
 
                         {{-- N° Orden --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-hash me-1"></i>N° Orden
                             </label>
                             <input type="text" class="form-control"
@@ -242,7 +250,7 @@
 
                         {{-- Contrato --}}
                         <div class="col-12 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-file me-1"></i>Contrato
                             </label>
                             <input type="text" class="form-control"
@@ -253,7 +261,7 @@
 
                         {{-- Señores --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-buildings me-1"></i>Señores
                             </label>
                             <input type="text" class="form-control"
@@ -264,7 +272,7 @@
 
                         {{-- Atención --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-user-pin me-1"></i>Atención
                             </label>
                             <input type="text" class="form-control"
@@ -275,7 +283,7 @@
 
                         {{-- Campo --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-map-pin me-1"></i>Campo
                             </label>
                             <input type="text" class="form-control"
@@ -286,19 +294,19 @@
 
                         {{-- Placa --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-car me-1"></i>Placa
                             </label>
                             <input type="text" class="form-control"
                                 wire:model.defer="placa"
                                 placeholder="Placa del vehículo..."
                                 maxlength="30" autocomplete="off"
-                                style="text-transform: uppercase;">
+                                >
                         </div>
 
                         {{-- Despachado por --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-send me-1"></i>Despachado por
                             </label>
                             <input type="text" class="form-control"
@@ -309,7 +317,7 @@
 
                         {{-- Transportado por --}}
                         <div class="col-6 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-truck me-1"></i>Transportado por
                             </label>
                             <input type="text" class="form-control"
@@ -320,14 +328,14 @@
 
                         {{-- Observaciones --}}
                         <div class="col-12 mb-1">
-                            <label class="form-label mb-1" style="font-size: 0.82rem;">
+                            <label class="form-label mb-1">
                                 <i class="bx bx-comment-detail me-1"></i>Observaciones
                             </label>
                             <textarea class="form-control"
                                 wire:model.defer="observations"
                                 placeholder="Observación / Comentario..."
                                 rows="2" maxlength="255"
-                                style="resize: none; font-size: 0.85rem;"></textarea>
+                                ></textarea>
                         </div>
 
                         {{-- Resumen --}}
@@ -336,12 +344,12 @@
                                 <div class="card-body p-2">
                                     <div class="row text-center align-items-center g-1">
                                         <div class="col-6">
-                                            <small class="text-muted d-block" style="font-size: 0.70rem;">ÍTEMS</small>
-                                            <span class="text-dark" style="font-size: 0.95rem;">{{ $total_items }}</span>
+                                            <small class="text-muted d-block" >ÍTEMS</small>
+                                            <span class="text-dark">{{ $total_items }}</span>
                                         </div>
                                         <div class="col-6">
-                                            <small class="text-muted d-block" style="font-size: 0.70rem;">UNIDADES TOTALES</small>
-                                            <span class="text-dark" style="font-size: 0.95rem;">{{ collect($cart)->sum('quantity') }}</span>
+                                            <small class="text-muted d-block" >UNIDADES TOTALES</small>
+                                            <span class="text-dark">{{ collect($cart)->sum('quantity') }}</span>
                                         </div>
                                     </div>
                                 </div>

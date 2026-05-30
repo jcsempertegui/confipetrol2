@@ -188,8 +188,7 @@
                 aria-labelledby="remitoDetailModalLabel" aria-hidden="true">
                 <div class="modal-dialog modal-lg" role="document">
                     <div class="modal-content">
-                        <div class="modal-header
-                            {{ $tipo_detail === 'INGRESO' ? 'bg-success text-white' : ($tipo_detail === 'EGRESO' ? 'bg-danger text-white' : '') }}">
+                        <div class="modal-header">
                             <h5 class="modal-title" id="remitoDetailModalLabel">
                                 <i class="bx bx-receipt me-2"></i>DETALLE DE REMITO
                                 @if($tipo_detail)

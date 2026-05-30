@@ -14,6 +14,7 @@ use App\Models\Lot;
 use App\Models\Warehouse;
 use App\Models\Color;
 use App\Models\Size;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Livewire\WithFileUploads;
@@ -25,7 +26,7 @@ use Illuminate\Support\Facades\Log;
 
 class ProductsController extends Component
 {
-    use WithPagination, WithFileUploads;
+    use WithPagination, WithFileUploads, AuditLog;
 
     protected $paginationTheme = 'bootstrap';
 
@@ -416,7 +417,16 @@ class ProductsController extends Component
             }
 
             DB::commit();
-            $message = $this->isEditMode ? 'PRODUCTO ACTUALIZADO EXITOSAMENTE.' : 'PRODUCTO CREADO CON ÉXITO.';
+
+            $isEdit = $this->isEditMode;
+            $accion = $isEdit ? 'EDITAR' : 'CREAR';
+            $desc = $isEdit
+                ? "Editó producto: [{$product->code}] {$product->name}"
+                : "Creó producto: [{$product->code}] {$product->name}";
+            $this->logActivity('PRODUCTOS', $accion, $desc, $product->id, null,
+                ['code' => $product->code, 'name' => $product->name, 'type' => $product->type]);
+
+            $message = $isEdit ? 'PRODUCTO ACTUALIZADO EXITOSAMENTE.' : 'PRODUCTO CREADO CON ÉXITO.';
             $this->resetInputFields();
             $this->dispatch('productStoreOrUpdate', $message);
 
@@ -562,6 +572,16 @@ class ProductsController extends Component
         if ($product) {
             $newStatus = $product->status == 1 ? 0 : 1;
             $product->update(['status' => $newStatus]);
+
+            $accion = $newStatus == 1 ? 'RESTAURAR' : 'ELIMINAR';
+            $this->logActivity(
+                'PRODUCTOS', $accion,
+                ($newStatus == 1 ? 'Restauró' : 'Eliminó') . " producto: [{$product->code}] {$product->name}",
+                $product->id,
+                ['status' => $newStatus == 1 ? 0 : 1],
+                ['status' => $newStatus]
+            );
+
             $message = $newStatus == 1 ? 'PRODUCTO RESTAURADO EXITOSAMENTE.' : 'PRODUCTO ELIMINADO EXITOSAMENTE.';
             $this->dispatch('productDeleted', $message);
         }

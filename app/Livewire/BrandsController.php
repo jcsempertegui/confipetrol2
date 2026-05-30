@@ -3,12 +3,13 @@
 namespace App\Livewire;
 
 use App\Models\Brand;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class BrandsController extends Component
-{    
-    use WithPagination;
+{
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $name, $brand_id;
@@ -61,12 +62,16 @@ class BrandsController extends Component
             'name' => $this->name
         ];
 
-        Brand::updateOrCreate(
-            ['id' => $this->brand_id],
-            $brands
+        $isEdit = $this->isEditMode;
+        $brand = Brand::updateOrCreate(['id' => $this->brand_id], $brands);
+
+        $this->logActivity(
+            'MARCAS', $isEdit ? 'EDITAR' : 'CREAR',
+            ($isEdit ? 'Editó' : 'Creó') . " marca: {$brand->name}",
+            $brand->id
         );
 
-        $message = $this->isEditMode ? 'MARCAS ACTUALIZADA EXITOSAMENTE.' : 'MARCAS CREADA CON ÉXITO.';
+        $message = $isEdit ? 'MARCAS ACTUALIZADA EXITOSAMENTE.' : 'MARCAS CREADA CON ÉXITO.';
 
         $this->resetInputFields();
         $this->dispatch('brandStoreOrUpdate', $message);
@@ -89,9 +94,12 @@ class BrandsController extends Component
 
         if ($brand) {
             $newEstado = $brand->status == 1 ? 0 : 1;
-            $brand->update([
-                'status' => $newEstado
-            ]);
+            $brand->update(['status' => $newEstado]);
+            $this->logActivity(
+                'MARCAS', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " marca: {$brand->name}",
+                $brand->id
+            );
             $message = $newEstado == 1 ? 'MARCAS RESTAURADA EXITOSAMENTE.' : 'MARCAS ELIMINADA EXITOSAMENTE.';
             $this->dispatch('brandDeleted', $message);
         } else {

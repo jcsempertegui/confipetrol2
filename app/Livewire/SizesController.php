@@ -3,12 +3,13 @@
 namespace App\Livewire;
 
 use App\Models\Size;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class SizesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $name, $size_id;
@@ -24,10 +25,9 @@ class SizesController extends Component
             ->paginate(20);
 
         return view('livewire.sizes.sizes', [
-            'sizes' => $sizes,
-            'startCount' => $sizes->total() - ($sizes->currentPage() - 1) * $sizes->perPage()
-        ])
-            ->extends('layouts.theme.app');
+            'sizes'      => $sizes,
+            'startCount' => $sizes->total() - ($sizes->currentPage() - 1) * $sizes->perPage(),
+        ])->extends('layouts.theme.app');
     }
 
     public function paginationView()
@@ -38,35 +38,28 @@ class SizesController extends Component
     public function resetInputFields()
     {
         $this->resetValidation();
-        $this->name = '';
+        $this->name    = '';
         $this->size_id = '';
         $this->isEditMode = false;
     }
 
     public function storeOrUpdate()
     {
-        $rules = [
-            'name' => 'required|unique:sizes,name,' . ($this->isEditMode ? $this->size_id : ''),
-        ];
-
-        $messages = [
-            'name.required' => 'El nombre es requerido',
-            'name.unique' => 'El nombre ya está en uso',
-        ];
-
-        $this->validate($rules, $messages);
-
-        $data = [
-            'name' => $this->name
-        ];
-
-        Size::updateOrCreate(
-            ['id' => $this->size_id],
-            $data
+        $this->validate(
+            ['name' => 'required|unique:sizes,name,' . ($this->isEditMode ? $this->size_id : '')],
+            ['name.required' => 'El nombre es requerido', 'name.unique' => 'El nombre ya está en uso']
         );
 
-        $message = $this->isEditMode ? 'TALLA ACTUALIZADA EXITOSAMENTE.' : 'TALLA CREADA CON ÉXITO.';
+        $isEdit = $this->isEditMode;
+        $size = Size::updateOrCreate(['id' => $this->size_id], ['name' => $this->name]);
 
+        $this->logActivity(
+            'TALLAS', $isEdit ? 'EDITAR' : 'CREAR',
+            ($isEdit ? 'Editó' : 'Creó') . " talla: {$size->name}",
+            $size->id
+        );
+
+        $message = $isEdit ? 'TALLA ACTUALIZADA EXITOSAMENTE.' : 'TALLA CREADA CON ÉXITO.';
         $this->resetInputFields();
         $this->dispatch('sizeStoreOrUpdate', $message);
     }
@@ -74,22 +67,23 @@ class SizesController extends Component
     public function edit($id)
     {
         $this->resetValidation();
-        
         $size = Size::findOrFail($id);
         $this->size_id = $id;
-        $this->name = $size->name;
+        $this->name    = $size->name;
         $this->isEditMode = true;
     }
 
     public function delete($id)
     {
         $size = Size::find($id);
-
         if ($size) {
             $newEstado = $size->status == 1 ? 0 : 1;
-            $size->update([
-                'status' => $newEstado
-            ]);
+            $size->update(['status' => $newEstado]);
+            $this->logActivity(
+                'TALLAS', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " talla: {$size->name}",
+                $size->id
+            );
             $message = $newEstado == 1 ? 'TALLA RESTAURADA EXITOSAMENTE.' : 'TALLA ELIMINADA EXITOSAMENTE.';
             $this->dispatch('sizeDeleted', $message);
         } else {

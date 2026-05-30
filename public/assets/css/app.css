@@ -3741,25 +3741,46 @@ input[type="radio"]:checked ~ .payment-method .imgName .name {
     font-size: 0.75rem;
 }
 
-/* MARCA - Azul Elegante */
 .tag-brand {
     background: rgba(13, 110, 253, 0.12);
     color: #0057a7;
     border: 1px solid rgba(13, 110, 253, 0.2);
 }
 
-/* CATEGORÍA - Verde Profesional */
 .tag-category {
     background: rgba(25, 135, 84, 0.12);
     color: #198754;
     border: 1px solid rgba(25, 135, 84, 0.2);
 }
 
-/* UNIDAD DE MEDIDA - Naranja Vibrante */
 .tag-unit {
     background: rgba(255, 152, 0, 0.12);
     color: #ff9800;
     border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.tag-type-producto {
+    background: rgba(13, 110, 253, 0.10);
+    color: #0057a7;
+    border: 1px solid rgba(13, 110, 253, 0.2);
+}
+
+.tag-type-activo {
+    background: rgba(255, 152, 0, 0.10);
+    color: #b36a00;
+    border: 1px solid rgba(255, 152, 0, 0.2);
+}
+
+.tag-type-consumible {
+    background: rgba(25, 135, 84, 0.10);
+    color: #198754;
+    border: 1px solid rgba(25, 135, 84, 0.2);
+}
+
+.tag-type-epps {
+    background: rgba(111, 66, 193, 0.10);
+    color: #6f42c1;
+    border: 1px solid rgba(111, 66, 193, 0.2);
 }
 
 /* Hover Efecto - Tags */

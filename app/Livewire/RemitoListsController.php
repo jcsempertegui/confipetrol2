@@ -8,6 +8,7 @@ use App\Models\Inventorie;
 use App\Models\Kardex;
 use App\Models\Product;
 use App\Models\ProductSku;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Carbon\Carbon;
@@ -15,7 +16,7 @@ use Illuminate\Support\Facades\DB;
 
 class RemitoListsController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $remito_id, $remito;
@@ -203,6 +204,15 @@ class RemitoListsController extends Component
             }
 
             DB::commit();
+
+            $this->logActivity(
+                'REMITOS', 'ANULAR',
+                "Anuló remito {$remito->tipo}: {$remito->remito_number}",
+                $remito->id,
+                ['status' => 1],
+                ['status' => 0]
+            );
+
             $this->dispatch('alert', 'EL REMITO HA SIDO ANULADO Y EL STOCK REVERTIDO', 'success');
 
         } catch (\Exception $e) {

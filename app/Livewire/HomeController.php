@@ -35,7 +35,7 @@ class HomeController extends Component
 
     public function render()
     {
-        //$this->totalesByDate();
+        $this->totalesByDate();
         return view('livewire.home.home')->extends('layouts.theme.app');
     }
 

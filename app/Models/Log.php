@@ -7,14 +7,22 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Log extends Model
 {
-     use HasFactory;
+    use HasFactory;
 
-    // Agregar los campos que se pueden asignar masivamente
     protected $fillable = [
-        'user_id', 
-        'evento',
+        'user_id',
+        'modulo',
+        'accion',
+        'descripcion',
+        'modelo_id',
+        'valores_anteriores',
+        'valores_nuevos',
         'ip',
-        'detalle',
+    ];
+
+    protected $casts = [
+        'valores_anteriores' => 'array',
+        'valores_nuevos'     => 'array',
     ];
 
     public function user()

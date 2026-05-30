@@ -3,12 +3,13 @@
 namespace App\Livewire;
 
 use App\Models\Worker;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class WorkersController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $name, $last_name, $document, $cargo, $birth_date, $phone, $status, $worker_id;
@@ -87,7 +88,10 @@ class WorkersController extends Component
 
         $this->validate($rules, $messages);
 
-        Worker::updateOrCreate(
+        $isEdit = $this->isEditMode;
+        $oldWorker = $isEdit ? Worker::find($this->worker_id) : null;
+
+        $worker = Worker::updateOrCreate(
             ['id' => $this->worker_id],
             [
                 'name'       => $this->name,
@@ -99,7 +103,25 @@ class WorkersController extends Component
             ]
         );
 
-        $message = $this->isEditMode ? 'TRABAJADOR ACTUALIZADO EXITOSAMENTE.' : 'TRABAJADOR CREADO CON ÉXITO.';
+        if ($isEdit) {
+            $this->logActivity(
+                'TRABAJADORES', 'EDITAR',
+                "Editó trabajador: {$worker->name} {$worker->last_name} (CI: {$worker->document})",
+                $worker->id,
+                $oldWorker ? ['name' => $oldWorker->name, 'last_name' => $oldWorker->last_name, 'cargo' => $oldWorker->cargo] : null,
+                ['name' => $worker->name, 'last_name' => $worker->last_name, 'cargo' => $worker->cargo]
+            );
+        } else {
+            $this->logActivity(
+                'TRABAJADORES', 'CREAR',
+                "Creó trabajador: {$worker->name} {$worker->last_name} (CI: {$worker->document})",
+                $worker->id,
+                null,
+                ['name' => $worker->name, 'last_name' => $worker->last_name, 'cargo' => $worker->cargo]
+            );
+        }
+
+        $message = $isEdit ? 'TRABAJADOR ACTUALIZADO EXITOSAMENTE.' : 'TRABAJADOR CREADO CON ÉXITO.';
 
         $this->resetInputFields();
         $this->dispatch('workerStoreOrUpdate', $message);
@@ -128,6 +150,16 @@ class WorkersController extends Component
         if ($worker) {
             $newEstado = $worker->status == 1 ? 0 : 1;
             $worker->update(['status' => $newEstado]);
+
+            $accion = $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR';
+            $this->logActivity(
+                'TRABAJADORES', $accion,
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " trabajador: {$worker->name} {$worker->last_name} (CI: {$worker->document})",
+                $worker->id,
+                ['status' => $newEstado == 1 ? 0 : 1],
+                ['status' => $newEstado]
+            );
+
             $message = $newEstado == 1 ? 'TRABAJADOR RESTAURADO EXITOSAMENTE.' : 'TRABAJADOR ELIMINADO EXITOSAMENTE.';
             $this->dispatch('workerDeleted', $message);
         } else {

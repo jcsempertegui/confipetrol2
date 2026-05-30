@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\User;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
@@ -10,7 +11,7 @@ use Spatie\Permission\Models\Permission;
 
 class RolesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
     public $searchTerm, $searchPermission;
 
@@ -105,8 +106,15 @@ class RolesController extends Component
         $this->validate($rules, $message);
 
         $role = Role::create(['name' => $this->name]);
-
         $role->syncPermissions($this->permisosSelected);
+
+        $this->logActivity(
+            'ROLES', 'CREAR',
+            "Creó rol: {$role->name} (" . count($this->permisosSelected) . " permisos)",
+            $role->id,
+            null,
+            ['name' => $role->name, 'permisos' => count($this->permisosSelected)]
+        );
 
         $this->dispatch('role-added', ['ROL CREADO CON ÉXITO.']);
         $this->resetInputFields();
@@ -148,6 +156,14 @@ class RolesController extends Component
         $role->save();
         $role->syncPermissions($this->permisosSelected);
 
+        $this->logActivity(
+            'ROLES', 'EDITAR',
+            "Editó rol: {$role->name} (" . count($this->permisosSelected) . " permisos)",
+            $role->id,
+            null,
+            ['name' => $role->name, 'permisos' => count($this->permisosSelected)]
+        );
+
         $this->dispatch('role-updated', 'ROL ACTUALIZADO EXITOSAMENTE.');
         $this->resetInputFields();
     }
@@ -159,6 +175,11 @@ class RolesController extends Component
             if ($role) {
                 $newEstado = $role->status == 1 ? 0 : 1;
                 $role->update(['status' => $newEstado]);
+                $this->logActivity(
+                    'ROLES', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                    ($newEstado == 1 ? 'Activó' : 'Desactivó') . " rol: {$role->name}",
+                    $role->id
+                );
                 $message = $newEstado == 1 ? 'ROL ACTIVADO EXITOSAMENTE.' : 'ROL DESACTIVADO EXITOSAMENTE.';
                 $this->dispatch('role-deleted', $message);
             }

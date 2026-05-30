@@ -3,12 +3,13 @@
 namespace App\Livewire;
 
 use App\Models\Categorie;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 
 class CategoriesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $name, $categorie_id;
@@ -62,12 +63,19 @@ class CategoriesController extends Component
             'name' => $this->name
         ];
 
-        Categorie::updateOrCreate(
+        $isEdit = $this->isEditMode;
+        $categorie = Categorie::updateOrCreate(
             ['id' => $this->categorie_id],
             $categories
         );
 
-        $message = $this->isEditMode ? 'CATEGORIA ACTUALIZADA EXITOSAMENTE.' : 'CATEGORIA CREADA CON ÉXITO.';
+        $this->logActivity(
+            'CATEGORIAS', $isEdit ? 'EDITAR' : 'CREAR',
+            ($isEdit ? 'Editó' : 'Creó') . " categoría: {$categorie->name}",
+            $categorie->id
+        );
+
+        $message = $isEdit ? 'CATEGORIA ACTUALIZADA EXITOSAMENTE.' : 'CATEGORIA CREADA CON ÉXITO.';
 
         $this->resetInputFields();
         $this->dispatch('categorieStoreOrUpdate', $message);
@@ -90,9 +98,12 @@ class CategoriesController extends Component
 
         if ($categorie) {
             $newEstado = $categorie->status == 1 ? 0 : 1;
-            $categorie->update([
-                'status' => $newEstado
-            ]);
+            $categorie->update(['status' => $newEstado]);
+            $this->logActivity(
+                'CATEGORIAS', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " categoría: {$categorie->name}",
+                $categorie->id
+            );
             $message = $newEstado == 1 ? 'CATEGORIA RESTAURADA EXITOSAMENTE.' : 'CATEGORIA ELIMINADA EXITOSAMENTE.';
             $this->dispatch('categorieDeleted', $message);
         } else {

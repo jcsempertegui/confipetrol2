@@ -8,13 +8,14 @@ use App\Models\Product;
 use App\Models\Inventorie;
 use App\Models\Setting;
 use App\Models\Warehouse;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
 
 class BranchesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $code, $branch_type, $name, $phone, $address, $status, $branche_id;
@@ -189,7 +190,16 @@ class BranchesController extends Component
             ]);
         }
 
-        $message = $this->isEditMode ? 'SUCURSAL ACTUALIZADO EXITOSAMENTE.' : 'SUCURSAL CREADO CON ÉXITO.';
+        $isEdit = $this->isEditMode;
+        $this->logActivity(
+            'SUCURSALES', $isEdit ? 'EDITAR' : 'CREAR',
+            ($isEdit ? 'Editó' : 'Creó') . " sucursal: [{$branche->code}] {$branche->name}",
+            $branche->id,
+            null,
+            ['code' => $branche->code, 'name' => $branche->name, 'branch_type' => $branche->branch_type]
+        );
+
+        $message = $isEdit ? 'SUCURSAL ACTUALIZADO EXITOSAMENTE.' : 'SUCURSAL CREADO CON ÉXITO.';
 
         $this->resetInputFields();
         $this->dispatch('branchesStoreOrUpdate', $message);
@@ -248,9 +258,12 @@ class BranchesController extends Component
 
         if ($branche) {
             $newEstado = $branche->status == 1 ? 0 : 1;
-            $branche->update([
-                'status' => $newEstado
-            ]);
+            $branche->update(['status' => $newEstado]);
+            $this->logActivity(
+                'SUCURSALES', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
+                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " sucursal: [{$branche->code}] {$branche->name}",
+                $branche->id
+            );
             $message = $newEstado == 1 ? 'SUCURSAL RESTAURADO EXITOSAMENTE.' : 'SUCURSAL ELIMINADO EXITOSAMENTE.';
             $this->dispatch('branchesDeleted', $message);
         } else {

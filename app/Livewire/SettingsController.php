@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\WithFileUploads;
 use App\Models\Setting;
 use App\Models\Branche;
+use App\Traits\AuditLog;
 use Illuminate\Support\Facades\Storage;
 use Intervention\Image\ImageManager;
 use Intervention\Image\Drivers\Gd\Driver;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\Cache;
 
 class SettingsController extends Component
 {
-    use WithFileUploads;
+    use WithFileUploads, AuditLog;
 
     public $business, $owner, $nit, $email, $phone, $address, $message, $image, $image_preview;
     public $setting_id;
@@ -141,6 +142,15 @@ class SettingsController extends Component
             DB::commit();
             Cache::forget('sidebar_branch_' . $this->branch_id);
             $this->image = null;
+
+            $this->logActivity(
+                'CONFIGURACION', 'EDITAR',
+                "Actualizó configuración de sucursal: {$this->business}",
+                $this->branch_id,
+                null,
+                ['business' => $this->business, 'owner' => $this->owner, 'branch_id' => $this->branch_id]
+            );
+
             $this->dispatch('settingsUpdate', 'DATOS DE NEGOCIO ACTUALIZADOS', 'success');
 
             $this->dispatch('update-sidebar', [

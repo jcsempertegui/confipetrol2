@@ -7,69 +7,59 @@ use App\Http\Requests\Auth\LoginRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Log; 
-use Illuminate\View\View; 
-use Illuminate\Support\Facades\DB; // IMPORTANTE
+use App\Models\Log;
+use Illuminate\View\View;
+use Illuminate\Support\Facades\DB;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Display the login view.
-     */
     public function create(): View
     {
         return view('auth.login');
     }
 
-    /**
-     * Handle an incoming authentication request.
-     */
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
         $request->session()->regenerate();
 
-        // --- INICIO LOGICA DE SEGURIDAD DE SESIONES ---
+        // --- LOGICA DE SEGURIDAD DE SESIONES ---
         $user = Auth::user();
-        $limit = $user->max_sessions ?? 1; 
+        $limit = $user->max_sessions ?? 1;
         $currentSessionId = $request->session()->getId();
 
-        // Buscar sesiones anteriores
         $activeSessions = DB::table('sessions')
             ->where('user_id', $user->id)
-            ->where('id', '!=', $currentSessionId) 
+            ->where('id', '!=', $currentSessionId)
             ->orderBy('last_activity', 'desc')
             ->get();
 
-        $sessionsToKeep = $limit - 1;
-        if ($sessionsToKeep < 0) $sessionsToKeep = 0;
-
-        $message = null; // Variable para el mensaje de alerta
+        $sessionsToKeep = max(0, $limit - 1);
+        $message = null;
 
         if ($activeSessions->count() > $sessionsToKeep) {
             $sessionsToDelete = $activeSessions->slice($sessionsToKeep);
-            $deletedCount = $sessionsToDelete->count(); // Contamos cuántas vamos a borrar
-            
+            $deletedCount = $sessionsToDelete->count();
             $idsToDelete = $sessionsToDelete->pluck('id')->toArray();
+
             if (!empty($idsToDelete)) {
                 DB::table('sessions')->whereIn('id', $idsToDelete)->delete();
-                
-                // Preparamos el mensaje para el usuario que entra
                 $message = "Atención: Se ha cerrado sesión en {$deletedCount} dispositivo(s) antiguo(s) por límite de seguridad.";
             }
         }
-        // --- FIN LOGICA DE SEGURIDAD ---
+        // --- FIN LOGICA ---
 
-        session(['branch_user_id' => Auth::user()->branch_id]);
-            
+        session(['branch_user_id' => $user->branch_id]);
+
         Log::create([
-            'user_id' => Auth::user()->id,
-            'evento' => 'Inicio de sesión',
-            'ip' => $request->ip(),
-            'detalle' => $request->header('User-Agent'),
+            'user_id'        => $user->id,
+            'modulo'         => 'ACCESO',
+            'accion'         => 'INICIO_SESION',
+            'descripcion'    => 'Inicio de sesión: ' . $user->login,
+            'ip'             => $request->ip(),
+            'valores_nuevos' => json_encode(['user_agent' => $request->header('User-Agent')]),
         ]);
 
-        // Redirigimos. Si hubo eliminaciones, agregamos el mensaje flash 'warning'
         if ($message) {
             return redirect()->route('home')->with('warning', $message);
         }
@@ -77,22 +67,19 @@ class AuthenticatedSessionController extends Controller
         return redirect()->route('home');
     }
 
-    /**
-     * Destroy an authenticated session.
-     */
     public function destroy(Request $request): RedirectResponse
     {
         if (Auth::user()) {
-             Log::create([
-                'user_id' => Auth::user()->id,
-                'evento' => 'Cierre de sesión',
-                'ip' => $request->ip(),
-                'detalle' => $request->header('User-Agent'),
+            Log::create([
+                'user_id'     => Auth::user()->id,
+                'modulo'      => 'ACCESO',
+                'accion'      => 'CIERRE_SESION',
+                'descripcion' => 'Cierre de sesión: ' . Auth::user()->login,
+                'ip'          => $request->ip(),
             ]);
         }
-       
-        Auth::guard('web')->logout();
 
+        Auth::guard('web')->logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
