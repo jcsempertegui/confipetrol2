@@ -14,7 +14,6 @@ class Product extends Model
         'name',
         'features',
         'model',
-        'image',
         'type',
         'lote',
         'minimum_stock',

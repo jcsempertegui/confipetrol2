@@ -55,7 +55,6 @@
                         <div class="mb-2">
                             <select wire:model.live="filter_type" class="form-select filter-pro-select">
                                 <option value="">FILTRO POR TIPO</option>
-                                <option value="0">PRODUCTO</option>
                                 <option value="1">ACTIVO</option>
                                 <option value="2">CONSUMIBLES</option>
                                 <option value="3">EPPS</option>
@@ -100,16 +99,14 @@
                                     <td>{{ $product->code ?: 'S/N' }}</td>
                                     <td>{{ $product->name ?: 'S/N' }}</td>
                                     <td>
-                                        @if ($product->type == 0)
-                                            <div class="badge rounded-pill text-primary bg-light-primary text-uppercase">Producto</div>
-                                        @elseif ($product->type == 1)
+                                        @if ($product->type == 1)
                                             <div class="badge rounded-pill text-warning bg-light-warning text-uppercase">Activo</div>
                                         @elseif ($product->type == 2)
                                             <div class="badge rounded-pill text-success bg-light-success text-uppercase">Consumible</div>
                                         @elseif ($product->type == 3)
                                             <div class="badge rounded-pill text-uppercase" style="background-color: rgba(111,66,193,0.1); color:#6f42c1;">EPPS</div>
                                         @else
-                                            <div class="badge rounded-pill text-danger bg-light-danger text-uppercase">Otro</div>
+                                            <div class="badge rounded-pill text-success bg-light-success text-uppercase">Consumible</div>
                                         @endif
                                     </td>
                                     <td>{{ $product->categories->name ?? '-' }}</td>
@@ -318,53 +315,13 @@
                                                     </div>
                                                 @endif
 
-
                                             </div>
                                         </div>
 
                                         <div class="col-md-4">
-                                            <div class="form-group" wire:ignore>
-                                                <div class="d-flex flex-column align-items-center">
-                                                    <label class="text-center">Imagen Principal</label>
-                                                    <div class="image-container">
-                                                        <img id="previewImage"
-                                                            src="{{ $image_preview ?? asset('assets/images/product.png') }}"
-                                                            class="img-thumbnail mt-2"
-                                                            style="border-radius: 25px; width: 200px; height: 200px; object-fit: cover; object-position: center;"
-                                                            alt="Vista previa">
-                                                        <div id="uploadOverlay" class="image-overlay" style="display: none;">
-                                                            <i class="bx bx-spin bx-loader upload-spinner"></i>
-                                                            <span id="uploadText">Subiendo imagen...</span>
-                                                            <div class="progress-bar-custom">
-                                                                <div id="progressFill" class="progress-fill" style="width: 0%;"></div>
-                                                            </div>
-                                                            <small id="progressPercent" class="mt-1">0%</small>
-                                                        </div>
-                                                    </div>
-                                                    <div>
-                                                        <input type="file" id="imageInput" name="image"
-                                                            class="form-control d-none" accept=".jpg,.jpeg,.png,.webp">
-                                                        <button type="button" id="selectImageBtn"
-                                                            class="btn btn-outline-primary mt-2"
-                                                            onclick="document.getElementById('imageInput').click()">
-                                                            <i class="bx bx-cloud-upload"></i> Seleccionar imagen
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            @error('image') <span class="text-danger er">{{ $message }}</span> @enderror
-
-                                            <div class="col-span-2 mt-3"><hr class="my-2"></div>
-
                                             <div class="col-md-12 mt-2">
                                                 <label class="form-label fw-bold">Tipo de producto</label>
                                                 <div class="d-flex flex-wrap gap-2 align-items-center">
-                                                    <div class="form-check me-3">
-                                                        <input class="form-check-input" type="radio" id="type-producto"
-                                                            wire:model.live="type" x-model="type"
-                                                            @change="tab = 'info'" value="0">
-                                                        <label class="form-check-label" for="type-producto">Producto</label>
-                                                    </div>
                                                     <div class="form-check me-3">
                                                         <input class="form-check-input" type="radio" id="type-activo"
                                                             wire:model.live="type" x-model="type"
@@ -382,14 +339,6 @@
                                                             wire:model.live="type" x-model="type"
                                                             @change="tab = 'info'" value="3">
                                                         <label class="form-check-label" for="type-epps">EPPS</label>
-                                                    </div>
-                                                    
-                                                    <div class="form-check form-switch form-check-danger ms-3" x-show="type == 0 || type == '0'" style="display:none;">
-                                                        <input class="form-check-input" type="checkbox" role="switch"
-                                                            id="flexSwitchCheckLot" wire:model.live="lote">
-                                                        <label class="form-check-label fw-bold" for="flexSwitchCheckLot">
-                                                            ¿Con Lote?
-                                                        </label>
                                                     </div>
                                                 </div>
                                             </div>
@@ -541,8 +490,6 @@
     </div>
 </div>
 
-<script type="text/javascript"
-    src="https://cdn.jsdelivr.net/npm/browser-image-compression@2.0.2/dist/browser-image-compression.js"></script>
 <script>
     function confirmDelete(id, action) {
         Swal.fire({
@@ -574,86 +521,7 @@
         setTimeout(() => { const b = document.querySelectorAll('.modal-backdrop'); if (b.length > 1) b[1].classList.add('second-backdrop'); }, 100);
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
-        const imageInput    = document.getElementById('imageInput');
-        const uploadOverlay = document.getElementById('uploadOverlay');
-        const progressFill  = document.getElementById('progressFill');
-        const progressPercent = document.getElementById('progressPercent');
-        const uploadText    = document.getElementById('uploadText');
-        const saveBtn       = document.getElementById('saveBtn');
-        const selectImageBtn= document.getElementById('selectImageBtn');
-        let isUploading     = false;
-
-        function showUploadLoader() {
-            isUploading = true;
-            uploadOverlay.style.display = 'flex';
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.classList.add('disabled'); }
-            if (selectImageBtn) { selectImageBtn.disabled = true; selectImageBtn.classList.add('disabled'); }
-        }
-        function hideUploadLoader() {
-            isUploading = false;
-            uploadOverlay.style.display = 'none';
-            if (saveBtn) { saveBtn.disabled = false; saveBtn.classList.remove('disabled'); }
-            if (selectImageBtn) { selectImageBtn.disabled = false; selectImageBtn.classList.remove('disabled'); }
-            progressFill.style.width = '0%';
-            progressPercent.textContent = '0%';
-        }
-        function updateProgress(percent) {
-            progressFill.style.width = percent + '%';
-            progressPercent.textContent = percent + '%';
-        }
-
-        if (imageInput) {
-            imageInput.addEventListener('change', async function (e) {
-                const file = e.target.files[0];
-                if (!file) return;
-                const preview = document.getElementById('previewImage');
-                showUploadLoader();
-                const reader = new FileReader();
-                reader.onload = function (e) { preview.src = e.target.result; };
-                reader.readAsDataURL(file);
-                uploadText.textContent = 'Optimizando...';
-                let fileToUpload = file;
-                try {
-                    const compressed = await imageCompression(file, { maxSizeMB: 5, maxWidthOrHeight: 1920, useWebWorker: true, fileType: 'image/webp', initialQuality: 1.0 });
-                    fileToUpload = new File([compressed], file.name.replace(/\.[^/.]+$/, '.webp'), { type: 'image/webp', lastModified: Date.now() });
-                } catch (err) { console.warn(err); }
-                uploadText.textContent = 'Subiendo...';
-                @this.upload('image', fileToUpload,
-                    () => { uploadText.textContent = '¡Listo!'; updateProgress(100); setTimeout(() => hideUploadLoader(), 500); },
-                    ()  => { uploadText.textContent = 'Error'; hideUploadLoader(); alert('Error al subir. Intente de nuevo.'); },
-                    (ev)=> { const p = Math.round(ev.detail.progress); updateProgress(p); uploadText.textContent = `Cargando... ${p}%`; }
-                );
-            });
-        }
-
-        if (saveBtn) {
-            saveBtn.addEventListener('click', function (e) {
-                if (isUploading) { e.preventDefault(); e.stopPropagation(); alert('Espere a que termine de subir la imagen.'); return false; }
-            });
-        }
-    });
-
     document.addEventListener('livewire:init', function () {
-        Livewire.on('load-image-preview', (data) => {
-            const preview = document.getElementById('previewImage');
-            if (preview) {
-                const imageUrl = data[0]?.image;
-                preview.src = imageUrl ? imageUrl : '{{ asset('assets/images/product.png') }}';
-            }
-        });
-
-        Livewire.on('reset-image-preview', () => {
-            const preview = document.getElementById('previewImage');
-            const input   = document.getElementById('imageInput');
-            if (preview) preview.src = '{{ asset('assets/images/product.png') }}';
-            if (input)   input.value = '';
-            const overlay = document.getElementById('uploadOverlay');
-            if (overlay)  overlay.style.display = 'none';
-            const btn = document.getElementById('saveBtn');
-            if (btn) { btn.disabled = false; btn.classList.remove('disabled'); }
-        });
-
         Livewire.on('alert', (data) => {
             const [msg, type, mg] = data;
             toast(msg, type);

@@ -47,7 +47,7 @@ class ProductsImport implements ToModel, WithHeadingRow, WithBatchInserts, WithC
             'categorie_id' => $categorie->id,
             'brand_id' => $brand->id,
             'unit_id' => $unit->id,
-            'type' => 0,
+            'type' => 2,
             'lote' => 0,
             'minimum_stock' => 0,
             'status' => 1

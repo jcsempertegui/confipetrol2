@@ -69,8 +69,8 @@
                                                             <span class="listsearch-name">{{ Str::limit($item->name, 45) }}</span>
                                                             <div class="listsearch-tags">
                                                                 @php
-                                                                    $typeLabels = [0 => 'Producto', 1 => 'Activo', 2 => 'Consumible', 3 => 'EPPS'];
-                                                                    $typeClasses = [0 => 'tag-type-producto', 1 => 'tag-type-activo', 2 => 'tag-type-consumible', 3 => 'tag-type-epps'];
+                                                                    $typeLabels = [1 => 'Activo', 2 => 'Consumible', 3 => 'EPPS'];
+                                                                    $typeClasses = [1 => 'tag-type-activo', 2 => 'tag-type-consumible', 3 => 'tag-type-epps'];
                                                                 @endphp
                                                                 <span class="tag {{ $typeClasses[$item->type] ?? 'tag-brand' }}">
                                                                     <i class='bx bx-cube'></i>

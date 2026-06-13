@@ -10,27 +10,22 @@ use App\Models\Branche;
 use App\Models\Inventorie;
 use App\Models\ProductSku;
 use App\Models\Kardex;
-use App\Models\Lot;
 use App\Models\Warehouse;
 use App\Models\Color;
 use App\Models\Size;
 use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Livewire\WithFileUploads;
-use Intervention\Image\Drivers\Gd\Driver;
-use Intervention\Image\ImageManager;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class ProductsController extends Component
 {
-    use WithPagination, WithFileUploads, AuditLog;
+    use WithPagination, AuditLog;
 
     protected $paginationTheme = 'bootstrap';
 
-    public $code, $name, $features, $model, $image, $image_preview;
+    public $code, $name, $features, $model;
     public $categorie_id, $brand_id, $unit_id, $product_id;
     public $minimum_stock = 0, $initial_stock = 0;
     public $isEditMode = false;
@@ -46,7 +41,7 @@ class ProductsController extends Component
 
     public $name_category, $name_brand, $name_unit, $unit_base_unit, $unit_factor;
 
-    public $type = 0;
+    public $type = 2;
     public $lote = false;
 
     public $branch_id, $pos_type, $openAccordion = null;
@@ -83,9 +78,6 @@ class ProductsController extends Component
 
     public function updatedType($value)
     {
-        if ($value != 0) {
-            $this->lote = false;
-        }
         if ($value != 3) {
             $this->skus = [];
             $this->color_id = '';
@@ -154,7 +146,6 @@ class ProductsController extends Component
                 'products.categorie_id',
                 'products.unit_id',
                 'products.minimum_stock',
-                'products.image',
             ])
             ->with([
                 'brands:id,name',
@@ -204,16 +195,13 @@ class ProductsController extends Component
         $this->product_id = '';
         $this->minimum_stock = 0;
         $this->initial_stock = 0;
-        $this->image = null;
-        $this->image_preview = null;
-        $this->type = 0;
+        $this->type = 2;
         $this->lote = false;
         $this->skus = [];
         $this->color_id = '';
         $this->size_id = '';
         $this->openAccordion = null;
         $this->isEditMode = false;
-        $this->dispatch('reset-image-preview');
     }
 
     public function storeOrUpdate()
@@ -241,12 +229,6 @@ class ProductsController extends Component
             $rules['initial_stock'] = 'nullable|numeric|min:0';
         }
 
-        if ($this->image && is_object($this->image)) {
-            $rules['image'] = 'nullable|image|max:20480';
-        } else {
-            $rules['image'] = 'nullable';
-        }
-
         $messages = [
             'code.required' => 'El código es requerido',
             'code.unique' => 'El código ya está en uso',
@@ -254,8 +236,6 @@ class ProductsController extends Component
             'name.min' => 'El nombre debe tener al menos 3 caracteres',
             'model.required' => 'El modelo es requerido',
             'minimum_stock.required' => 'El stock mínimo es requerido',
-            'image.image' => 'El archivo debe ser una imagen.',
-            'image.max' => 'La imagen es demasiado pesada (Máx 20MB).',
             'categorie_id.required' => 'La categoría es requerida',
             'brand_id.required' => 'La marca es requerida',
             'unit_id.required' => 'La unidad es requerida',
@@ -271,26 +251,6 @@ class ProductsController extends Component
         DB::beginTransaction();
 
         try {
-            $imagePath = null;
-            if ($this->image && is_object($this->image)) {
-                if ($this->isEditMode && $this->product_id) {
-                    $prodCheck = Product::find($this->product_id);
-                    if ($prodCheck && $prodCheck->image && Storage::disk('public')->exists($prodCheck->image)) {
-                        Storage::disk('public')->delete($prodCheck->image);
-                    }
-                }
-                $manager = new ImageManager(new Driver());
-                $filename = 'PROD_' . time() . '.webp';
-                $img = $manager->read($this->image->getRealPath());
-                $img->scaleDown(width: 1920);
-                $encoded = (string) $img->toWebp(95);
-                Storage::disk('public')->put('products/' . $filename, $encoded);
-                $imagePath = 'products/' . $filename;
-                unset($img, $encoded);
-            } elseif ($this->isEditMode) {
-                $imagePath = $this->image;
-            }
-
             $productsData = [
                 'code' => $this->code,
                 'name' => $this->name,
@@ -298,11 +258,10 @@ class ProductsController extends Component
                 'model' => ($this->type == 1) ? $this->model : null,
                 'minimum_stock' => $this->minimum_stock,
                 'type' => $this->type,
-                'lote' => ($this->type == 0) ? $this->lote : false,
+                'lote' => false,
                 'categorie_id' => ($this->type == 1) ? null : $this->categorie_id,
                 'brand_id' => $this->brand_id,
                 'unit_id' => $this->unit_id,
-                'image' => $imagePath,
             ];
 
             $product = Product::updateOrCreate(['id' => $this->product_id], $productsData);
@@ -332,17 +291,7 @@ class ProductsController extends Component
                 if ($totalInitialStock > 0) {
                     $invToUpdate = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
                     if ($invToUpdate) {
-                        if ($this->lote && $this->type == 0) {
-                            $invToUpdate->stock_lot += $totalInitialStock;
-                            Lot::create([
-                                'lot_number' => 'INIT-' . ($product->code ?? time()),
-                                'quantity' => $totalInitialStock,
-                                'product_id' => $product->id,
-                                'branch_id' => $this->branch_id,
-                            ]);
-                        } else {
-                            $invToUpdate->stock_nolot += $totalInitialStock;
-                        }
+                        $invToUpdate->stock_nolot += $totalInitialStock;
                         $invToUpdate->save();
 
                         Kardex::create([
@@ -428,7 +377,6 @@ class ProductsController extends Component
 
         $this->product_id = $product->id;
         $this->code = $product->code;
-        $this->image = $product->image;
         $this->name = $product->name;
         $this->features = $product->features;
         $this->model = $product->model;
@@ -436,12 +384,9 @@ class ProductsController extends Component
         $this->categorie_id = $product->categorie_id;
         $this->brand_id = $product->brand_id;
         $this->unit_id = $product->unit_id;
-        $this->image_preview = $product->image ? asset('storage/' . $product->image) : null;
         $this->type = $product->type;
         $this->lote = (bool) $product->lote;
         $this->isEditMode = true;
-
-        $this->dispatch('load-image-preview', ['image' => $this->image_preview]);
 
         if ($product->type == 3) {
             $this->skus = ProductSku::with(['color', 'size'])

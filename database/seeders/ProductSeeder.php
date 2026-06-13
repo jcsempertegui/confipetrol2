@@ -19,11 +19,11 @@ class ProductSeeder extends Seeder
                 'code' => $code,
                 'name' => $name,
                 'features' => "Características del producto $i",
-                'image' => null,
                 'lote' => 0,
-                'categorie_id' => 1, 
-                'brand_id' => 1,     
-                'unit_id' => 1,      
+                'type' => 2,
+                'categorie_id' => 1,
+                'brand_id' => 1,
+                'unit_id' => 1,
             ]);
 
             Inventorie::create([

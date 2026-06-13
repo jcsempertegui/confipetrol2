@@ -102,15 +102,12 @@
                                     <td>{{ $inventorie->product->code ?: 'S/N' }}</td>
                                     <td>{{ $inventorie->product->name ?: 'S/N' }}</td>
                                     <td>
-                                        @if ($inventorie->product->type == 0)
-                                            <div class="badge rounded-pill text-primary bg-light-primary text-uppercase">Producto
-                                            </div>
+                                        @if ($inventorie->product->type == 1)
+                                            <div class="badge rounded-pill text-warning bg-light-warning text-uppercase">Activo</div>
                                         @elseif ($inventorie->product->type == 3)
-                                            <div class="badge rounded-pill text-warning bg-light-warning text-uppercase">Insumo
-                                            </div>
+                                            <div class="badge rounded-pill text-uppercase" style="background-color: rgba(111,66,193,0.1); color:#6f42c1;">EPPS</div>
                                         @else
-                                            <div class="badge rounded-pill text-secondary bg-light-secondary text-uppercase">Otro
-                                            </div>
+                                            <div class="badge rounded-pill text-success bg-light-success text-uppercase">Consumible</div>
                                         @endif
                                     </td>
                                     <td>{{ $inventorie->product->minimum_stock ?: '0' }}</td>
@@ -231,15 +228,12 @@
                                     <td>{{ $inventorie->product->code ?: 'S/N' }}</td>
                                     <td>{{ $inventorie->product->name ?: 'S/N' }}</td>
                                     <td>
-                                        @if ($inventorie->product->type == 0)
-                                            <div class="badge rounded-pill text-primary bg-light-primary text-uppercase">Producto
-                                            </div>
+                                        @if ($inventorie->product->type == 1)
+                                            <div class="badge rounded-pill text-warning bg-light-warning text-uppercase">Activo</div>
                                         @elseif ($inventorie->product->type == 3)
-                                            <div class="badge rounded-pill text-warning bg-light-warning text-uppercase">Insumo
-                                            </div>
+                                            <div class="badge rounded-pill text-uppercase" style="background-color: rgba(111,66,193,0.1); color:#6f42c1;">EPPS</div>
                                         @else
-                                            <div class="badge rounded-pill text-secondary bg-light-secondary text-uppercase">Otro
-                                            </div>
+                                            <div class="badge rounded-pill text-success bg-light-success text-uppercase">Consumible</div>
                                         @endif
                                     </td>
                                     <td>{{ $inventorie->product->minimum_stock ?: '0' }}</td>

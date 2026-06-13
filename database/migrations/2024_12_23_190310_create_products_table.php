@@ -16,7 +16,6 @@ return new class extends Migration {
             $table->string('name');
             $table->text('features')->nullable();
             $table->string('model', 100)->nullable();
-            $table->string('image')->nullable();
             $table->tinyInteger('type')->default(0);
             $table->tinyInteger('has_loyalty')->default(0)->nullable();
             $table->integer('loyalty_req_qty')->default(0)->nullable();
