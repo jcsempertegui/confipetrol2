@@ -13,7 +13,7 @@ return [
     |
     */
 
-    'name' => env('APP_NAME', 'MASTEC POS'),
+    'name' => env('APP_NAME', 'CONFIPETROL'),
 
     /*
     |--------------------------------------------------------------------------

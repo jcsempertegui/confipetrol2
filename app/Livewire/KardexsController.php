@@ -91,7 +91,6 @@ class KardexsController extends Component
             'products.code',
             'products.name',
             'products.lote',
-            'inventories.sale_price',
             'inventories.stock_lot',
             'inventories.stock_nolot'
         ])
@@ -126,8 +125,6 @@ class KardexsController extends Component
 
         $query = Product::select(
             'products.id', 'products.code', 'products.name', 'products.type', 'products.lote', 'products.categorie_id', 'products.brand_id',
-            'inventories.sale_price',
-            'inventories.purchase_price',
             'inventories.stock', 'inventories.stock_lot', 'inventories.stock_nolot'
         )
         ->with(['categories', 'brands'])

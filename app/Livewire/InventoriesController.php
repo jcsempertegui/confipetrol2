@@ -93,23 +93,21 @@ class InventoriesController extends Component
         $bodyStyle = '<style font-size="10" border="1" border-color="' . $borderColor . '">';
         $bodyEnd = '</style>';
 
-        $totalStyle = '<style bgcolor="#FFFFCC" border="1" border-color="' . $borderColor . '" font-size="11"><b>';
-
         $data = [];
 
         $businessName = $settings ? mb_strtoupper($settings->business) : 'EMPRESA';
         $address = $settings && $settings->branch ? $settings->branch->address : '';
         $phone = $settings && $settings->branch ? $settings->branch->phone : '';
 
-        $data[] = ['<center><style font-size="16"><b>' . $businessName . '</b></style></center>', null, null, null, null, null, null, null, null];
-        $data[] = ['<center><style color="#444444" font-size="10">' . $address . '</style></center>', null, null, null, null, null, null, null, null];
-        $data[] = ['<center><style color="#444444" font-size="10">Tel: ' . $phone . '</style></center>', null, null, null, null, null, null, null, null];
+        $data[] = ['<center><style font-size="16"><b>' . $businessName . '</b></style></center>', null, null, null, null, null, null];
+        $data[] = ['<center><style color="#444444" font-size="10">' . $address . '</style></center>', null, null, null, null, null, null];
+        $data[] = ['<center><style color="#444444" font-size="10">Tel: ' . $phone . '</style></center>', null, null, null, null, null, null];
 
-        $data[] = ['<center><style font-size="12" bgcolor="#EFEFEF"><b>STOCK DE INVENTARIO GENERAL VALORADO</b></style></center>', null, null, null, null, null, null, null, null];
+        $data[] = ['<center><style font-size="12" bgcolor="#EFEFEF"><b>STOCK DE INVENTARIO GENERAL</b></style></center>', null, null, null, null, null, null];
 
         $data[] = [
             '<style font-size="10"><b>Generado por:</b> ' . ($user->name ?? 'Sistema') . '</style>',
-            null, null, null, null, null, null,
+            null, null, null, null,
             '<right><style font-size="10"><b>Fecha:</b> ' . $date . '</style></right>',
             null
         ];
@@ -118,12 +116,10 @@ class InventoriesController extends Component
             $hStyle . 'CÓDIGO' . $hEnd,
             $hStyle . 'PRODUCTO' . $hEnd,
             $hStyle . 'TIPO PRODUCTO' . $hEnd,
-            $hStyle . 'PRECIO COMPRA' . $hEnd,
-            $hStyle . 'PRECIO VENTA' . $hEnd,
             $hStyle . 'STOCK MINIMO' . $hEnd,
             $hStyle . 'STOCK' . $hEnd,
-            $hStyle . 'T. VALORADO' . $hEnd,
-            $hStyle . 'SUCURSAL / ALMACÉN' . $hEnd
+            $hStyle . 'SUCURSAL / ALMACÉN' . $hEnd,
+            null
         ];
 
         $inventories = Inventorie::with(['product', 'warehouse.branch'])
@@ -154,7 +150,6 @@ class InventoriesController extends Component
         }
 
         $branchCounts = Warehouse::where('status', 1)->get()->groupBy('branch_id')->map->count();
-        $totalInventario = 0;
 
         foreach ($inventories as $inv) {
             $tipoProducto = '';
@@ -165,9 +160,6 @@ class InventoriesController extends Component
             } else {
                 $tipoProducto = 'Otro';
             }
-
-            $tValorado = ($inv->stock ?: 0) * ($inv->purchase_price ?: 0);
-            $totalInventario += $tValorado;
 
             $branchName = 'S/N';
             if ($inv->warehouse && $inv->warehouse->branch) {
@@ -182,43 +174,29 @@ class InventoriesController extends Component
                 $bodyStyle . '<center>' . ($inv->product->code ?: 'S/N') . '</center>' . $bodyEnd,
                 $bodyStyle . ($inv->product->name ?: 'S/N') . $bodyEnd,
                 $bodyStyle . '<center>' . strtoupper($tipoProducto) . '</center>' . $bodyEnd,
-                $bodyStyle . '<right>' . number_format($inv->purchase_price ?: 0, 2) . '</right>' . $bodyEnd,
-                $bodyStyle . '<right>' . number_format($inv->sale_price ?: 0, 2) . '</right>' . $bodyEnd,
                 $bodyStyle . '<center>' . ($inv->product->minimum_stock ?: 0) . '</center>' . $bodyEnd,
                 $bodyStyle . '<center>' . ($inv->stock ?: 0) . '</center>' . $bodyEnd,
-                $bodyStyle . '<right>' . number_format($tValorado, 2) . '</right>' . $bodyEnd,
-                $bodyStyle . '<center>' . $branchName . '</center>' . $bodyEnd
+                $bodyStyle . '<center>' . $branchName . '</center>' . $bodyEnd,
+                null
             ];
         }
 
-        $data[] = [
-            '<right><style font-size="11"><b>TOTAL GENERAL:</b></style></right>',
-            null, null, null, null, null, null,
-            '<right>' . $totalStyle . number_format($totalInventario, 2) . '</b></style></right>',
-            null
-        ];
-
         $xlsx = SimpleXLSXGen::fromArray($data);
 
-        $xlsx->mergeCells('A1:I1');
-        $xlsx->mergeCells('A2:I2');
-        $xlsx->mergeCells('A3:I3');
-        $xlsx->mergeCells('A4:I4');
-        $xlsx->mergeCells('A5:G5');
-        $xlsx->mergeCells('H5:I5');
-        $ultimoIndice = count($data);
-        $xlsx->mergeCells('A' . $ultimoIndice . ':G' . $ultimoIndice);
-        $xlsx->mergeCells('H' . $ultimoIndice . ':I' . $ultimoIndice);
+        $xlsx->mergeCells('A1:G1');
+        $xlsx->mergeCells('A2:G2');
+        $xlsx->mergeCells('A3:G3');
+        $xlsx->mergeCells('A4:G4');
+        $xlsx->mergeCells('A5:E5');
+        $xlsx->mergeCells('F5:G5');
 
         $xlsx->setColWidth(1, 15);
         $xlsx->setColWidth(2, 45);
         $xlsx->setColWidth(3, 18);
         $xlsx->setColWidth(4, 15);
-        $xlsx->setColWidth(5, 15);
-        $xlsx->setColWidth(6, 15);
-        $xlsx->setColWidth(7, 12);
-        $xlsx->setColWidth(8, 18);
-        $xlsx->setColWidth(9, 28);
+        $xlsx->setColWidth(5, 12);
+        $xlsx->setColWidth(6, 28);
+        $xlsx->setColWidth(7, 5);
 
         $fileName = 'inventario_valorado_' . $branch_id . '_' . time() . '.xlsx';
         $path = storage_path('app/public/' . $fileName);
@@ -344,7 +322,6 @@ class InventoriesController extends Component
             'has_lote'       => $inventory->product->lote == 1,
             'stock_lot'      => $inventory->stock_lot,
             'stock_nolot'    => $inventory->stock_nolot,
-            'purchase_price' => $inventory->purchase_price,
         ];
 
         if ($this->selectedInventory['has_lote']) {
@@ -411,7 +388,7 @@ class InventoriesController extends Component
             DB::beginTransaction();
 
             $inventory    = Inventorie::find($this->selectedInventory['id']);
-            $costPrice    = $this->selectedInventory['purchase_price'] ?? 0;
+            $costPrice    = 0;
             $lot_id_saved = null;
 
             if ($this->selectedInventory['has_lote']) {

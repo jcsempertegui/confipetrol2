@@ -6,7 +6,7 @@
     @include('layouts.theme.styles')
 
 
-    <title>Mastec Pos - @stack('title', 'Home')</title>
+    <title>CONFIPETROL - @stack('title', 'Home')</title>
     <meta name="google" content="notranslate"> <!-- Agregar esta línea -->
     <meta http-equiv="Content-Language" content="es"> <!-- Agregar esta línea -->
     <meta name="csrf-token" content="{{ csrf_token() }}">

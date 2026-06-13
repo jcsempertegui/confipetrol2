@@ -55,7 +55,6 @@
                                                 <span class="listsearch-name">{{ Str::limit($item->name, 40) }}</span>
                                             </div>
                                             <div class="listsearch-info">
-                                                <span class="listsearch-price">Bs. {{ number_format($item->sale_price, 2) }}</span>
                                                 <span class="listsearch-stock {{ $currentStock == 0 ? 'stock-zero' : '' }}">
                                                     <i class='bx bx-error-circle' style="{{ $currentStock == 0 ? '' : 'display:none;' }}"></i>
                                                     Stock: {{ $currentStock }}

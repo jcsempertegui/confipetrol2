@@ -32,7 +32,7 @@ class ProductsController extends Component
 
     public $code, $name, $features, $model, $image, $image_preview;
     public $categorie_id, $brand_id, $unit_id, $product_id;
-    public $purchase_price, $sale_price, $profit = 25, $minimum_stock = 0, $initial_stock = 0;
+    public $minimum_stock = 0, $initial_stock = 0;
     public $isEditMode = false;
 
     public $filter_category = '';
@@ -161,7 +161,7 @@ class ProductsController extends Component
                 'categories:id,name',
                 'units:id,name',
                 'inventories' => function ($query) use ($warehouseId) {
-                    $query->select('product_id', 'purchase_price', 'sale_price', 'warehouse_id')
+                    $query->select('product_id', 'warehouse_id')
                         ->where('warehouse_id', $warehouseId);
                 },
             ])
@@ -202,9 +202,6 @@ class ProductsController extends Component
         $this->brand_id = null;
         $this->unit_id = null;
         $this->product_id = '';
-        $this->purchase_price = '';
-        $this->sale_price = null;
-        $this->profit = 25;
         $this->minimum_stock = 0;
         $this->initial_stock = 0;
         $this->image = null;
@@ -227,10 +224,7 @@ class ProductsController extends Component
         $rules = [
             'code' => 'required|unique:products,code,' . ($this->isEditMode ? $this->product_id : ''),
             'name' => 'required|min:3',
-            'purchase_price' => 'required|numeric|min:0',
-            'sale_price' => 'required|numeric|min:0',
             'minimum_stock' => 'required|numeric|min:0',
-            'profit' => 'required|numeric|min:0',
             'brand_id' => 'required|numeric',
             'unit_id' => 'required|numeric',
         ];
@@ -259,10 +253,7 @@ class ProductsController extends Component
             'name.required' => 'El producto es requerido',
             'name.min' => 'El nombre debe tener al menos 3 caracteres',
             'model.required' => 'El modelo es requerido',
-            'purchase_price.required' => 'El precio de compra es requerido',
-            'sale_price.required' => 'El precio de venta es requerido',
             'minimum_stock.required' => 'El stock mínimo es requerido',
-            'profit.required' => 'La utilidad es requerida',
             'image.image' => 'El archivo debe ser una imagen.',
             'image.max' => 'La imagen es demasiado pesada (Máx 20MB).',
             'categorie_id.required' => 'La categoría es requerida',
@@ -320,25 +311,17 @@ class ProductsController extends Component
             $allWarehouses = Warehouse::pluck('id')->toArray();
 
             if ($this->isEditMode) {
-                Inventorie::where('product_id', $product->id)
-                    ->where('warehouse_id', $warehouseId)
-                    ->update([
-                        'purchase_price' => $this->purchase_price,
-                        'sale_price' => $this->sale_price,
-                        'profit' => $this->profit,
-                    ]);
-
                 foreach ($allWarehouses as $wId) {
                     Inventorie::firstOrCreate(
                         ['product_id' => $product->id, 'warehouse_id' => $wId],
-                        ['purchase_price' => $this->purchase_price ?: 0, 'sale_price' => $this->sale_price ?: 0, 'profit' => $this->profit ?: 25, 'stock_lot' => 0, 'stock_nolot' => 0]
+                        ['stock_lot' => 0, 'stock_nolot' => 0]
                     );
                 }
             } else {
                 foreach ($allWarehouses as $wId) {
                     Inventorie::firstOrCreate(
                         ['product_id' => $product->id, 'warehouse_id' => $wId],
-                        ['purchase_price' => $this->purchase_price ?: 0, 'sale_price' => $this->sale_price ?: 0, 'profit' => $this->profit ?: 25, 'stock_lot' => 0, 'stock_nolot' => 0]
+                        ['stock_lot' => 0, 'stock_nolot' => 0]
                     );
                 }
 
@@ -367,8 +350,8 @@ class ProductsController extends Component
                             'description' => 'STOCK INICIAL',
                             'quantity_in' => $totalInitialStock,
                             'balance' => $totalInitialStock,
-                            'price' => $this->purchase_price ?: 0,
-                            'total' => $totalInitialStock * ($this->purchase_price ?: 0),
+                            'price' => 0,
+                            'total' => 0,
                             'product_id' => $product->id,
                             'user_id' => auth()->id(),
                             'warehouse_id' => $warehouseId,
@@ -441,13 +424,7 @@ class ProductsController extends Component
     {
         $this->resetValidation();
 
-        $warehouseId = $this->getDefaultWarehouseId();
-
-        $product = Product::select('products.*', 'inventories.purchase_price', 'inventories.sale_price', 'inventories.profit')
-            ->join('inventories', 'products.id', '=', 'inventories.product_id')
-            ->where('products.id', $id)
-            ->where('inventories.warehouse_id', $warehouseId)
-            ->firstOrFail();
+        $product = Product::findOrFail($id);
 
         $this->product_id = $product->id;
         $this->code = $product->code;
@@ -456,9 +433,6 @@ class ProductsController extends Component
         $this->features = $product->features;
         $this->model = $product->model;
         $this->minimum_stock = $product->minimum_stock;
-        $this->purchase_price = $product->purchase_price;
-        $this->sale_price = $product->sale_price;
-        $this->profit = $product->profit;
         $this->categorie_id = $product->categorie_id;
         $this->brand_id = $product->brand_id;
         $this->unit_id = $product->unit_id;
@@ -591,33 +565,6 @@ class ProductsController extends Component
     {
         $this->code = substr(now()->format('YmHisv') . uniqid(), 0, 15);
         $this->dispatch('alert', 'CÓDIGO GENERADO CON ÉXITO.', 'success');
-    }
-
-    private function roundToNearestTenth($value)
-    {
-        return round($value * 10) / 10;
-    }
-
-    public function calculateSalePrice()
-    {
-        if (is_numeric($this->purchase_price) && is_numeric($this->profit)) {
-            $this->sale_price = number_format($this->roundToNearestTenth($this->purchase_price * (1 + ($this->profit / 100))), 2, '.', '');
-        } else {
-            $this->sale_price = null;
-        }
-    }
-
-    public function calculatePurchasePrice()
-    {
-        if (is_numeric($this->sale_price) && is_numeric($this->profit)) {
-            if (!is_numeric($this->purchase_price) || $this->purchase_price == 0) {
-                $this->purchase_price = number_format($this->roundToNearestTenth($this->sale_price / (1 + ($this->profit / 100))), 2, '.', '');
-            } else {
-                $this->profit = round((($this->sale_price / $this->purchase_price) - 1) * 100, 2);
-            }
-        } else {
-            $this->purchase_price = null;
-        }
     }
 
     public function storeCategory()

@@ -27,13 +27,6 @@ class ProductSeeder extends Seeder
             ]);
 
             Inventorie::create([
-                'purchase_price' => rand(10, 100),
-                'sale_price' => rand(120, 200),
-                'wholesale_price' => rand(90, 110),
-                'wholesale_min_quantity' => rand(5, 20),
-                'sale_price_3' => rand(110, 150),
-                'sale_price_4' => rand(150, 180),
-                'profit' => rand(10, 40),
                 'stock_lot' => 0,
                 'stock_nolot' => rand(10, 100),
                 'product_id' => $product->id,

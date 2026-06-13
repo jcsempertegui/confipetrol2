@@ -5,7 +5,7 @@
         $branch = $userBranch ? \DB::table('branches')->where('id', $userBranch)->first() : null;
         return [
             'logoImage' => (!empty($setting) && !empty($setting->image)) ? 'storage/' . $setting->image : 'assets/images/login.png',
-            'businessName' => (!empty($setting) && !empty($setting->business)) ? $setting->business : 'MASTEC POS',
+            'businessName' => (!empty($setting) && !empty($setting->business)) ? $setting->business : 'CONFIPETROL',
             'enableSizeColor' => $branch ? $branch->enable_size_color : 0,
             'invoiceType' => $branch ? $branch->invoice_type : 'ninguno',
         ];

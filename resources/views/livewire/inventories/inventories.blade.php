@@ -83,11 +83,8 @@
                             <th>CODIGO</th>
                             <th>PRODUCTO</th>
                             <th>TIPO PRODUCTO</th>
-                            <th>PRECIO COMPRA</th>
-                            <th>PRECIO VENTA</th>
                             <th>STOCK MINIMO</th>
                             <th>STOCK</th>
-                            <th>T. VALORADO</th>
                             <th>SUCURSAL</th>
                             <th>ACCIONES</th>
                         </tr>
@@ -95,7 +92,7 @@
                     <tbody>
                         @if ($inventories->isEmpty())
                             <tr>
-                                <td colspan="11" class="text-center">No se encontraron registros.</td>
+                                <td colspan="7" class="text-center">No se encontraron registros.</td>
                             </tr>
                         @else
                             @foreach ($inventories as $index => $inventorie)
@@ -116,12 +113,8 @@
                                             </div>
                                         @endif
                                     </td>
-                                    <td>{{ $inventorie->purchase_price ?: '0.00' }}</td>
-                                    <td>{{ $inventorie->sale_price ?: '0.00' }}</td>
                                     <td>{{ $inventorie->product->minimum_stock ?: '0' }}</td>
                                     <td>{{ $inventorie->stock ?: '0' }}</td>
-                                    <td>{{ number_format(($inventorie->stock ?: 0) * ($inventorie->purchase_price ?: 0), 2) }}
-                                    </td>
                                     <td>
                                         {{ $inventorie->branch->name ?: 'S/N' }}
                                         @php
@@ -152,23 +145,16 @@
                             @endforeach
                         @endif
                         <tr class="template-tr-spacer">
-                            <td colspan="11" class="template-td-spacer"></td>
+                            <td colspan="7" class="template-td-spacer"></td>
                         </tr>
                     </tbody>
                     <tfoot class="template-sticky-tfoot">
                         <tr>
-                            @php
-                                $totalValoradoMobile = $inventories->sum(fn($i) => ($i->stock ?: 0) * ($i->purchase_price ?: 0));
-                            @endphp
                             <td class="text-muted small">{{ $inventories->total() }} items</td>
                             <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-end pe-2">T. VALORADO:</td>
-                            <td>{{ number_format($totalValoradoMobile, 2) }}</td>
                             <td></td>
                             <td></td>
                         </tr>
@@ -226,11 +212,8 @@
                             <th>CODIGO</th>
                             <th>PRODUCTO</th>
                             <th>TIPO PRODUCTO</th>
-                            <th>PRECIO COMPRA</th>
-                            <th>PRECIO VENTA</th>
                             <th>STOCK MINIMO</th>
                             <th>STOCK</th>
-                            <th>T. VALORADO</th>
                             <th>SUCURSAL</th>
                             <th>ACCIONES</th>
                         </tr>
@@ -238,7 +221,7 @@
                     <tbody>
                         @if ($inventories->isEmpty())
                             <tr>
-                                <td colspan="11" class="text-center">No se encontraron registros.</td>
+                                <td colspan="7" class="text-center">No se encontraron registros.</td>
                             </tr>
                         @else
                             @foreach ($inventories as $index => $inventorie)
@@ -259,12 +242,8 @@
                                             </div>
                                         @endif
                                     </td>
-                                    <td>{{ $inventorie->purchase_price ?: '0.00' }}</td>
-                                    <td>{{ $inventorie->sale_price ?: '0.00' }}</td>
                                     <td>{{ $inventorie->product->minimum_stock ?: '0' }}</td>
                                     <td>{{ $inventorie->stock ?: '0' }}</td>
-                                    <td>{{ number_format(($inventorie->stock ?: 0) * ($inventorie->purchase_price ?: 0), 2) }}
-                                    </td>
                                     <td>
                                         {{ $inventorie->branch->name ?: 'S/N' }}
                                         @php
@@ -297,18 +276,11 @@
                     </tbody>
                     <tfoot class="template-sticky-tfoot">
                         <tr>
-                            @php
-                                $totalValorado = $inventories->sum(fn($i) => ($i->stock ?: 0) * ($i->purchase_price ?: 0));
-                            @endphp
                             <td class="text-muted small">{{ $inventories->total() }} items</td>
                             <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
-                            <td></td>
-                            <td></td>
-                            <td class="text-end pe-2">T. VALORADO:</td>
-                            <td>{{ number_format($totalValorado, 2) }}</td>
                             <td></td>
                             <td></td>
                         </tr>

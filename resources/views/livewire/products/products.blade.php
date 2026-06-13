@@ -81,8 +81,6 @@
                             <th>CÓDIGO</th>
                             <th>NOMBRE</th>
                             <th>TIPO</th>
-                            <th>P. COMPRA</th>
-                            <th>P. VENTA</th>
                             <th>CATEGORÍA</th>
                             <th>MARCA</th>
                             <th>UMD</th>
@@ -93,7 +91,7 @@
                     <tbody>
                         @if ($products->isEmpty())
                             <tr>
-                                <td colspan="11" class="text-center">No se encontraron registros.</td>
+                                <td colspan="9" class="text-center">No se encontraron registros.</td>
                             </tr>
                         @else
                             @foreach ($products as $index => $product)
@@ -114,8 +112,6 @@
                                             <div class="badge rounded-pill text-danger bg-light-danger text-uppercase">Otro</div>
                                         @endif
                                     </td>
-                                    <td>{{ optional($product->inventories)->purchase_price ?: '0.00' }}</td>
-                                    <td>{{ optional($product->inventories)->sale_price ?: '0.00' }}</td>
                                     <td>{{ $product->categories->name ?? '-' }}</td>
                                     <td>{{ $product->brands->name ?? '-' }}</td>
                                     <td>{{ $product->units->name ?? '-' }}</td>
@@ -322,43 +318,6 @@
                                                     </div>
                                                 @endif
 
-                                                <div class="col-span-2 mb-1"><hr class="my-2"></div>
-
-                                                <div class="col-lg-4 col-sm-6 mb-2">
-                                                    <label>Precio de Compra</label>
-                                                    <div class="position-relative input-icon">
-                                                        <input type="text" class="form-control text-end price-decimal"
-                                                            id="purchase_price" wire:model.lazy="purchase_price"
-                                                            placeholder="0.00" wire:change="calculateSalePrice"
-                                                            inputmode="decimal">
-                                                        <span class="position-absolute top-50 translate-middle-y">Bs</span>
-                                                    </div>
-                                                    @error('purchase_price') <span class="text-danger er">{{ $message }}</span> @enderror
-                                                </div>
-
-                                                <div class="col-lg-4 col-sm-6 mb-2">
-                                                    <label>Ganancia (%)</label>
-                                                    <div class="position-relative input-icon">
-                                                        <input type="text" class="form-control text-end"
-                                                            wire:model="profit" value="25" maxlength="5"
-                                                            wire:change="calculateSalePrice" inputmode="decimal"
-                                                            oninput="this.value = this.value.replace(/[^0-9.]/g, '')">
-                                                        <span class="position-absolute top-50 translate-middle-y">%</span>
-                                                    </div>
-                                                    @error('profit') <span class="text-danger er">{{ $message }}</span> @enderror
-                                                </div>
-
-                                                <div class="col-md-4 col-sm-6 mb-2">
-                                                    <label>Precio de Venta</label>
-                                                    <div class="position-relative input-icon">
-                                                        <input type="text" class="form-control text-end price-decimal"
-                                                            id="sale_price" wire:model.lazy="sale_price"
-                                                            placeholder="0.00" inputmode="decimal"
-                                                            wire:change="calculatePurchasePrice">
-                                                        <span class="position-absolute top-50 translate-middle-y">Bs</span>
-                                                    </div>
-                                                    @error('sale_price') <span class="text-danger er">{{ $message }}</span> @enderror
-                                                </div>                                            
 
                                             </div>
                                         </div>
@@ -515,7 +474,7 @@
                                                                     @else
                                                                         <input type="text"
                                                                             class="form-control form-control-sm text-end bg-light text-muted"
-                                                                            value="{{ $sale_price ?: '0.00' }}" readonly
+                                                                            value="0.00" readonly
                                                                             title="Precio Base General" style="width: 80px;">
                                                                     @endif
                                                                 </div>

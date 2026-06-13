@@ -10,9 +10,6 @@ class Inventorie extends Model
     use HasFactory;
 
     protected $fillable = [
-        'purchase_price',
-        'sale_price',
-        'profit',
         'stock_lot',
         'stock_nolot',
         'stock',

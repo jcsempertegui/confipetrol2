@@ -149,9 +149,6 @@ class WarehousesController extends Component
                     $inventoriesData[] = [
                         'product_id' => $product->id,
                         'warehouse_id' => $warehouse->id,
-                        'purchase_price' => $baseInv ? $baseInv->purchase_price : 0,
-                        'sale_price' => $baseInv ? $baseInv->sale_price : 0,
-                        'profit' => $baseInv ? $baseInv->profit : 25,
                         'stock_lot' => 0,
                         'stock_nolot' => 0,
                         'created_at' => now(),
@@ -201,9 +198,6 @@ class WarehousesController extends Component
             $inventoriesData[] = [
                 'product_id' => $product->id,
                 'warehouse_id' => $id,
-                'purchase_price' => $baseInv ? $baseInv->purchase_price : 0,
-                'sale_price' => $baseInv ? $baseInv->sale_price : 0,
-                'profit' => $baseInv ? $baseInv->profit : 25,
                 'stock_lot' => 0,
                 'stock_nolot' => 0,
                 'created_at' => now(),

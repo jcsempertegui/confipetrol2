@@ -8,8 +8,6 @@ return new class extends Migration
     {
         Schema::create('inventories', function (Blueprint $table) {
             $table->id();
-            $table->decimal('purchase_price', 10, 2)->default(0);
-            $table->decimal('sale_price', 10, 2)->default(0);
             $table->integer('profit')->default(0);
             $table->integer('stock_lot')->default(0);
             $table->integer('stock_nolot')->default(0);

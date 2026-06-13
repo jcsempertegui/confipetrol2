@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mastec Pos - Login</title>
+    <title>CONFIPETROL - Login</title>
     <link rel="icon" href="assets/images/favicon.ico" type="image/png" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
@@ -529,8 +529,8 @@
         <div class="login-container">
             <!-- Header -->
             <div class="login-header">
-                <img src="assets/images/login.png" class="company-logo" width="70" alt="Mastec POS" />
-                <h1 class="login-title">Mastec POS</h1>
+                <img src="assets/images/login.png" class="company-logo" width="70" alt="CONFIPETROL" />
+                <h1 class="login-title">CONFIPETROL</h1>
                 <p class="login-subtitle">Acceso al sistema de ventas</p>
             </div>
 
