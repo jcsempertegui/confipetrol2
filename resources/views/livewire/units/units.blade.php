@@ -8,7 +8,9 @@
                 <li class="breadcrumb-item text-primary">Administracion</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Unidades de Medida</li>
             </ol>
+            @can('crear-unidades')
             @include('components.tools.buttonRegister')
+            @endcan
         </div>
     </div>
 
@@ -84,15 +86,21 @@
                                     </td>
                                     <td>
                                         <div class="d-flex order-actions">
+                                            @can('editar-unidades')
                                             <a href="javascript:;" wire:click="edit({{ $unit->id }})" data-bs-toggle="modal"
                                                 data-bs-target="#theModal" class="btn-action-primary"><i
                                                     class="bx bxs-edit-alt"></i></a>
+                                            @endcan
                                             @if ($unit->status == 1)
+                                                @can('eliminar-unidades')
                                                 <a href="javascript:;" onclick="confirmDelete({{ $unit->id }}, 'delete')"
                                                     class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
+                                                @endcan
                                             @else
+                                                @can('restaurar-unidades')
                                                 <a href="javascript:;" onclick="confirmDelete({{ $unit->id }}, 'restore')"
                                                     class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
+                                                @endcan
                                             @endif
                                         </div>
                                     </td>

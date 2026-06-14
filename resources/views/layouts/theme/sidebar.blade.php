@@ -50,7 +50,7 @@
             </a>
         </li>
 
-        @canany(['ver-usuario', 'ver-rol', 'ver-ajustes', 'ver-log', 'ver-sucursales', 'ver-planillas'])
+        @canany(['ver-usuario', 'ver-rol', 'ver-ajustes', 'ver-log', 'ver-sucursales'])
             <li>
                 <a href="javascript:;" class="has-arrow">
                     <div class="parent-icon"><i class="bx bx-cog"></i></div>
@@ -80,7 +80,7 @@
             </li>
         @endcanany
 
-        @canany(['ver-productos', 'ver-categorias', 'ver-marcas', 'ver-unidades', 'ver-variantes', 'ver-adicionales', 'importar-productos'])
+        @canany(['ver-productos', 'ver-categorias', 'ver-marcas', 'ver-unidades', 'importar-productos'])
             <li>
                 <a href="javascript:;" class="has-arrow">
                     <div class="parent-icon"><i class="bx bx-package"></i></div>
@@ -119,27 +119,39 @@
         @endcan
        
 
+        @canany(['nueva-entrega', 'listar-entrega'])
         <li>
             <a href="javascript:;" class="has-arrow">
                 <div class="parent-icon"><i class="bx bx-cart"></i></div>
                 <div class="menu-title">Entregas</div>
             </a>
             <ul>
+                @can('nueva-entrega')
                 <li><a href="{{ url('deliveries') }}"><i class="bx bx-radio-circle"></i> Nueva Entrega</a></li>
+                @endcan
+                @can('listar-entrega')
                 <li><a href="{{ url('delivery_lists') }}"><i class="bx bx-radio-circle"></i> Listar Entregas</a></li>
+                @endcan
             </ul>
         </li>
+        @endcanany
 
+        @canany(['nuevo-remito', 'listar-remito'])
         <li>
             <a href="javascript:;" class="has-arrow">
                 <div class="parent-icon"><i class="bx bx-receipt"></i></div>
                 <div class="menu-title">Remitos</div>
             </a>
             <ul>
+                @can('nuevo-remito')
                 <li><a href="{{ url('remitos') }}"><i class="bx bx-radio-circle"></i> Nuevo Remito</a></li>
+                @endcan
+                @can('listar-remito')
                 <li><a href="{{ url('remito_lists') }}"><i class="bx bx-radio-circle"></i> Listar Remitos</a></li>
+                @endcan
             </ul>
         </li>
+        @endcanany
 
         @canany(['ver-stock', 'ver-kardex'])
             <li>
@@ -158,17 +170,19 @@
             </li>
         @endcanany
 
-        @canany(['ver-reporteventa', 'ver-reportecompra', 'ver-reporteingreso', 'ver-reporteganancias', 'ver-reporteestado', 'ver-reportevencimiento', 'ver-reportestockmin', 'ver-reportecomision'])
+        @canany(['ver-reporteentrega', 'ver-reporteremito'])
             <li>
                 <a href="javascript:;" class="has-arrow">
                     <div class="parent-icon"><i class="bx bx-bar-chart"></i></div>
                     <div class="menu-title">Reportes</div>
                 </a>
                 <ul>
-                    <li><a href="{{ url('delivery_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Entregas</a>
-                    </li>
-                    <li><a href="{{ url('remito_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Remitos</a>
-                    </li>
+                    @can('ver-reporteentrega')
+                    <li><a href="{{ url('delivery_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Entregas</a></li>
+                    @endcan
+                    @can('ver-reporteremito')
+                    <li><a href="{{ url('remito_reports') }}"><i class="bx bx-radio-circle"></i> Reporte de Remitos</a></li>
+                    @endcan
                 </ul>
             </li>
         @endcanany

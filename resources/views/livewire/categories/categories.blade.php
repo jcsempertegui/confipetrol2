@@ -7,7 +7,7 @@
                 <li class="breadcrumb-item">Administracion</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Categorias</li>
             </ol>
-            @can('crear-usuario')
+            @can('crear-categorias')
                 @include('components.tools.buttonRegister')
             @endcan
         </div>
@@ -60,16 +60,18 @@
 
                                     <td>
                                         <div class="d-flex order-actions">
+                                            @can('editar-categorias')
                                             <a href="javascript:;" wire:click="edit({{ $categorie->id }})"
                                                 data-bs-toggle="modal" data-bs-target="#theModal" class="btn-action-primary"><i
                                                     class="bx bxs-edit-alt"></i></a>
+                                            @endcan
                                             @if ($categorie->status == 1)
-                                                @can('eliminar-usuario')
+                                                @can('eliminar-categorias')
                                                     <a href="javascript:;" onclick="confirmDelete({{ $categorie->id }}, 'delete')"
                                                         class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
                                                 @endcan
                                             @else
-                                                @can('restaurar-usuario')
+                                                @can('restaurar-categorias')
                                                     <a href="javascript:;" onclick="confirmDelete({{ $categorie->id }}, 'restore')"
                                                         class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
                                                 @endcan

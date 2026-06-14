@@ -155,10 +155,12 @@
                                                 <i class="bx bx-list-ul"></i>
                                             </a>
                                             @if($remito->status != 0)
+                                                @can('eliminar-remito')
                                                 <a href="javascript:;" onclick="confirmDeleteRemito({{ $remito->id }})"
                                                     class="btn-action-danger ms-1" title="Anular remito">
                                                     <i class="bx bxs-trash"></i>
                                                 </a>
+                                                @endcan
                                             @endif
                                         </div>
                                     </td>

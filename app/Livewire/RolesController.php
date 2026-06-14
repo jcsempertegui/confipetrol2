@@ -28,22 +28,16 @@ class RolesController extends Component
 
     public function getPermisosExcluidos()
     {
-        $posType = auth()->user()->branche ? (int) auth()->user()->branche->pos_type : null;
-        $esRestaurante = in_array($posType, [0, 4]);
-
-        $permisosExcluidos = $esRestaurante ? [] : [
-            'ver-variantes', 'crear-variantes', 'editar-variantes', 'eliminar-variantes', 'restaurar-variantes',
-            'ver-adicionales', 'crear-adicionales', 'editar-adicionales', 'eliminar-adicionales', 'restaurar-adicionales',
-        ];
+        $permisosExcluidos = [];
 
         if (auth()->id() !== 1) {
-            $permisosExcluidos = array_merge($permisosExcluidos, [
-                'ver-ajustesadicionales',
+            $permisosExcluidos = [
                 'ver-sucursales',
                 'crear-sucursal',
                 'editar-sucursal',
-                'eliminar-sucursal'
-            ]);
+                'eliminar-sucursal',
+                'cambiar-sucursal',
+            ];
         }
 
         return $permisosExcluidos;
@@ -51,8 +45,7 @@ class RolesController extends Component
 
     public function getGruposExcluidos()
     {
-        $posType = auth()->user()->branche ? (int) auth()->user()->branche->pos_type : null;
-        return in_array($posType, [0, 4]) ? [] : ['Zonas'];
+        return [];
     }
 
     public function render()

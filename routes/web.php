@@ -41,7 +41,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('logs', LogsController::class)->middleware('permission:ver-log')->name('logs');
     Route::get('settings', SettingsController::class)->middleware('permission:ver-ajustes')->name('settings');
     Route::get('branches', BranchesController::class)->middleware('permission:ver-sucursales')->name('branches');
-    Route::get('warehouses', WarehousesController::class)->name('warehouses');
+    Route::get('warehouses', WarehousesController::class)->middleware('permission:ver-sucursales')->name('warehouses');
     Route::get('categories', CategoriesController::class)->middleware('permission:ver-categorias')->name('categories');
     Route::get('units', UnitsController::class)->middleware('permission:ver-unidades')->name('units');
 
@@ -50,15 +50,15 @@ Route::middleware(['auth'])->group(function () {
     Route::get('inventoryPdf/{branch_id}', [ProductsController::class, 'inventoryPdf'])->name('inventoryPdf');
     Route::get('workers', WorkersController::class)->middleware('permission:ver-trabajadores')->name('workers');
 
-    Route::get('deliveries', DeliveriesController::class)->name('deliveries');
-    Route::get('delivery_lists', DeliveryListsController::class)->name('delivery_lists');
-    Route::get('delivery_reports', DeliveryReportsController::class)->name('delivery_reports');
-    Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->name('delivery_reports.deliveryReportPdf');
+    Route::get('deliveries', DeliveriesController::class)->middleware('permission:nueva-entrega')->name('deliveries');
+    Route::get('delivery_lists', DeliveryListsController::class)->middleware('permission:listar-entrega')->name('delivery_lists');
+    Route::get('delivery_reports', DeliveryReportsController::class)->middleware('permission:ver-reporteentrega')->name('delivery_reports');
+    Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->middleware('permission:ver-reporteentrega')->name('delivery_reports.deliveryReportPdf');
 
-    Route::get('remitos', RemitosController::class)->name('remitos');
-    Route::get('remito_lists', RemitoListsController::class)->name('remito_lists');
-    Route::get('remito_reports', RemitoReportsController::class)->name('remito_reports');
-    Route::get('/remito_reports/remitoReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}/{tipo}', [RemitoReportsController::class, 'remitoReportPdf'])->name('remito_reports.remitoReportPdf');
+    Route::get('remitos', RemitosController::class)->middleware('permission:nuevo-remito')->name('remitos');
+    Route::get('remito_lists', RemitoListsController::class)->middleware('permission:listar-remito')->name('remito_lists');
+    Route::get('remito_reports', RemitoReportsController::class)->middleware('permission:ver-reporteremito')->name('remito_reports');
+    Route::get('/remito_reports/remitoReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}/{tipo}', [RemitoReportsController::class, 'remitoReportPdf'])->middleware('permission:ver-reporteremito')->name('remito_reports.remitoReportPdf');
 
 
     Route::get('inventories', InventoriesController::class)->middleware('permission:ver-stock')->name('inventories');

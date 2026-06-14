@@ -7,7 +7,7 @@
                 <li class="breadcrumb-item text-primary">Administracion</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Sucursales</li>
             </ol>
-            @can('crear-productos')
+            @can('crear-sucursal')
             @include('components.tools.buttonRegister')
             @endcan
         </div>
@@ -78,19 +78,21 @@
 
                             <td>
                                 <div class="d-flex order-actions">
+                                    @can('editar-sucursal')
                                     <a href="javascript:;" wire:click="edit({{ $branche->id }})" data-bs-toggle="modal"
                                         data-bs-target="#theModal" class="btn-action-primary"><i
                                             class="bx bxs-edit-alt"></i></a>
+                                    @endcan
                                     <a href="javascript:;" wire:click="syncInventory({{ $branche->id }})"
                                         class="btn-action-primary ms-1" title="Sincronizar Productos" style="background-color: #0dcaf0; border-color: #0dcaf0; color: white;"><i
                                             class="bx bx-sync"></i></a>
                                     @if($branche->status == 1)
-                                    @can('eliminar-usuario')
+                                    @can('eliminar-sucursal')
                                     <a href="javascript:;" onclick="confirmDelete({{ $branche->id }}, 'delete')"
                                         class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
                                     @endcan
                                     @else
-                                    @can('restaurar-usuario')
+                                    @can('eliminar-sucursal')
                                     <a href="javascript:;" onclick="confirmDelete({{ $branche->id }}, 'restore')"
                                         class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
 

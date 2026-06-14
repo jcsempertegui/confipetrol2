@@ -8,7 +8,7 @@
                 <li class="breadcrumb-item">Administracion</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Marcas</li>
             </ol>
-            @can('crear-usuario')
+            @can('crear-marcas')
                 @include('components.tools.buttonRegister')
             @endcan
         </div>
@@ -59,16 +59,18 @@
 
                                     <td>
                                         <div class="d-flex order-actions">
+                                            @can('editar-marcas')
                                             <a href="javascript:;" wire:click="edit({{ $brand->id }})" data-bs-toggle="modal"
                                                 data-bs-target="#theModal" class="btn-action-primary"><i
                                                     class="bx bxs-edit-alt"></i></a>
+                                            @endcan
                                             @if($brand->status == 1)
-                                                @can('eliminar-usuario')
+                                                @can('eliminar-marcas')
                                                     <a href="javascript:;" onclick="confirmDelete({{ $brand->id }}, 'delete')"
                                                         class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
                                                 @endcan
                                             @else
-                                                @can('restaurar-usuario')
+                                                @can('restaurar-marcas')
                                                     <a href="javascript:;" onclick="confirmDelete({{ $brand->id }}, 'restore')"
                                                         class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
 

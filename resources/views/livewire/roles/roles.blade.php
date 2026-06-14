@@ -7,7 +7,7 @@
                 <li class="breadcrumb-item text-primary">Administracion</li>
                 <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Roles</li>
             </ol>
-            @can('crear-productos')
+            @can('crear-rol')
             @include('components.tools.buttonRegister')
             @endcan
         </div>

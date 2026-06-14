@@ -139,10 +139,12 @@
                                             </a>
 
                                             @if($delivery->status != 0)
+                                                @can('eliminar-entrega')
                                                 <a href="javascript:;" onclick="confirmDeleteDelivery({{ $delivery->id }})"
                                                     class="btn-action-danger ms-1" title="Anular entrega">
                                                     <i class="bx bxs-trash"></i>
                                                 </a>
+                                                @endcan
                                             @endif
                                         </div>
                                     </td>
