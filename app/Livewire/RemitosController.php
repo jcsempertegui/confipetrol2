@@ -117,7 +117,6 @@ class RemitosController extends Component
                 'products.type',
                 'products.brand_id',
                 'products.categorie_id',
-                'products.image',
                 'inventories.stock_lot',
                 'inventories.stock_nolot',
             ])
