@@ -13,6 +13,7 @@ use App\Models\Kardex;
 use App\Models\Branche;
 use App\Models\Worker;
 use App\Models\Warehouse;
+use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
 use Exception;
@@ -21,7 +22,7 @@ include_once(base_path('public/assets/plugins/literal.php'));
 
 class DeliveriesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
 
     public $search = '';
     public $products = [];
@@ -519,6 +520,15 @@ class DeliveriesController extends Component
             }
 
             DB::commit();
+
+            $totalItems = collect($this->cart)->sum('quantity');
+            $this->logActivity(
+                'ENTREGAS', 'CREAR',
+                "Registró entrega EPP: {$deliveryNumber} ({$totalItems} ítems)",
+                $delivery->id,
+                null,
+                ['delivery_number' => $deliveryNumber, 'branch_id' => $this->branch_id, 'worker_id' => $this->workers_id, 'items' => $totalItems]
+            );
 
             $this->clearDeliveries();
             $this->delivery_date = now()->format('Y-m-d');

@@ -13,6 +13,7 @@ use App\Models\ProductSku;
 use App\Models\Warehouse;
 use App\Models\Setting;
 use App\Models\Printer;
+use App\Traits\AuditLog;
 use Livewire\WithPagination;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -20,7 +21,7 @@ use Shuchkin\SimpleXLSXGen;
 
 class InventoriesController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $warehousesList = [];
@@ -478,6 +479,14 @@ class InventoriesController extends Component
             ]);
 
             DB::commit();
+
+            $this->logActivity(
+                'INVENTARIO', 'EDITAR',
+                "Ajustó stock de: {$this->selectedInventory['product_name']} ({$this->selectedInventory['product_code']}) | Anterior: {$old_quantity} → Nuevo: {$this->new_quantity}",
+                $this->selectedInventory['product_id'],
+                ['stock' => $old_quantity],
+                ['stock' => (int) $this->new_quantity, 'motivo' => $this->adjustment_reason]
+            );
 
             $this->selectedInventory = null;
             $this->availableLots     = [];

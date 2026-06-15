@@ -7,6 +7,7 @@ use App\Models\DeliveryDetail;
 use App\Models\Inventorie;
 use App\Models\Kardex;
 use App\Models\ProductSku;
+use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Carbon\Carbon;
@@ -14,7 +15,7 @@ use Illuminate\Support\Facades\DB;
 
 class DeliveryListsController extends Component
 {
-    use WithPagination;
+    use WithPagination, AuditLog;
     protected $paginationTheme = 'bootstrap';
 
     public $delivery_id, $delivery;
@@ -169,6 +170,15 @@ class DeliveryListsController extends Component
             }
 
             DB::commit();
+
+            $this->logActivity(
+                'ENTREGAS', 'ANULAR',
+                "Anuló entrega EPP: {$delivery->delivery_number}",
+                $delivery->id,
+                ['status' => 1],
+                ['status' => 0]
+            );
+
             $this->dispatch('alert', 'LA ENTREGA HA SIDO ANULADA Y EL STOCK RESTAURADO', 'success');
 
         } catch (\Exception $e) {
