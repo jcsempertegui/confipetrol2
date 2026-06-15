@@ -15,8 +15,6 @@ class Kardex extends Model
         'quantity_in',
         'quantity_out',
         'balance',
-        'price',
-        'total',
         'product_id',
         'user_id',
         'warehouse_id',

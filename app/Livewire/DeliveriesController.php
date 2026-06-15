@@ -159,7 +159,6 @@ class DeliveriesController extends Component
                 'products.id',
                 'products.code',
                 'products.name',
-                'products.lote',
                 'products.type',
                 'products.brand_id',
                 'products.categorie_id',
@@ -310,10 +309,7 @@ class DeliveriesController extends Component
         $warehouseId = $defaultWarehouse ? $defaultWarehouse->id : 1;
         $inventory = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
 
-        $availableStock = 0;
-        if ($inventory) {
-            $availableStock = $product->lote == 1 ? $inventory->stock_lot : $inventory->stock_nolot;
-        }
+        $availableStock = $inventory ? $inventory->stock_nolot : 0;
 
         if ($availableStock <= 0) {
             $this->dispatch('alert', 'SIN STOCK DISPONIBLE PARA ESTE PRODUCTO', 'error');
@@ -378,12 +374,10 @@ class DeliveriesController extends Component
         } else {
             $defaultWarehouse = Warehouse::where('branch_id', $this->branch_id)->where('is_default', 1)->first();
             $warehouseId = $defaultWarehouse ? $defaultWarehouse->id : 1;
-            $product = Product::find($item['id']);
             $inventory = Inventorie::where('product_id', $item['id'])->where('warehouse_id', $warehouseId)->first();
-            if ($inventory && $product) {
-                $available = $product->lote == 1 ? $inventory->stock_lot : $inventory->stock_nolot;
-                if ($quantity > $available) {
-                    $this->dispatch('alert', 'NO HAY SUFICIENTE STOCK DISPONIBLE (disponible: ' . $available . ')', 'error');
+            if ($inventory) {
+                if ($quantity > $inventory->stock_nolot) {
+                    $this->dispatch('alert', 'NO HAY SUFICIENTE STOCK DISPONIBLE (disponible: ' . $inventory->stock_nolot . ')', 'error');
                     $this->dispatch('update-delivery-qty-input', ['productId' => $cartKey, 'qty' => $previousQty]);
                     return;
                 }
@@ -497,12 +491,8 @@ class DeliveriesController extends Component
                     $inventory = Inventorie::where('product_id', $item['id'])
                         ->where('warehouse_id', $warehouseId)
                         ->lockForUpdate()->first();
-                    if ($inventory && $product) {
-                        if ($product->lote == 1) {
-                            $inventory->stock_lot -= $item['quantity'];
-                        } else {
-                            $inventory->stock_nolot -= $item['quantity'];
-                        }
+                    if ($inventory) {
+                        $inventory->stock_nolot -= $item['quantity'];
                         $inventory->save();
                     }
                 }
@@ -519,8 +509,6 @@ class DeliveriesController extends Component
                     'quantity_in'      => 0,
                     'quantity_out'     => $item['quantity'],
                     'balance'          => $previousBalance - $item['quantity'],
-                    'price'            => 0,
-                    'total'            => 0,
                     'product_id'       => $item['id'],
                     'user_id'          => auth()->id(),
                     'warehouse_id'     => $warehouseId,

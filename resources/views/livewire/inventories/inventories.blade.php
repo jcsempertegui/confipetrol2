@@ -136,6 +136,14 @@
                                                     <i class="bx bx-list-ul"></i>
                                                 </a>
                                             @endif
+                                            @if ($inventorie->product->skus_count > 0)
+                                                <a href="javascript:;"
+                                                    wire:click="openSkusModal({{ $inventorie->id }})"
+                                                    data-bs-toggle="modal" data-bs-target="#skusModal"
+                                                    class="btn-action-warning ms-1" title="Ver Tallas / Colores">
+                                                    <i class="bx bx-palette"></i>
+                                                </a>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -262,6 +270,14 @@
                                                     <i class="bx bx-list-ul"></i>
                                                 </a>
                                             @endif
+                                            @if ($inventorie->product->skus_count > 0)
+                                                <a href="javascript:;"
+                                                    wire:click="openSkusModal({{ $inventorie->id }})"
+                                                    data-bs-toggle="modal" data-bs-target="#skusModal"
+                                                    class="btn-action-warning ms-1" title="Ver Tallas / Colores">
+                                                    <i class="bx bx-palette"></i>
+                                                </a>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -284,6 +300,61 @@
 
             <div class="template-pagination-mobile">
                 {{ $inventories->links() }}
+            </div>
+        </div>
+    </div>
+
+    {{-- MODAL TALLAS / COLORES --}}
+    <div wire:ignore.self class="modal fade" id="skusModal" tabindex="-1" aria-labelledby="skusModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="skusModalLabel">
+                        <i class="bx bx-palette me-1"></i> STOCK POR TALLAS / COLORES
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    @if ($skusProductName)
+                        <p class="mb-3 fw-semibold">{{ $skusProductName }}</p>
+                    @endif
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle table-striped" style="width:100%;">
+                            <thead>
+                                <tr>
+                                    <th>COLOR</th>
+                                    <th>TALLA</th>
+                                    <th>SKU</th>
+                                    <th class="text-end">STOCK</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @if (empty($skusList))
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted">No hay variantes registradas para esta sucursal.</td>
+                                    </tr>
+                                @else
+                                    @foreach ($skusList as $sku)
+                                        <tr>
+                                            <td>{{ $sku['color'] }}</td>
+                                            <td>{{ $sku['size'] }}</td>
+                                            <td><small class="text-muted">{{ $sku['sku'] ?: '—' }}</small></td>
+                                            <td class="text-end fw-semibold">{{ $sku['stock'] }}</td>
+                                        </tr>
+                                    @endforeach
+                                    <tr class="table-secondary">
+                                        <td colspan="3" class="fw-bold">TOTAL</td>
+                                        <td class="text-end fw-bold">{{ collect($skusList)->sum('stock') }}</td>
+                                    </tr>
+                                @endif
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>

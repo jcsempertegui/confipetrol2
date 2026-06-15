@@ -15,7 +15,6 @@ class Product extends Model
         'features',
         'model',
         'type',
-        'lote',
         'minimum_stock',
         'status',
         'categorie_id',

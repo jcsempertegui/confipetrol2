@@ -23,11 +23,13 @@ return new class extends Migration {
             $table->tinyInteger('status')->default(1);
             $table->foreignId('branch_id')->constrained('branches')->onDelete('cascade');
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+            $table->foreignId('worker_id')->nullable()->constrained('workers')->nullOnDelete(); // ← AGREGADO
             $table->timestamps();
 
             $table->index('branch_id');
             $table->index('status');
             $table->index('tipo');
+            $table->index('worker_id'); 
         });
     }
 

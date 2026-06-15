@@ -163,16 +163,10 @@ class RemitoListsController extends Component
                     $inventory = Inventorie::where('product_id', $detail->product_id)
                         ->where('warehouse_id', $detail->warehouse_id)
                         ->first();
-                    if ($inventory && $product) {
-                        if ($product->lote == 1) {
-                            $inventory->stock_lot = $isIngreso
-                                ? $inventory->stock_lot - $detail->quantity
-                                : $inventory->stock_lot + $detail->quantity;
-                        } else {
-                            $inventory->stock_nolot = $isIngreso
-                                ? $inventory->stock_nolot - $detail->quantity
-                                : $inventory->stock_nolot + $detail->quantity;
-                        }
+                    if ($inventory) {
+                        $inventory->stock_nolot = $isIngreso
+                            ? $inventory->stock_nolot - $detail->quantity
+                            : $inventory->stock_nolot + $detail->quantity;
                         $inventory->save();
                     }
                 }
@@ -192,8 +186,6 @@ class RemitoListsController extends Component
                     'quantity_in'      => $isIngreso ? 0 : $detail->quantity,
                     'quantity_out'     => $isIngreso ? $detail->quantity : 0,
                     'balance'          => $newBalance,
-                    'price'            => 0,
-                    'total'            => 0,
                     'product_id'       => $detail->product_id,
                     'user_id'          => auth()->id(),
                     'warehouse_id'     => $detail->warehouse_id,

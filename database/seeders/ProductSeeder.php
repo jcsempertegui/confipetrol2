@@ -19,7 +19,6 @@ class ProductSeeder extends Seeder
                 'code' => $code,
                 'name' => $name,
                 'features' => "Características del producto $i",
-                'lote' => 0,
                 'type' => 2,
                 'categorie_id' => 1,
                 'brand_id' => 1,

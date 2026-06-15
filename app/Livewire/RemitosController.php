@@ -12,6 +12,7 @@ use App\Models\Inventorie;
 use App\Models\Kardex;
 use App\Models\Branche;
 use App\Models\Warehouse;
+use App\Models\Worker;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
@@ -34,6 +35,9 @@ class RemitosController extends Component
     public $selectedProductData = null;
     public $productSkus = [];
     public $selectedSkuId = null;
+
+    public $workers = [];
+    public $worker_id = '';
 
     public $tipo = 'EGRESO';
     public $contrato = '';
@@ -63,6 +67,7 @@ class RemitosController extends Component
     {
         $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
         $this->remito_date = now()->format('Y-m-d');
+        $this->workers = Worker::where('status', 1)->orderBy('name')->get();
         $this->refreshData();
     }
 
@@ -113,7 +118,6 @@ class RemitosController extends Component
                 'products.id',
                 'products.code',
                 'products.name',
-                'products.lote',
                 'products.type',
                 'products.brand_id',
                 'products.categorie_id',
@@ -261,10 +265,7 @@ class RemitosController extends Component
         $inventory = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
 
         if ($this->tipo === 'EGRESO') {
-            $availableStock = 0;
-            if ($inventory) {
-                $availableStock = $product->lote == 1 ? $inventory->stock_lot : $inventory->stock_nolot;
-            }
+            $availableStock = $inventory ? $inventory->stock_nolot : 0;
             if ($availableStock <= 0) {
                 $this->dispatch('alert', 'SIN STOCK DISPONIBLE PARA ESTE PRODUCTO', 'error');
                 return;
@@ -278,8 +279,7 @@ class RemitosController extends Component
         if (isset($cart[$cartKey])) {
             $newQty = $cart[$cartKey]['quantity'] + 1;
             if ($this->tipo === 'EGRESO' && $inventory) {
-                $available = $product->lote == 1 ? $inventory->stock_lot : $inventory->stock_nolot;
-                if ($newQty > $available) {
+                if ($newQty > $inventory->stock_nolot) {
                     $this->dispatch('alert', 'STOCK INSUFICIENTE', 'error');
                     return;
                 }
@@ -335,10 +335,9 @@ class RemitosController extends Component
                 $warehouseId = $defaultWarehouse ? $defaultWarehouse->id : 1;
                 $product = Product::find($item['id']);
                 $inventory = Inventorie::where('product_id', $item['id'])->where('warehouse_id', $warehouseId)->first();
-                if ($inventory && $product) {
-                    $available = $product->lote == 1 ? $inventory->stock_lot : $inventory->stock_nolot;
-                    if ($quantity > $available) {
-                        $this->dispatch('alert', 'NO HAY SUFICIENTE STOCK DISPONIBLE (disponible: ' . $available . ')', 'error');
+                if ($inventory) {
+                    if ($quantity > $inventory->stock_nolot) {
+                        $this->dispatch('alert', 'NO HAY SUFICIENTE STOCK DISPONIBLE (disponible: ' . $inventory->stock_nolot . ')', 'error');
                         $this->dispatch('update-remito-qty-input', ['productId' => $cartKey, 'qty' => $previousQty]);
                         return;
                     }
@@ -419,6 +418,7 @@ class RemitosController extends Component
                 'status'          => 1,
                 'branch_id'       => $this->branch_id,
                 'user_id'         => auth()->id(),
+                'worker_id'       => $this->worker_id ?: null,
                 'created_at'      => $remitoDateTime,
                 'updated_at'      => now(),
             ]);
@@ -467,28 +467,21 @@ class RemitosController extends Component
                         ]);
                     }
                 } else {
-                    $product = Product::find($item['id']);
                     $inventory = Inventorie::where('product_id', $item['id'])
                         ->where('warehouse_id', $warehouseId)
                         ->lockForUpdate()->first();
 
-                    if ($inventory && $product) {
-                        if ($product->lote == 1) {
-                            $inventory->stock_lot = $isIngreso
-                                ? $inventory->stock_lot + $item['quantity']
-                                : $inventory->stock_lot - $item['quantity'];
-                        } else {
-                            $inventory->stock_nolot = $isIngreso
-                                ? $inventory->stock_nolot + $item['quantity']
-                                : $inventory->stock_nolot - $item['quantity'];
-                        }
+                    if ($inventory) {
+                        $inventory->stock_nolot = $isIngreso
+                            ? $inventory->stock_nolot + $item['quantity']
+                            : $inventory->stock_nolot - $item['quantity'];
                         $inventory->save();
-                    } else if ($isIngreso && $product) {
+                    } else if ($isIngreso) {
                         Inventorie::create([
                             'product_id'   => $item['id'],
                             'warehouse_id' => $warehouseId,
-                            'stock_lot'    => $product->lote == 1 ? $item['quantity'] : 0,
-                            'stock_nolot'  => $product->lote == 1 ? 0 : $item['quantity'],
+                            'stock_lot'    => 0,
+                            'stock_nolot'  => $item['quantity'],
                             'stock'        => 0,
                             'status'       => 1,
                         ]);
@@ -509,8 +502,6 @@ class RemitosController extends Component
                     'balance'          => $isIngreso
                         ? $previousBalance + $item['quantity']
                         : $previousBalance - $item['quantity'],
-                    'price'            => 0,
-                    'total'            => 0,
                     'product_id'       => $item['id'],
                     'user_id'          => auth()->id(),
                     'warehouse_id'     => $warehouseId,
@@ -557,6 +548,7 @@ class RemitosController extends Component
         $this->despachado_por = '';
         $this->transportado_por = '';
         $this->placa = '';
+        $this->worker_id = '';
     }
 
     public function resetInputFields()

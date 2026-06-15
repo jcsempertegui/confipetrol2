@@ -26,6 +26,7 @@ class Remito extends Model
         'status',
         'branch_id',
         'user_id',
+        'worker_id',
         'created_at',
         'updated_at',
     ];
@@ -38,6 +39,11 @@ class Remito extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function worker()
+    {
+        return $this->belongsTo(Worker::class);
     }
 
     public function details()

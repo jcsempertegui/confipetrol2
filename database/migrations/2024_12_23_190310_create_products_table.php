@@ -5,9 +5,6 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('products', function (Blueprint $table) {
@@ -19,7 +16,6 @@ return new class extends Migration {
             $table->tinyInteger('type')->default(0);
             $table->tinyInteger('has_loyalty')->default(0)->nullable();
             $table->integer('loyalty_req_qty')->default(0)->nullable();
-            $table->tinyInteger('lote')->default(0);
             $table->integer('minimum_stock')->default(0);
             $table->tinyInteger('status')->default(1);
             $table->foreignId('categorie_id')->constrained('categories')->onDelete('cascade');
@@ -27,15 +23,11 @@ return new class extends Migration {
             $table->foreignId('unit_id')->constrained('units')->onDelete('cascade');
             $table->timestamps();
 
-            // Índices adicionales para optimización
             $table->index('code');
             $table->index('name');
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('products');

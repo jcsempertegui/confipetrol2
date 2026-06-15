@@ -44,7 +44,7 @@
                             <ul class="listsearch" x-show="openSearch" style="display:block; top: 110%; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #eee;">
                                 @forelse ($products as $item)
                                     @php
-                                        $currentStock = $item->lote == 1 ? $item->stock_lot : $item->stock_nolot;
+                                        $currentStock = $item->stock_nolot;
                                     @endphp
                                     <li class="listsearch-item"
                                         wire:click="selectProduct({{ $item->id }}); $wire.set('search', ''); openSearch = false"
@@ -194,16 +194,13 @@
                             <th class="text-center">ENTRADA</th>
                             <th class="text-center">SALIDA</th>
                             <th class="text-center">SALDO</th>
-                            <th>COSTO UNITARIO</th>
-                            <th>TOTAL VALORIZADO</th>
-                            <th>LOTE</th>
                             <th>USUARIO</th>
                         </tr>
                     </thead>
                     <tbody>
                         @if (isset($kardexs) && $kardexs->isEmpty())
                             <tr>
-                                <td colspan="11" class="text-center py-4 text-muted">No se encontraron movimientos.</td>
+                                <td colspan="8" class="text-center py-4 text-muted">No se encontraron movimientos.</td>
                             </tr>
                         @elseif (isset($kardexs))
                             @foreach ($kardexs as $index => $kardex)
@@ -233,15 +230,6 @@
                                         @endif
                                     </td>
                                     <td class="text-center"><span class="fw-bold text-dark">{{ $kardex->balance }}</span></td>
-                                    <td>Bs. {{ number_format($kardex->price, 2) }}</td>
-                                    <td>Bs. {{ number_format($kardex->total, 2) }}</td>
-                                    <td>
-                                        @if ($kardex->lot)
-                                            <span class="badge bg-secondary">{{ $kardex->lot->lot_number ?? 'N/A' }}</span>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
-                                    </td>
                                     <td>{{ $kardex->user->login ?? $kardex->user->name ?? 'S/N' }}</td>
                                 </tr>
                             @endforeach

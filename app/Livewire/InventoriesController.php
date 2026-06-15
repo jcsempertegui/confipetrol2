@@ -42,6 +42,9 @@ class InventoriesController extends Component
     public $availableSkus = [];
     public $selected_sku_id = '';
 
+    public $skusList = [];
+    public $skusProductName = '';
+
     protected $listeners = ['updateLot'];
 
     public $perPage = 20;
@@ -260,7 +263,10 @@ class InventoriesController extends Component
 
     public function render()
     {
-        $inventories = Inventorie::with(['product', 'warehouse.branch'])
+        $inventories = Inventorie::with([
+                'product' => fn($q) => $q->withCount('skus'),
+                'warehouse.branch',
+            ])
             ->whereHas('product', function ($query) {
                 $query->whereIn('type', [0, 3, 4]);
             })
@@ -319,7 +325,7 @@ class InventoriesController extends Component
             'branch_id'      => $branchId,
             'branch_name'    => $branchName,
             'current_stock'  => $inventory->stock,
-            'has_lote'       => $inventory->product->lote == 1,
+            'has_lote'       => false,
             'stock_lot'      => $inventory->stock_lot,
             'stock_nolot'    => $inventory->stock_nolot,
         ];
@@ -461,8 +467,6 @@ class InventoriesController extends Component
                 'quantity_in'      => $difference > 0 ? abs($difference) : 0,
                 'quantity_out'     => $difference < 0 ? abs($difference) : 0,
                 'balance'          => $newBalance,
-                'price'            => $costPrice,
-                'total'            => abs($difference) * $costPrice,
                 'product_id'       => $this->selectedInventory['product_id'],
                 'lot_id'           => $lot_id_saved,
                 'user_id'          => auth()->id(),
@@ -576,6 +580,36 @@ class InventoriesController extends Component
         $this->lot_expiration_date = '';
         $this->lot_quantity        = '';
         $this->resetValidation();
+    }
+
+    public function openSkusModal($inventory_id)
+    {
+        $inventory = Inventorie::with(['product', 'warehouse.branch'])->find($inventory_id);
+
+        if (!$inventory) {
+            $this->dispatch('alert', 'INVENTARIO NO ENCONTRADO', 'error');
+            return;
+        }
+
+        $branchId = $inventory->warehouse && $inventory->warehouse->branch
+            ? $inventory->warehouse->branch->id
+            : null;
+
+        $this->skusProductName = $inventory->product->name . ' (' . ($inventory->product->code ?: 'S/C') . ')';
+
+        $this->skusList = ProductSku::with(['color', 'size'])
+            ->where('product_id', $inventory->product_id)
+            ->when($branchId, fn($q) => $q->where('branch_id', $branchId))
+            ->orderBy('color_id')
+            ->orderBy('size_id')
+            ->get()
+            ->map(fn($sku) => [
+                'color' => $sku->color->name ?? 'S/C',
+                'size'  => $sku->size->name  ?? 'S/T',
+                'sku'   => $sku->sku          ?? '',
+                'stock' => $sku->stock        ?? 0,
+            ])
+            ->toArray();
     }
 
     public function paginationView()

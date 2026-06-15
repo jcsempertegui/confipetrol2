@@ -138,16 +138,11 @@ class DeliveryListsController extends Component
                         $inventory->save();
                     }
                 } else {
-                    $product = $detail->product;
                     $inventory = Inventorie::where('product_id', $detail->product_id)
                         ->where('warehouse_id', $detail->warehouse_id)
                         ->first();
-                    if ($inventory && $product) {
-                        if ($product->lote == 1) {
-                            $inventory->stock_lot += $detail->quantity;
-                        } else {
-                            $inventory->stock_nolot += $detail->quantity;
-                        }
+                    if ($inventory) {
+                        $inventory->stock_nolot += $detail->quantity;
                         $inventory->save();
                     }
                 }
@@ -164,8 +159,6 @@ class DeliveryListsController extends Component
                     'quantity_in'      => $detail->quantity,
                     'quantity_out'     => 0,
                     'balance'          => $newBalance,
-                    'price'            => 0,
-                    'total'            => 0,
                     'product_id'       => $detail->product_id,
                     'user_id'          => auth()->id(),
                     'warehouse_id'     => $detail->warehouse_id,

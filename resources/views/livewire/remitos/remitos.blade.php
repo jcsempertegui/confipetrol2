@@ -57,7 +57,7 @@
                                             style="display:block; top: 110%; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #eee;">
                                             @forelse ($products as $item)
                                                 @php
-                                                    $currentStock = $item->lote == 1 ? $item->stock_lot : $item->stock_nolot;
+                                                    $currentStock = $item->stock_nolot;
                                                 @endphp
                                                 <li class="listsearch-item"
                                                     wire:click="AddOrUpdate({{ $item->id }}); $wire.set('search', '')"
@@ -257,6 +257,19 @@
                                 wire:model.defer="contrato"
                                 placeholder="Nombre / Nro. de Contrato..."
                                 maxlength="150" autocomplete="off">
+                        </div>
+
+                        {{-- Trabajador --}}
+                        <div class="col-12 mb-1">
+                            <label class="form-label mb-1">
+                                <i class="bx bx-user me-1"></i>Trabajador
+                            </label>
+                            <select class="form-select" wire:model.defer="worker_id">
+                                <option value="">— Sin trabajador —</option>
+                                @foreach ($workers as $worker)
+                                    <option value="{{ $worker->id }}">{{ $worker->name }} {{ $worker->last_name }}</option>
+                                @endforeach
+                            </select>
                         </div>
 
                         {{-- Señores --}}

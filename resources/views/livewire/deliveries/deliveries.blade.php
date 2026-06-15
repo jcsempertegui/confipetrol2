@@ -47,7 +47,7 @@
                                             style="display:block; top: 110%; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border: 1px solid #eee;">
                                             @forelse ($products as $item)
                                                 @php
-                                                    $currentStock = $item->lote == 1 ? $item->stock_lot : $item->stock_nolot;
+                                                    $currentStock = $item->stock_nolot;
                                                 @endphp
                                                 <li class="listsearch-item"
                                                     wire:click="AddOrUpdate({{ $item->id }}); $wire.set('search', '')"

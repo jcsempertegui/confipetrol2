@@ -90,7 +90,6 @@ class KardexsController extends Component
             'products.id',
             'products.code',
             'products.name',
-            'products.lote',
             'inventories.stock_lot',
             'inventories.stock_nolot'
         ])
@@ -124,7 +123,7 @@ class KardexsController extends Component
         $warehouseId = $defaultWarehouse ? $defaultWarehouse->id : 1;
 
         $query = Product::select(
-            'products.id', 'products.code', 'products.name', 'products.type', 'products.lote', 'products.categorie_id', 'products.brand_id',
+            'products.id', 'products.code', 'products.name', 'products.type', 'products.categorie_id', 'products.brand_id',
             'inventories.stock', 'inventories.stock_lot', 'inventories.stock_nolot'
         )
         ->with(['categories', 'brands'])
@@ -199,9 +198,7 @@ class KardexsController extends Component
     public function getCurrentStockProperty()
     {
         if (!$this->selectedProduct) return 0;
-        return $this->selectedProduct->lote == 1
-            ? $this->selectedProduct->stock_lot
-            : $this->selectedProduct->stock_nolot;
+        return $this->selectedProduct->stock_nolot;
     }
 
     public function getTotalInProperty()

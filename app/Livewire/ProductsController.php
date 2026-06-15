@@ -42,7 +42,6 @@ class ProductsController extends Component
     public $name_category, $name_brand, $name_unit, $unit_base_unit, $unit_factor;
 
     public $type = 2;
-    public $lote = false;
 
     public $branch_id, $pos_type, $openAccordion = null;
 
@@ -196,7 +195,6 @@ class ProductsController extends Component
         $this->minimum_stock = 0;
         $this->initial_stock = 0;
         $this->type = 2;
-        $this->lote = false;
         $this->skus = [];
         $this->color_id = '';
         $this->size_id = '';
@@ -258,7 +256,6 @@ class ProductsController extends Component
                 'model' => ($this->type == 1) ? $this->model : null,
                 'minimum_stock' => $this->minimum_stock,
                 'type' => $this->type,
-                'lote' => false,
                 'categorie_id' => ($this->type == 1) ? null : $this->categorie_id,
                 'brand_id' => $this->brand_id,
                 'unit_id' => $this->unit_id,
@@ -299,8 +296,6 @@ class ProductsController extends Component
                             'description' => 'STOCK INICIAL',
                             'quantity_in' => $totalInitialStock,
                             'balance' => $totalInitialStock,
-                            'price' => 0,
-                            'total' => 0,
                             'product_id' => $product->id,
                             'user_id' => auth()->id(),
                             'warehouse_id' => $warehouseId,
@@ -385,7 +380,6 @@ class ProductsController extends Component
         $this->brand_id = $product->brand_id;
         $this->unit_id = $product->unit_id;
         $this->type = $product->type;
-        $this->lote = (bool) $product->lote;
         $this->isEditMode = true;
 
         if ($product->type == 3) {

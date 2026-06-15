@@ -3,6 +3,7 @@
 namespace App\Livewire\Reports;
 
 use App\Models\User;
+use App\Models\Worker;
 use App\Models\RemitoDetail;
 use App\Models\Branche;
 use App\Models\Setting;
@@ -20,6 +21,7 @@ class RemitoReportsController extends Component
     public $searchTerm;
     public $branches, $branch_id;
     public $users, $user_id;
+    public $workers, $worker_id;
     public $fromDate, $toDate;
     public $filter_tipo = '';
 
@@ -41,6 +43,7 @@ class RemitoReportsController extends Component
     public function mount()
     {
         $this->users     = User::where('status', 1)->get();
+        $this->workers   = Worker::where('status', 1)->orderBy('name')->get();
         $this->branches  = Branche::where('status', 1)->get();
         $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
         $this->fromDate  = now()->format('Y-m-d');
@@ -73,6 +76,7 @@ class RemitoReportsController extends Component
         $toDate    = Carbon::parse($this->toDate)->endOfDay();
         $branch_id = $this->branch_id;
         $user_id   = $this->user_id;
+        $worker_id = $this->worker_id;
         $tipo      = $this->filter_tipo;
 
         return RemitoDetail::with([
@@ -82,8 +86,9 @@ class RemitoReportsController extends Component
             'sku.size:id,name',
             'remito.user:id,name,login',
             'remito.branch:id,name',
+            'remito.worker:id,name,last_name',
         ])
-            ->whereHas('remito', function ($query) use ($branch_id, $user_id, $tipo) {
+            ->whereHas('remito', function ($query) use ($branch_id, $user_id, $worker_id, $tipo) {
                 $query->where('branch_id', $branch_id)
                       ->where('status', 1);
 
@@ -93,6 +98,10 @@ class RemitoReportsController extends Component
 
                 if ($user_id) {
                     $query->where('user_id', $user_id);
+                }
+
+                if ($worker_id) {
+                    $query->where('worker_id', $worker_id);
                 }
             })
             ->when($this->fromDate && $this->toDate, function ($query) use ($fromDate, $toDate) {
@@ -124,12 +133,13 @@ class RemitoReportsController extends Component
         $this->totalQuantityRemito = $collection->sum('quantity');
     }
 
-    public function remitoReportPdf($fromDate, $toDate, $branch_id, $user_id = null, $tipo = '')
+    public function remitoReportPdf($fromDate, $toDate, $branch_id, $user_id = null, $tipo = '', $worker_id = null)
     {
         $this->fromDate    = $fromDate;
         $this->toDate      = $toDate;
         $this->branch_id   = $branch_id;
         $this->user_id     = $user_id == '0' ? null : $user_id;
+        $this->worker_id   = $worker_id == '0' ? null : $worker_id;
         $this->filter_tipo = $tipo == '0' ? '' : $tipo;
 
         $settings = Setting::first();
