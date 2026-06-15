@@ -53,7 +53,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('deliveries', DeliveriesController::class)->middleware('permission:nueva-entrega')->name('deliveries');
     Route::get('delivery_lists', DeliveryListsController::class)->middleware('permission:listar-entrega')->name('delivery_lists');
     Route::get('delivery_reports', DeliveryReportsController::class)->middleware('permission:ver-reporteentrega')->name('delivery_reports');
-    Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->middleware('permission:ver-reporteentrega')->name('delivery_reports.deliveryReportPdf');
+    Route::get('/delivery_reports/deliveryReportPdf/{fromDate}/{toDate}/{branch_id}/{user_id}/{worker_id}', [DeliveryReportsController::class, 'deliveryReportPdf'])->middleware('permission:ver-reporteentrega')->name('delivery_reports.deliveryReportPdf');
 
     Route::get('remitos', RemitosController::class)->middleware('permission:nuevo-remito')->name('remitos');
     Route::get('remito_lists', RemitoListsController::class)->middleware('permission:listar-remito')->name('remito_lists');

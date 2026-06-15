@@ -12,7 +12,6 @@ use App\Models\Inventorie;
 use App\Models\Kardex;
 use App\Models\Branche;
 use App\Models\Warehouse;
-use App\Models\Worker;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithPagination;
@@ -35,9 +34,6 @@ class RemitosController extends Component
     public $selectedProductData = null;
     public $productSkus = [];
     public $selectedSkuId = null;
-
-    public $workers = [];
-    public $worker_id = '';
 
     public $tipo = 'EGRESO';
     public $contrato = '';
@@ -67,7 +63,6 @@ class RemitosController extends Component
     {
         $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
         $this->remito_date = now()->format('Y-m-d');
-        $this->workers = Worker::where('status', 1)->orderBy('name')->get();
         $this->refreshData();
     }
 
@@ -418,7 +413,6 @@ class RemitosController extends Component
                 'status'          => 1,
                 'branch_id'       => $this->branch_id,
                 'user_id'         => auth()->id(),
-                'worker_id'       => $this->worker_id ?: null,
                 'created_at'      => $remitoDateTime,
                 'updated_at'      => now(),
             ]);
@@ -548,7 +542,6 @@ class RemitosController extends Component
         $this->despachado_por = '';
         $this->transportado_por = '';
         $this->placa = '';
-        $this->worker_id = '';
     }
 
     public function resetInputFields()

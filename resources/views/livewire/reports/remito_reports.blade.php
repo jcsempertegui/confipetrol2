@@ -46,19 +46,6 @@
                 </div>
                 <div class="col-md-2 col-6">
                     <div class="form-group">
-                        <label>Trabajador</label>
-                        <div class="input-group">
-                            <select class="form-select" wire:model="worker_id">
-                                <option value="">Todos</option>
-                                @foreach ($workers as $worker)
-                                    <option value="{{ $worker->id }}">{{ $worker->name }} {{ $worker->last_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-md-2 col-6">
-                    <div class="form-group">
                         <label>Usuario</label>
                         <div class="input-group">
                             <select class="form-select" wire:model="user_id">
@@ -115,7 +102,6 @@
                     'branch_id' => $branch_id,
                     'user_id'   => $user_id ?: '0',
                     'tipo'      => $filter_tipo ?: '0',
-                    'worker_id' => $worker_id ?: '0',
                 ]) }}" target="_blank" class="btn-action-danger"><i class="bx bxs-file-pdf"></i></a>
             </div>
         </div>
@@ -141,7 +127,6 @@
                             <th>N°</th>
                             <th>N° REMITO</th>
                             <th>TIPO</th>
-                            <th>TRABAJADOR</th>
                             <th>CONTRATO</th>
                             <th>CAMPO</th>
                             <th>USUARIO</th>
@@ -156,7 +141,7 @@
                     <tbody>
                         @if ($remitos->isEmpty())
                             <tr>
-                                <td colspan="13" class="text-center">No se encontraron registros.</td>
+                                <td colspan="12" class="text-center">No se encontraron registros.</td>
                             </tr>
                         @else
                             @foreach ($remitos as $index => $detail)
@@ -172,13 +157,6 @@
                                             <span class="badge rounded-pill text-danger bg-light-danger">
                                                 <i class="bx bx-log-out me-1"></i>EGRESO
                                             </span>
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($detail->remito->worker)
-                                            {{ $detail->remito->worker->name }} {{ $detail->remito->worker->last_name }}
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
@@ -211,13 +189,12 @@
                             @endforeach
                         @endif
                         <tr class="template-tr-spacer">
-                            <td colspan="13" class="template-td-spacer"></td>
+                            <td colspan="12" class="template-td-spacer"></td>
                         </tr>
                     </tbody>
                     <tfoot class="template-sticky-tfoot">
                         <tr>
                             <td class="text-muted small">{{ $totalItems }} items</td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>
@@ -254,7 +231,6 @@
                     'branch_id' => $branch_id,
                     'user_id'   => $user_id ?: '0',
                     'tipo'      => $filter_tipo ?: '0',
-                    'worker_id' => $worker_id ?: '0',
                 ]) }}" target="_blank" class="btn-action-danger"><i class="bx bxs-file-pdf"></i></a>
             </div>
         </div>
@@ -280,7 +256,6 @@
                             <th>N°</th>
                             <th>N° REMITO</th>
                             <th>TIPO</th>
-                            <th>TRABAJADOR</th>
                             <th>CONTRATO</th>
                             <th>CAMPO</th>
                             <th>USUARIO</th>
@@ -295,7 +270,7 @@
                     <tbody>
                         @if ($remitos->isEmpty())
                             <tr>
-                                <td colspan="13" class="text-center">No se encontraron registros.</td>
+                                <td colspan="12" class="text-center">No se encontraron registros.</td>
                             </tr>
                         @else
                             @foreach ($remitos as $index => $detail)
@@ -307,13 +282,6 @@
                                             <span class="badge rounded-pill text-success bg-light-success">INGRESO</span>
                                         @elseif(($detail->remito->tipo ?? '') === 'EGRESO')
                                             <span class="badge rounded-pill text-danger bg-light-danger">EGRESO</span>
-                                        @else
-                                            <span class="text-muted">—</span>
-                                        @endif
-                                    </td>
-                                    <td>
-                                        @if($detail->remito->worker)
-                                            {{ $detail->remito->worker->name }} {{ $detail->remito->worker->last_name }}
                                         @else
                                             <span class="text-muted">—</span>
                                         @endif
@@ -349,7 +317,6 @@
                     <tfoot class="template-sticky-tfoot">
                         <tr>
                             <td class="text-muted small">{{ $totalItems }} items</td>
-                            <td></td>
                             <td></td>
                             <td></td>
                             <td></td>

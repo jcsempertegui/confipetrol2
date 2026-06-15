@@ -259,19 +259,6 @@
                                 maxlength="150" autocomplete="off">
                         </div>
 
-                        {{-- Trabajador --}}
-                        <div class="col-12 mb-1">
-                            <label class="form-label mb-1">
-                                <i class="bx bx-user me-1"></i>Trabajador
-                            </label>
-                            <select class="form-select" wire:model.defer="worker_id">
-                                <option value="">— Sin trabajador —</option>
-                                @foreach ($workers as $worker)
-                                    <option value="{{ $worker->id }}">{{ $worker->name }} {{ $worker->last_name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-
                         {{-- Señores --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">

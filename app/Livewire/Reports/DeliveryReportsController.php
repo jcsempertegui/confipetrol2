@@ -3,6 +3,7 @@
 namespace App\Livewire\Reports;
 
 use App\Models\User;
+use App\Models\Worker;
 use App\Models\DeliveryDetail;
 use App\Models\Branche;
 use App\Models\Setting;
@@ -20,6 +21,7 @@ class DeliveryReportsController extends Component
     public $searchTerm;
     public $branches, $branch_id;
     public $users, $user_id;
+    public $workers, $worker_id;
     public $fromDate, $toDate;
 
     public $totalItems, $totalQuantityDelivered;
@@ -35,6 +37,7 @@ class DeliveryReportsController extends Component
     public function mount()
     {
         $this->users     = User::where('status', 1)->get();
+        $this->workers   = Worker::where('status', 1)->orderBy('name')->get();
         $this->branches  = Branche::where('status', 1)->get();
         $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
         $this->fromDate  = now()->format('Y-m-d');
@@ -67,6 +70,7 @@ class DeliveryReportsController extends Component
         $toDate    = Carbon::parse($this->toDate)->endOfDay();
         $branch_id = $this->branch_id;
         $user_id   = $this->user_id;
+        $worker_id = $this->worker_id;
 
         return DeliveryDetail::with([
             'product:id,name,code',
@@ -76,12 +80,16 @@ class DeliveryReportsController extends Component
             'delivery.worker:id,name,last_name',
             'delivery.user:id,name,login',
         ])
-            ->whereHas('delivery', function ($query) use ($branch_id, $user_id) {
+            ->whereHas('delivery', function ($query) use ($branch_id, $user_id, $worker_id) {
                 $query->where('branch_id', $branch_id)
                       ->where('status', 1);
 
                 if ($user_id) {
                     $query->where('user_id', $user_id);
+                }
+
+                if ($worker_id) {
+                    $query->where('worker_id', $worker_id);
                 }
             })
             ->when($this->fromDate && $this->toDate, function ($query) use ($fromDate, $toDate) {
@@ -114,12 +122,13 @@ class DeliveryReportsController extends Component
         $this->totalQuantityDelivered = $collection->sum('quantity');
     }
 
-    public function deliveryReportPdf($fromDate, $toDate, $branch_id, $user_id = null)
+    public function deliveryReportPdf($fromDate, $toDate, $branch_id, $user_id = null, $worker_id = null)
     {
-        $this->fromDate  = $fromDate;
-        $this->toDate    = $toDate;
-        $this->branch_id = $branch_id;
-        $this->user_id   = $user_id == '0' ? null : $user_id;
+        $this->fromDate   = $fromDate;
+        $this->toDate     = $toDate;
+        $this->branch_id  = $branch_id;
+        $this->user_id    = $user_id == '0' ? null : $user_id;
+        $this->worker_id  = $worker_id == '0' ? null : $worker_id;
 
         $settings = Setting::first();
         $user     = auth()->user();

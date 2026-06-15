@@ -34,6 +34,19 @@
                 </div>
                 <div class="col-md-2 col-6">
                     <div class="form-group">
+                        <label>Seleccionar Trabajador</label>
+                        <div class="input-group">
+                            <select class="form-select" wire:model="worker_id">
+                                <option value="">Todos</option>
+                                @foreach ($workers as $worker)
+                                    <option value="{{ $worker->id }}">{{ $worker->name }} {{ $worker->last_name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6">
+                    <div class="form-group">
                         <label>Seleccionar Usuario</label>
                         <div class="input-group">
                             <select class="form-select" wire:model="user_id">
@@ -88,6 +101,7 @@
                     'toDate'    => $toDate,
                     'branch_id' => $branch_id,
                     'user_id'   => $user_id ?: '0',
+                    'worker_id' => $worker_id ?: '0',
                 ]) }}" target="_blank" class="btn-action-danger"><i class="bx bxs-file-pdf"></i></a>
             </div>
         </div>
@@ -204,6 +218,7 @@
                     'toDate'    => $toDate,
                     'branch_id' => $branch_id,
                     'user_id'   => $user_id ?: '0',
+                    'worker_id' => $worker_id ?: '0',
                 ]) }}" target="_blank" class="btn-action-danger"><i class="bx bxs-file-pdf"></i></a>
             </div>
         </div>
