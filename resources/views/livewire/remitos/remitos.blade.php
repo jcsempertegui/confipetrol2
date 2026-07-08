@@ -240,23 +240,29 @@
                         {{-- N° Orden --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-hash me-1"></i>N° Orden
+                                <i class="bx bx-hash me-1"></i>N° Orden <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('n_orden') is-invalid @enderror"
                                 wire:model.defer="n_orden"
                                 placeholder="Nro. de Orden..."
                                 maxlength="100" autocomplete="off">
+                            @error('n_orden')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Contrato --}}
                         <div class="col-12 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-file me-1"></i>Contrato
+                                <i class="bx bx-file me-1"></i>Contrato <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('contrato') is-invalid @enderror"
                                 wire:model.defer="contrato"
                                 placeholder="Nombre / Nro. de Contrato..."
                                 maxlength="150" autocomplete="off">
+                            @error('contrato')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Señores --}}
@@ -276,57 +282,71 @@
                         {{-- Atención --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-user-pin me-1"></i>Atención
+                                <i class="bx bx-user-pin me-1"></i>Atención <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('atencion') is-invalid @enderror"
                                 wire:model.defer="atencion"
                                 placeholder="A/C de..."
                                 maxlength="150" autocomplete="off">
+                            @error('atencion')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Campo --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-map-pin me-1"></i>Campo
+                                <i class="bx bx-map-pin me-1"></i>Campo <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('campo') is-invalid @enderror"
                                 wire:model.defer="campo"
                                 placeholder="Campo / Ubicación..."
                                 maxlength="150" autocomplete="off">
+                            @error('campo')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Placa --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-car me-1"></i>Placa
+                                <i class="bx bx-car me-1"></i>Placa <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('placa') is-invalid @enderror"
                                 wire:model.defer="placa"
                                 placeholder="Placa del vehículo..."
-                                maxlength="30" autocomplete="off"
-                                >
+                                maxlength="30" autocomplete="off">
+                            @error('placa')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Despachado por --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-send me-1"></i>Despachado por
+                                <i class="bx bx-send me-1"></i>Despachado por <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('despachado_por') is-invalid @enderror"
                                 wire:model.defer="despachado_por"
                                 placeholder="Nombre del despachador..."
                                 maxlength="150" autocomplete="off">
+                            @error('despachado_por')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Transportado por --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-truck me-1"></i>Transportado por
+                                <i class="bx bx-truck me-1"></i>Transportado por <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('transportado_por') is-invalid @enderror"
                                 wire:model.defer="transportado_por"
                                 placeholder="Nombre del transportista..."
                                 maxlength="150" autocomplete="off">
+                            @error('transportado_por')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Observaciones --}}
@@ -337,8 +357,7 @@
                             <textarea class="form-control"
                                 wire:model.defer="observations"
                                 placeholder="Observación / Comentario..."
-                                rows="2" maxlength="255"
-                                ></textarea>
+                                rows="2" maxlength="500"></textarea>
                         </div>
 
                         {{-- Resumen --}}
