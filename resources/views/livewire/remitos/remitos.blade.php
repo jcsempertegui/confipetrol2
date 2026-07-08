@@ -329,7 +329,8 @@
                             <input type="text" class="form-control @error('despachado_por') is-invalid @enderror"
                                 wire:model.defer="despachado_por"
                                 placeholder="Nombre del despachador..."
-                                maxlength="150" autocomplete="off">
+                                maxlength="150" autocomplete="off"
+                                oninput="this.value=this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g,'')">
                             @error('despachado_por')
                                 <span class="text-danger small">{{ $message }}</span>
                             @enderror
@@ -343,7 +344,8 @@
                             <input type="text" class="form-control @error('transportado_por') is-invalid @enderror"
                                 wire:model.defer="transportado_por"
                                 placeholder="Nombre del transportista..."
-                                maxlength="150" autocomplete="off">
+                                maxlength="150" autocomplete="off"
+                                oninput="this.value=this.value.replace(/[^a-zA-ZáéíóúÁÉÍÓÚñÑüÜ\s]/g,'')">
                             @error('transportado_por')
                                 <span class="text-danger small">{{ $message }}</span>
                             @enderror

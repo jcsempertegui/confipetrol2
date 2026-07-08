@@ -374,8 +374,8 @@ class RemitosController extends Component
                 'atencion'         => 'required|string|min:2|max:200',
                 'campo'            => 'required|string|min:2|max:200',
                 'placa'            => 'required|string|min:1|max:50',
-                'despachado_por'   => 'required|string|min:2|max:200',
-                'transportado_por' => 'required|string|min:2|max:200',
+                'despachado_por'   => ['required', 'string', 'min:2', 'max:200', 'regex:/^[\p{L}\s]+$/u'],
+                'transportado_por' => ['required', 'string', 'min:2', 'max:200', 'regex:/^[\p{L}\s]+$/u'],
                 'observations'     => 'nullable|string|max:500',
             ],
             [
@@ -393,8 +393,10 @@ class RemitosController extends Component
                 'placa.required'            => 'La Placa es obligatoria.',
                 'despachado_por.required'   => 'Despachado por es obligatorio.',
                 'despachado_por.min'       => 'Despachado por debe tener al menos 2 caracteres.',
+                'despachado_por.regex'     => 'Despachado por solo debe contener letras.',
                 'transportado_por.required' => 'Transportado por es obligatorio.',
                 'transportado_por.min'     => 'Transportado por debe tener al menos 2 caracteres.',
+                'transportado_por.regex'   => 'Transportado por solo debe contener letras.',
             ]
         );
 
