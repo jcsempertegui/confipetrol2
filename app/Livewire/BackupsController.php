@@ -16,7 +16,7 @@ class BackupsController extends Component
     public bool $isRestoring = false;
     public $sqlFile = null;
 
-    protected $listeners = ['confirmDelete', 'confirmRestoreFromList'];
+    protected $listeners = [];
 
     public function createBackup(): void
     {

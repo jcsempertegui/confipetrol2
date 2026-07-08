@@ -270,12 +270,12 @@
                 cancelButtonText: 'Cancelar',
             }).then((result) => {
                 if (result.isConfirmed) {
-                    @this.dispatch('confirmDelete', filename);
+                    @this.call('confirmDelete', filename);
                 }
             });
         } else {
             if (confirm('¿Eliminar este backup?\n' + filename)) {
-                @this.dispatch('confirmDelete', filename);
+                @this.call('confirmDelete', filename);
             }
         }
     }
@@ -293,12 +293,12 @@
                 cancelButtonText: 'Cancelar',
             }).then((result) => {
                 if (result.isConfirmed) {
-                    @this.dispatch('confirmRestoreFromList', filename);
+                    @this.call('confirmRestoreFromList', filename);
                 }
             });
         } else {
             if (confirm('¿Restaurar la base de datos desde?\n' + filename + '\n\nEsta acción es irreversible.')) {
-                @this.dispatch('confirmRestoreFromList', filename);
+                @this.call('confirmRestoreFromList', filename);
             }
         }
     }

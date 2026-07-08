@@ -262,12 +262,15 @@
                         {{-- Señores --}}
                         <div class="col-6 mb-1">
                             <label class="form-label mb-1">
-                                <i class="bx bx-buildings me-1"></i>Señores
+                                <i class="bx bx-buildings me-1"></i>Señores <span class="text-danger">*</span>
                             </label>
-                            <input type="text" class="form-control"
+                            <input type="text" class="form-control @error('senores') is-invalid @enderror"
                                 wire:model.defer="senores"
                                 placeholder="Destinatario..."
                                 maxlength="150" autocomplete="off">
+                            @error('senores')
+                                <span class="text-danger small">{{ $message }}</span>
+                            @enderror
                         </div>
 
                         {{-- Atención --}}

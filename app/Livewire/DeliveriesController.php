@@ -171,7 +171,6 @@ class DeliveriesController extends Component
                     ->where('inventories.warehouse_id', $warehouseId);
             })
             ->where('products.status', 1)
-            ->where('products.type', 3)
             ->where(function ($q) use ($searchTerm) {
                 $q->where('products.code', 'LIKE', '%' . $searchTerm . '%')
                     ->orWhere('products.name', 'LIKE', '%' . $searchTerm . '%');
@@ -192,7 +191,6 @@ class DeliveriesController extends Component
 
         $product = Product::where('id', $product_id)
             ->where('status', 1)
-            ->where('type', 3)
             ->first();
 
         if (!$product) {

@@ -366,8 +366,25 @@ class RemitosController extends Component
         }
 
         $this->validate(
-            ['remito_date' => 'required|date'],
-            ['remito_date.required' => 'La fecha del remito es obligatoria.', 'remito_date.date' => 'La fecha debe ser válida.']
+            [
+                'remito_date' => 'required|date',
+                'senores'     => 'required|string|min:2|max:200',
+                'contrato'    => 'nullable|string|max:200',
+                'atencion'    => 'nullable|string|max:200',
+                'campo'       => 'nullable|string|max:200',
+                'n_orden'     => 'nullable|string|max:100',
+                'despachado_por'   => 'nullable|string|max:200',
+                'transportado_por' => 'nullable|string|max:200',
+                'placa'       => 'nullable|string|max:50',
+                'observations'=> 'nullable|string|max:500',
+            ],
+            [
+                'remito_date.required' => 'La fecha del remito es obligatoria.',
+                'remito_date.date'     => 'La fecha debe ser válida.',
+                'senores.required'     => 'El campo Señores (Destinatario) es obligatorio.',
+                'senores.min'          => 'El destinatario debe tener al menos 2 caracteres.',
+                'senores.max'          => 'El destinatario no puede superar los 200 caracteres.',
+            ]
         );
 
         DB::beginTransaction();
