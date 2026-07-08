@@ -10,6 +10,40 @@
         </div>
     </div>
 
+    @if(auth()->id() == 1)
+    <div class="card mb-3">
+        <div class="card-body px-4 py-3">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <i class="bx bx-power-off fs-5 {{ $systemEnabled ? 'text-success' : 'text-danger' }}"></i>
+                        <span class="fw-semibold">Estado Global del Sistema</span>
+                    </div>
+                    <div class="text-muted small">
+                        @if($systemEnabled)
+                            El sistema está activo. Todos los usuarios tienen acceso normal.
+                        @else
+                            El sistema está desactivado. Solo el administrador puede acceder.
+                        @endif
+                    </div>
+                </div>
+                <button wire:click="toggleSystem"
+                    wire:loading.attr="disabled"
+                    wire:target="toggleSystem"
+                    class="btn {{ $systemEnabled ? 'btn-outline-danger' : 'btn-success' }} btn-sm px-4">
+                    <span wire:loading.remove wire:target="toggleSystem">
+                        <i class="bx {{ $systemEnabled ? 'bx-lock' : 'bx-lock-open' }} me-1"></i>
+                        {{ $systemEnabled ? 'Desactivar Sistema' : 'Activar Sistema' }}
+                    </span>
+                    <span wire:loading wire:target="toggleSystem">
+                        <i class="bx bx-spin bx-loader me-1"></i> Procesando...
+                    </span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
+
     <div class="card">
         <div class="card-body px-4 mt-2">
             <div class="card-header d-flex justify-content-between align-items-center px-3 py-2 mb-3">

@@ -20,6 +20,7 @@ class SettingsController extends Component
     public $business, $owner, $nit, $email, $phone, $address, $message, $image, $image_preview;
     public $setting_id;
     public $branch_id;
+    public bool $systemEnabled = true;
 
     public function mount()
     {
@@ -29,6 +30,7 @@ class SettingsController extends Component
             $this->branch_id = auth()->user()->branch_id;
         }
 
+        $this->systemEnabled = !file_exists(storage_path('app/system_disabled.lock'));
         $this->loadSettings();
     }
 
@@ -72,6 +74,29 @@ class SettingsController extends Component
         $this->message = '';
         $this->image = null;
         $this->image_preview = null;
+    }
+
+    public function toggleSystem()
+    {
+        if (auth()->id() !== 1) {
+            return;
+        }
+
+        $lockFile = storage_path('app/system_disabled.lock');
+
+        if ($this->systemEnabled) {
+            file_put_contents($lockFile, now()->toDateTimeString());
+            $this->systemEnabled = false;
+            $this->logActivity('CONFIGURACION', 'EDITAR', 'Desactivó el sistema globalmente', null);
+            $this->dispatch('settingsUpdate', 'SISTEMA DESACTIVADO', 'warning');
+        } else {
+            if (file_exists($lockFile)) {
+                unlink($lockFile);
+            }
+            $this->systemEnabled = true;
+            $this->logActivity('CONFIGURACION', 'EDITAR', 'Activó el sistema globalmente', null);
+            $this->dispatch('settingsUpdate', 'SISTEMA ACTIVADO', 'success');
+        }
     }
 
     public function updateSettings()

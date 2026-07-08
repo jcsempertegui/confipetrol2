@@ -48,15 +48,16 @@ class CategoriesController extends Component
     public function storeOrUpdate()
     {
         $rules = [
-            'name' => 'required|unique:categories,name,' . ($this->isEditMode ? $this->categorie_id : ''),
+            'name' => 'required|min:2|max:100|unique:categories,name,' . ($this->isEditMode ? $this->categorie_id : ''),
         ];
 
         $messages = [
             'name.required' => 'El nombre es requerido',
-            'name.unique' => 'El nombre ya está en uso',
+            'name.min'      => 'El nombre debe tener al menos 2 caracteres',
+            'name.max'      => 'El nombre no puede superar los 100 caracteres',
+            'name.unique'   => 'El nombre ya está en uso',
         ];
 
-        // VALIDAR DATOS
         $this->validate($rules, $messages);
 
         $categories = [

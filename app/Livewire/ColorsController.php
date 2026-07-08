@@ -46,8 +46,13 @@ class ColorsController extends Component
     public function storeOrUpdate()
     {
         $this->validate(
-            ['name' => 'required|unique:colors,name,' . ($this->isEditMode ? $this->color_id : '')],
-            ['name.required' => 'El nombre es requerido', 'name.unique' => 'El nombre ya está en uso']
+            ['name' => 'required|min:1|max:50|unique:colors,name,' . ($this->isEditMode ? $this->color_id : '')],
+            [
+                'name.required' => 'El nombre es requerido',
+                'name.min'      => 'El nombre no puede estar vacío',
+                'name.max'      => 'El nombre no puede superar los 50 caracteres',
+                'name.unique'   => 'El nombre ya está en uso',
+            ]
         );
 
         $isEdit = $this->isEditMode;

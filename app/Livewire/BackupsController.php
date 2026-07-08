@@ -3,14 +3,20 @@
 namespace App\Livewire;
 
 use Livewire\Component;
+use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class BackupsController extends Component
 {
-    public bool $isCreating = false;
+    use WithFileUploads;
 
-    protected $listeners = ['confirmDelete'];
+    public bool $isCreating = false;
+    public bool $isRestoring = false;
+    public $sqlFile = null;
+
+    protected $listeners = ['confirmDelete', 'confirmRestoreFromList'];
 
     public function createBackup(): void
     {
@@ -51,6 +57,91 @@ class BackupsController extends Component
             unlink($path);
             $this->dispatch('backupSuccess', 'Backup eliminado correctamente.');
         }
+    }
+
+    public function confirmRestoreFromList(string $filename): void
+    {
+        $filename = basename($filename);
+
+        if (!str_ends_with($filename, '.sql')) {
+            $this->dispatch('backupError', 'Archivo inválido.');
+            return;
+        }
+
+        $path = storage_path('app/backups/' . $filename);
+
+        if (!file_exists($path)) {
+            $this->dispatch('backupError', 'Archivo no encontrado.');
+            return;
+        }
+
+        $this->isRestoring = true;
+
+        try {
+            $this->executeRestoreFile($path);
+            $this->dispatch('backupSuccess', 'Base de datos restaurada desde: ' . $filename);
+        } catch (\Throwable $e) {
+            $this->dispatch('backupError', 'Error al restaurar: ' . $e->getMessage());
+        }
+
+        $this->isRestoring = false;
+    }
+
+    public function uploadAndRestore(): void
+    {
+        $this->validate(
+            ['sqlFile' => 'required|file|max:102400'],
+            [
+                'sqlFile.required' => 'Seleccione un archivo .sql',
+                'sqlFile.max'      => 'El archivo no puede superar 100MB',
+            ]
+        );
+
+        if (strtolower($this->sqlFile->getClientOriginalExtension()) !== 'sql') {
+            $this->addError('sqlFile', 'Solo se permiten archivos .sql');
+            return;
+        }
+
+        $this->isRestoring = true;
+
+        try {
+            $this->executeRestoreFile($this->sqlFile->getRealPath());
+            $this->sqlFile = null;
+            $this->dispatch('backupSuccess', 'Base de datos restaurada desde archivo subido.');
+        } catch (\Throwable $e) {
+            $this->dispatch('backupError', 'Error al restaurar: ' . $e->getMessage());
+        }
+
+        $this->isRestoring = false;
+    }
+
+    private function executeRestoreFile(string $path): void
+    {
+        set_time_limit(300);
+        ini_set('memory_limit', '256M');
+
+        DB::unprepared('SET FOREIGN_KEY_CHECKS=0');
+
+        $handle = fopen($path, 'r');
+        $statement = '';
+
+        while (($line = fgets($handle)) !== false) {
+            $trimmed = rtrim($line);
+            if ($trimmed === '' || str_starts_with($trimmed, '--')) {
+                continue;
+            }
+            $statement .= $line;
+            if (str_ends_with(rtrim($trimmed), ';')) {
+                $clean = trim($statement);
+                if (!empty($clean)) {
+                    DB::unprepared($clean);
+                }
+                $statement = '';
+            }
+        }
+
+        fclose($handle);
+        DB::unprepared('SET FOREIGN_KEY_CHECKS=1');
     }
 
     private function getBackups(): array
