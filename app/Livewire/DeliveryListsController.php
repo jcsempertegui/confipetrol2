@@ -24,6 +24,7 @@ class DeliveryListsController extends Component
 
     public $searchTerm;
     public $filter_status = '1';
+    public $filter_worker = '';
     protected $listeners = ['deleteDelivery'];
     public $branch_id;
 
@@ -33,6 +34,7 @@ class DeliveryListsController extends Component
 
     public function updatedPerPage() { $this->resetPage(); }
     public function updatedFilterStatus() { $this->resetPage(); }
+    public function updatedFilterWorker() { $this->resetPage(); }
 
     public function mount()
     {
@@ -65,16 +67,19 @@ class DeliveryListsController extends Component
             ->withSum('details', 'quantity')
             ->where('branch_id', $this->branch_id)
             ->when($this->filter_status !== '', fn ($q) => $q->where('status', $this->filter_status))
+            ->when(!empty($this->filter_worker), fn ($q) => $q->whereHas('worker', fn ($w) =>
+                $w->where('name', 'like', '%' . $this->filter_worker . '%')
+                  ->orWhere('last_name', 'like', '%' . $this->filter_worker . '%')
+                  ->orWhere('document', 'like', '%' . $this->filter_worker . '%')
+            ))
             ->when($fromDate && $toDate, fn ($q) => $q->whereBetween('created_at', [$fromDate, $toDate]))
-            ->where(function ($query) {
-                if (strlen($this->searchTerm) > 0) {
-                    $query->where('delivery_number', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhereHas('worker', fn ($q) =>
-                            $q->where('name', 'like', '%' . $this->searchTerm . '%')
-                              ->orWhere('last_name', 'like', '%' . $this->searchTerm . '%')
-                        );
-                }
-            })
+            ->when(!empty($this->searchTerm), fn ($q) => $q->where(fn ($sub) =>
+                $sub->where('delivery_number', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhereHas('worker', fn ($w) =>
+                        $w->where('name', 'like', '%' . $this->searchTerm . '%')
+                          ->orWhere('last_name', 'like', '%' . $this->searchTerm . '%')
+                    )
+            ))
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
     }

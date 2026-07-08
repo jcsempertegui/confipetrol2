@@ -38,9 +38,17 @@
                 </div>
 
                 <div class="col-md-3 col-6">
+                    <div class="form-group">
+                        <label>Filtrar por Contrato</label>
+                        <input type="text" class="form-control" wire:model.live.debounce.400ms="filter_contrato"
+                            placeholder="N° contrato...">
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-6">
                     <div class="form-group d-flex align-items-end">
                         <button wire:click="RemitosByDate" wire:loading.attr="disabled"
-                            class="btn btn-outline-secondary btnIcon" :disabled="!@this.fromDate || !@this.toDate">
+                            class="btn btn-outline-secondary btnIcon">
                             <span wire:loading.remove wire:target="RemitosByDate">
                                 <i class="bx bx-search-alt"></i> CONSULTAR
                             </span>

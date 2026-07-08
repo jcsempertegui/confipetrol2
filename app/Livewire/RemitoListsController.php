@@ -28,6 +28,7 @@ class RemitoListsController extends Component
     public $searchTerm;
     public $filter_status = '1';
     public $filter_tipo = '';
+    public $filter_contrato = '';
     protected $listeners = ['deleteRemito'];
     public $branch_id;
 
@@ -38,6 +39,7 @@ class RemitoListsController extends Component
     public function updatedPerPage() { $this->resetPage(); }
     public function updatedFilterStatus() { $this->resetPage(); }
     public function updatedFilterTipo() { $this->resetPage(); }
+    public function updatedFilterContrato() { $this->resetPage(); }
 
     public function mount()
     {
@@ -70,16 +72,15 @@ class RemitoListsController extends Component
             ->where('branch_id', $this->branch_id)
             ->when($this->filter_status !== '', fn ($q) => $q->where('status', $this->filter_status))
             ->when($this->filter_tipo !== '', fn ($q) => $q->where('tipo', $this->filter_tipo))
+            ->when(!empty($this->filter_contrato), fn ($q) => $q->where('contrato', 'like', '%' . $this->filter_contrato . '%'))
             ->when($fromDate && $toDate, fn ($q) => $q->whereBetween('created_at', [$fromDate, $toDate]))
-            ->where(function ($query) {
-                if (strlen($this->searchTerm) > 0) {
-                    $query->where('remito_number', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhere('contrato', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhere('senores', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhere('n_orden', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhere('campo', 'like', '%' . $this->searchTerm . '%');
-                }
-            })
+            ->when(!empty($this->searchTerm), fn ($q) => $q->where(fn ($sub) =>
+                $sub->where('remito_number', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('contrato', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('senores', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('n_orden', 'like', '%' . $this->searchTerm . '%')
+                    ->orWhere('campo', 'like', '%' . $this->searchTerm . '%')
+            ))
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
     }

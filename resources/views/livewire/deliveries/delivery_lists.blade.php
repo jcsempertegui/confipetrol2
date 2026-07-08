@@ -20,8 +20,7 @@
                         <div class="position-relative input-icon">
                             <input id="desde" class="form-control flatpickr" type="text" wire:model="fromDate"
                                 placeholder="Seleccionar Fecha Inicial">
-                            <span class="position-absolute top-50 translate-middle-y"><i
-                                    class='bx bx-calendar'></i></span>
+                            <span class="position-absolute top-50 translate-middle-y"><i class='bx bx-calendar'></i></span>
                         </div>
                     </div>
                 </div>
@@ -32,23 +31,28 @@
                         <div class="position-relative input-icon">
                             <input id="hasta" class="form-control flatpickr" type="text" wire:model="toDate"
                                 placeholder="Seleccionar Fecha Final">
-                            <span class="position-absolute top-50 translate-middle-y"><i
-                                    class='bx bx-calendar'></i></span>
+                            <span class="position-absolute top-50 translate-middle-y"><i class='bx bx-calendar'></i></span>
                         </div>
+                    </div>
+                </div>
+
+                <div class="col-md-3 col-6">
+                    <div class="form-group">
+                        <label>Filtrar por Trabajador</label>
+                        <input type="text" class="form-control" wire:model.live.debounce.400ms="filter_worker"
+                            placeholder="Nombre, apellido o documento...">
                     </div>
                 </div>
 
                 <div class="col-md-3 col-6">
                     <div class="form-group d-flex align-items-end">
                         <button wire:click="DeliveriesByDate" wire:loading.attr="disabled"
-                            class="btn btn-outline-secondary btnIcon" :disabled="!@this.fromDate || !@this.toDate">
+                            class="btn btn-outline-secondary btnIcon">
                             <span wire:loading.remove wire:target="DeliveriesByDate">
-                                <i class="bx bx-search-alt"></i>
-                                CONSULTAR
+                                <i class="bx bx-search-alt"></i> CONSULTAR
                             </span>
                             <span wire:loading wire:target="DeliveriesByDate">
-                                <i class="bx bx-spin bx-loader"></i>
-                                PROCESANDO...
+                                <i class="bx bx-spin bx-loader"></i> PROCESANDO...
                             </span>
                         </button>
                     </div>

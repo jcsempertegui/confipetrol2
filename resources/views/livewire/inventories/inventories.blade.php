@@ -11,31 +11,41 @@
         </div>
     </div>
 
-    <div class="d-flex gap-2 mt-1 mb-2" style="flex-shrink: 0;">
-        <div class="form-group">
-            <label for="hasta">Seleccionar Sucursal</label>
-            <div class="input-group">
-                <select class="form-select" data-placeholder="Buscar Sucursal..." wire:model="warehouse_id">
-                    <option value="">Todos</option>
-                    @foreach ($warehousesList as $wh)
-                        <option value="{{ $wh['id'] }}">{{ $wh['display_name'] }}</option>
-                    @endforeach
-                </select>
+    <div class="card mb-2 template-shrink-none">
+        <div class="card-body py-2">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-3 col-6">
+                    <label class="form-label mb-1">Sucursal / Almacén</label>
+                    <select class="form-select" wire:model="warehouse_id">
+                        <option value="">Todos</option>
+                        @foreach ($warehousesList as $wh)
+                            <option value="{{ $wh['id'] }}">{{ $wh['display_name'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-2 col-6">
+                    <label class="form-label mb-1">Tipo de Producto</label>
+                    <select class="form-select" wire:model.live="filter_type">
+                        <option value="">Todos los tipos</option>
+                        <option value="0">Consumible</option>
+                        <option value="1">Activo</option>
+                        <option value="2">Consumible</option>
+                        <option value="3">EPPs</option>
+                    </select>
+                </div>
+                <div class="col-md-2 col-6 d-flex align-items-end">
+                    <div class="form-check mb-1">
+                        <input class="form-check-input" type="checkbox" wire:model.live="filter_low_stock" id="chkLowStock">
+                        <label class="form-check-label" for="chkLowStock">Solo stock bajo</label>
+                    </div>
+                </div>
+                <div class="col-md-2 col-6 d-flex align-items-end">
+                    <button class="btn btn-outline-secondary btnIcon" wire:click.prevent="searchBybranch" wire:loading.attr="disabled">
+                        <span wire:loading.remove wire:target="searchBybranch"><i class="bx bx-search-alt"></i> CONSULTAR</span>
+                        <span wire:loading wire:target="searchBybranch"><i class="bx bx-spin bx-loader"></i> PROCESANDO...</span>
+                    </button>
+                </div>
             </div>
-        </div>
-
-        <div class="form-group d-flex align-items-end">
-            <button class="btn btn-outline-secondary btnIcon" wire:click.prevent="searchBybranch"
-                wire:loading.attr="disabled">
-                <span wire:loading.remove wire:target="searchBybranch">
-                    <i class="bx bx-search-alt"></i>
-                    CONSULTAR
-                </span>
-                <span wire:loading wire:target="searchBybranch">
-                    <i class="bx bx-spin bx-loader"></i>
-                    PROCESANDO...
-                </span>
-            </button>
         </div>
     </div>
 

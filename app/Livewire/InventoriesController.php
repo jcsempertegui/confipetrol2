@@ -46,15 +46,17 @@ class InventoriesController extends Component
     public $skusList = [];
     public $skusProductName = '';
 
+    public $filter_type = '';
+    public $filter_low_stock = false;
+
     protected $listeners = ['updateLot'];
 
     public $perPage = 20;
     public $perPageOptions = [20, 50, 100];
 
-    public function updatedPerPage()
-    {
-        $this->resetPage();
-    }
+    public function updatedPerPage() { $this->resetPage(); }
+    public function updatedFilterType() { $this->resetPage(); }
+    public function updatedFilterLowStock() { $this->resetPage(); }
 
     public function mount()
     {
@@ -127,22 +129,14 @@ class InventoriesController extends Component
         ];
 
         $inventories = Inventorie::with(['product', 'warehouse.branch'])
-            ->whereHas('product', function ($query) {
-                $query->whereIn('type', [0, 3, 4]);
-            })
-            ->when(!empty($this->warehouse_id), function ($query) {
-                $query->where('warehouse_id', $this->warehouse_id);
-            })
+            ->whereHas('product', fn($q) => $q->where('status', 1))
+            ->when(!empty($this->warehouse_id), fn($q) => $q->where('warehouse_id', $this->warehouse_id))
+            ->when($this->filter_type !== '', fn($q) => $q->whereHas('product', fn($p) => $p->where('type', $this->filter_type)))
+            ->when($this->filter_low_stock, fn($q) => $q->whereRaw('(inventories.stock_lot + inventories.stock_nolot) <= (SELECT minimum_stock FROM products WHERE products.id = inventories.product_id)'))
             ->when(!empty($this->searchTerm), function ($query) {
                 $query->where(function ($q) {
-                    $q->where('stock', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhereHas('product', function ($productQuery) {
-                            $productQuery->where('name', 'like', '%' . $this->searchTerm . '%')
-                                ->orWhere('code', 'like', '%' . $this->searchTerm . '%');
-                        })
-                        ->orWhereHas('warehouse.branch', function ($branchQuery) {
-                            $branchQuery->where('name', 'like', '%' . $this->searchTerm . '%');
-                        });
+                    $q->orWhereHas('product', fn($p) => $p->where('name', 'like', '%' . $this->searchTerm . '%')->orWhere('code', 'like', '%' . $this->searchTerm . '%'))
+                      ->orWhereHas('warehouse.branch', fn($b) => $b->where('name', 'like', '%' . $this->searchTerm . '%'));
                 });
             })
             ->orderBy('id', 'desc')
@@ -220,22 +214,14 @@ class InventoriesController extends Component
         $printer = Printer::where('branch_id', $branch_id)->where('status', 1)->first();
 
         $inventories = Inventorie::with(['product', 'warehouse.branch'])
-            ->whereHas('product', function ($query) {
-                $query->whereIn('type', [0, 3, 4]);
-            })
-            ->when(!empty($this->warehouse_id), function ($query) {
-                $query->where('warehouse_id', $this->warehouse_id);
-            })
+            ->whereHas('product', fn($q) => $q->where('status', 1))
+            ->when(!empty($this->warehouse_id), fn($q) => $q->where('warehouse_id', $this->warehouse_id))
+            ->when($this->filter_type !== '', fn($q) => $q->whereHas('product', fn($p) => $p->where('type', $this->filter_type)))
+            ->when($this->filter_low_stock, fn($q) => $q->whereRaw('(inventories.stock_lot + inventories.stock_nolot) <= (SELECT minimum_stock FROM products WHERE products.id = inventories.product_id)'))
             ->when(!empty($this->searchTerm), function ($query) {
                 $query->where(function ($q) {
-                    $q->where('stock', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhereHas('product', function ($productQuery) {
-                            $productQuery->where('name', 'like', '%' . $this->searchTerm . '%')
-                                ->orWhere('code', 'like', '%' . $this->searchTerm . '%');
-                        })
-                        ->orWhereHas('warehouse.branch', function ($branchQuery) {
-                            $branchQuery->where('name', 'like', '%' . $this->searchTerm . '%');
-                        });
+                    $q->orWhereHas('product', fn($p) => $p->where('name', 'like', '%' . $this->searchTerm . '%')->orWhere('code', 'like', '%' . $this->searchTerm . '%'))
+                      ->orWhereHas('warehouse.branch', fn($b) => $b->where('name', 'like', '%' . $this->searchTerm . '%'));
                 });
             })
             ->orderBy('id', 'desc')
@@ -269,21 +255,24 @@ class InventoriesController extends Component
                 'warehouse.branch',
             ])
             ->whereHas('product', function ($query) {
-                $query->whereIn('type', [0, 3, 4]);
+                $query->where('status', 1);
             })
-            ->when(!empty($this->warehouse_id), function ($query) {
-                $query->where('warehouse_id', $this->warehouse_id);
+            ->when(!empty($this->warehouse_id), fn($q) => $q->where('warehouse_id', $this->warehouse_id))
+            ->when($this->filter_type !== '', function ($query) {
+                $query->whereHas('product', fn($q) => $q->where('type', $this->filter_type));
+            })
+            ->when($this->filter_low_stock, function ($query) {
+                $query->whereRaw('(inventories.stock_lot + inventories.stock_nolot) <= (SELECT minimum_stock FROM products WHERE products.id = inventories.product_id)');
             })
             ->when(!empty($this->searchTerm), function ($query) {
                 $query->where(function ($q) {
-                    $q->where('stock', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhereHas('product', function ($productQuery) {
-                            $productQuery->where('name', 'like', '%' . $this->searchTerm . '%')
-                                ->orWhere('code', 'like', '%' . $this->searchTerm . '%');
-                        })
-                        ->orWhereHas('warehouse.branch', function ($branchQuery) {
-                            $branchQuery->where('name', 'like', '%' . $this->searchTerm . '%');
-                        });
+                    $q->orWhereHas('product', function ($pq) {
+                        $pq->where('name', 'like', '%' . $this->searchTerm . '%')
+                           ->orWhere('code', 'like', '%' . $this->searchTerm . '%');
+                    })
+                    ->orWhereHas('warehouse.branch', function ($bq) {
+                        $bq->where('name', 'like', '%' . $this->searchTerm . '%');
+                    });
                 });
             })
             ->orderBy('id', 'desc')
