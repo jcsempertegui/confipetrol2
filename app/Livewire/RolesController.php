@@ -6,19 +6,33 @@ use App\Models\User;
 use App\Traits\AuditLog;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesController extends Component
 {
-    use WithPagination, AuditLog;
-    protected $paginationTheme = 'bootstrap';
-    public $searchTerm, $searchPermission;
+    use AuditLog, WithPagination;
 
-    public $name, $estado, $permisosSelected = [], $search, $selected_id;
+    protected $paginationTheme = 'bootstrap';
+
+    public $searchTerm;
+
+    public $searchPermission;
+
+    public $name;
+
+    public $estado;
+
+    public $permisosSelected = [];
+
+    public $search;
+
+    public $selected_id;
+
     public $componentKey = 0;
 
     public $perPage = 20;
+
     public $perPageOptions = [20, 50, 100];
 
     public function updatedPerPage()
@@ -28,19 +42,7 @@ class RolesController extends Component
 
     public function getPermisosExcluidos()
     {
-        $permisosExcluidos = [];
-
-        if (auth()->id() !== 1) {
-            $permisosExcluidos = [
-                'ver-sucursales',
-                'crear-sucursal',
-                'editar-sucursal',
-                'eliminar-sucursal',
-                'cambiar-sucursal',
-            ];
-        }
-
-        return $permisosExcluidos;
+        return [];
     }
 
     public function getGruposExcluidos()
@@ -50,7 +52,7 @@ class RolesController extends Component
 
     public function render()
     {
-        $roles = Role::where('name', 'like', '%' . $this->searchTerm . '%')
+        $roles = Role::where('name', 'like', '%'.$this->searchTerm.'%')
             ->where('id', '!=', 1)
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
@@ -60,14 +62,14 @@ class RolesController extends Component
 
         $permisos = Permission::when($this->searchPermission, function ($query) {
             $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->searchPermission . '%')
-                    ->orWhere('grupo', 'like', '%' . $this->searchPermission . '%');
+                $q->where('name', 'like', '%'.$this->searchPermission.'%')
+                    ->orWhere('grupo', 'like', '%'.$this->searchPermission.'%');
             });
         })
-            ->when(!empty($gruposExcluidos), function ($query) use ($gruposExcluidos) {
+            ->when(! empty($gruposExcluidos), function ($query) use ($gruposExcluidos) {
                 $query->whereNotIn('grupo', $gruposExcluidos);
             })
-            ->when(!empty($permisosExcluidos), function ($query) use ($permisosExcluidos) {
+            ->when(! empty($permisosExcluidos), function ($query) use ($permisosExcluidos) {
                 $query->whereNotIn('name', $permisosExcluidos);
             })
             ->orderBy('name', 'asc')
@@ -76,7 +78,7 @@ class RolesController extends Component
         return view('livewire.roles.roles', [
             'roles' => $roles,
             'permisos' => $permisos,
-            'startCount' => $roles->total() - ($roles->currentPage() - 1) * $roles->perPage()
+            'startCount' => $roles->total() - ($roles->currentPage() - 1) * $roles->perPage(),
         ])
             ->extends('layouts.theme.app')
             ->section('content');
@@ -84,9 +86,10 @@ class RolesController extends Component
 
     public function Create()
     {
+        abort_unless(auth()->user()->can('crear-rol'), 403);
         $rules = [
             'name' => 'required|unique:roles|min:2',
-            'permisosSelected' => 'required|array'
+            'permisosSelected' => 'required|array',
         ];
         $message = [
             'name.required' => 'Nombre de el rol es requerido',
@@ -103,10 +106,10 @@ class RolesController extends Component
 
         $this->logActivity(
             'ROLES', 'CREAR',
-            "Creó rol: {$role->name} (" . count($this->permisosSelected) . " permisos)",
+            "Creó rol: {$role->name} (".count($this->permisosSelected).' permisos)',
             $role->id,
             null,
-            ['name' => $role->name, 'permisos' => count($this->permisosSelected)]
+            ['nombre' => $role->name, 'permisos' => $role->permissions()->pluck('name')->sort()->values()->all()]
         );
 
         $this->dispatch('role-added', ['ROL CREADO CON ÉXITO.']);
@@ -115,6 +118,7 @@ class RolesController extends Component
 
     public function edit($id)
     {
+        abort_unless(auth()->user()->can('editar-rol'), 403);
         $this->resetInputFields();
         $role = Role::findOrFail($id);
 
@@ -129,9 +133,10 @@ class RolesController extends Component
 
     public function Update()
     {
+        abort_unless(auth()->user()->can('editar-rol'), 403);
         $rules = [
             'name' => "required|unique:roles,name,{$this->selected_id}|min:2",
-            'permisosSelected' => 'required|array'
+            'permisosSelected' => 'required|array',
         ];
 
         $message = [
@@ -145,16 +150,17 @@ class RolesController extends Component
         $this->validate($rules, $message);
 
         $role = Role::find($this->selected_id);
+        $before = ['nombre' => $role->name, 'permisos' => $role->permissions->pluck('name')->sort()->values()->all()];
         $role->name = $this->name;
         $role->save();
         $role->syncPermissions($this->permisosSelected);
 
         $this->logActivity(
             'ROLES', 'EDITAR',
-            "Editó rol: {$role->name} (" . count($this->permisosSelected) . " permisos)",
+            "Editó rol: {$role->name} (".count($this->permisosSelected).' permisos)',
             $role->id,
-            null,
-            ['name' => $role->name, 'permisos' => count($this->permisosSelected)]
+            $before,
+            ['nombre' => $role->name, 'permisos' => $role->permissions()->pluck('name')->sort()->values()->all()]
         );
 
         $this->dispatch('role-updated', 'ROL ACTUALIZADO EXITOSAMENTE.');
@@ -163,15 +169,19 @@ class RolesController extends Component
 
     public function Destroy($id)
     {
+        abort_unless(auth()->user()->can('eliminar-rol'), 403);
         if ($id) {
             $role = Role::find($id);
             if ($role) {
                 $newEstado = $role->status == 1 ? 0 : 1;
+                $before = ['estado' => (bool) $role->status];
                 $role->update(['status' => $newEstado]);
                 $this->logActivity(
                     'ROLES', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
-                    ($newEstado == 1 ? 'Activó' : 'Desactivó') . " rol: {$role->name}",
-                    $role->id
+                    ($newEstado == 1 ? 'Activó' : 'Desactivó')." rol: {$role->name}",
+                    $role->id,
+                    $before,
+                    ['estado' => (bool) $newEstado]
                 );
                 $message = $newEstado == 1 ? 'ROL ACTIVADO EXITOSAMENTE.' : 'ROL DESACTIVADO EXITOSAMENTE.';
                 $this->dispatch('role-deleted', $message);
@@ -195,12 +205,12 @@ class RolesController extends Component
         $permisosGrupo = Permission::where('grupo', $grupo)
             ->whereNotIn('name', $this->getPermisosExcluidos())
             ->pluck('name')->toArray();
-            
+
         if (empty($permisosGrupo)) {
             return false;
         }
-        
-        return collect($permisosGrupo)->every(fn($permiso) => in_array($permiso, $this->permisosSelected));
+
+        return collect($permisosGrupo)->every(fn ($permiso) => in_array($permiso, $this->permisosSelected));
     }
 
     public function toggleGroup($grupo, $checked)

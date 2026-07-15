@@ -2,113 +2,198 @@
 
 namespace App\Livewire;
 
-use App\Models\Categorie;
+use App\Models\Category;
+use App\Models\ProductAttribute;
 use App\Traits\AuditLog;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
-use Livewire\WithPagination;
 
 class CategoriesController extends Component
 {
-    use WithPagination, AuditLog;
-    protected $paginationTheme = 'bootstrap';
+    use AuditLog;
 
-    public $name, $categorie_id;
-    public $isEditMode = false;
-    public $searchTerm;
-    public $roles;
+    public $categoryId;
 
-    protected $listeners = ['delete'];
+    public $name = '';
+
+    public $code = '';
+
+    public $description = '';
+
+    public $status = 1;
+
+    public $attributeId;
+
+    public $attributeName = '';
+
+    public $attributeCode = '';
+
+    public $attributeType = 'text';
+
+    public $attributeScope = 'product';
+
+    public $attributeOptions = '';
+
+    public $attributeStatus = 1;
+
+    public $selectedCategoryId;
+
+    public $attributeRequired = true;
 
     public function render()
     {
-        $categories = Categorie::where('name', 'like', '%' . $this->searchTerm . '%')
-            ->orderBy('id', 'desc')
-            ->paginate(10);
-
         return view('livewire.categories.categories', [
-            'categories' => $categories,
-            'startCount' => $categories->total() - ($categories->currentPage() - 1) * $categories->perPage()
-        ])
-            ->extends('layouts.theme.app');
+            'categories' => Category::with('attributes')->withCount('products')->orderBy('name')->get(),
+            'selectedCategory' => $this->selectedCategoryId ? Category::with('attributes')->find($this->selectedCategoryId) : null,
+        ])->extends('layouts.theme.app');
     }
 
-    public function paginationView()
+    public function saveCategory(): void
     {
-        return 'vendor.livewire.bootstrap';
+        abort_unless(auth()->user()->can($this->categoryId ? 'editar-categoria' : 'crear-categoria'), 403);
+        $this->code = Str::upper(trim($this->code));
+        $data = $this->validate([
+            'name' => 'required|string|max:150',
+            'code' => ['nullable', 'string', 'max:50', Rule::unique('categories')->ignore($this->categoryId)],
+            'description' => 'nullable|string|max:1000', 'status' => 'boolean',
+        ]);
+        $this->code = $this->code ?: $this->makeCategoryCode();
+        $data['code'] = $this->code;
+        $before = $this->categoryId ? Category::findOrFail($this->categoryId)->only(['name', 'code', 'description', 'status']) : null;
+        $category = Category::updateOrCreate(['id' => $this->categoryId], $data);
+        $this->selectedCategoryId = $category->id;
+        $this->logActivity('CATEGORIAS', $this->categoryId ? 'EDITAR' : 'CREAR', 'Categoría '.$category->name, $category->id, $before, $category->only(['name', 'code', 'description', 'status']));
+        $this->resetCategory();
+        $this->dispatch('alert', 'Categoría guardada correctamente.', 'success');
     }
 
-    public function resetInputFields()
+    public function editCategory(int $id): void
     {
+        abort_unless(auth()->user()->can('editar-categoria'), 403);
+        $category = Category::with('attributes')->findOrFail($id);
+        $this->categoryId = $id;
+        $this->name = $category->name;
+        $this->code = $category->code;
+        $this->description = $category->description ?? '';
+        $this->status = (int) $category->status;
+        $this->selectedCategoryId = $category->id;
+    }
+
+    public function toggleCategory(int $id): void
+    {
+        abort_unless(auth()->user()->can('eliminar-categoria'), 403);
+        $category = Category::findOrFail($id);
+        $before = ['status' => (bool) $category->status];
+        $category->update(['status' => ! $category->status]);
+        $this->logActivity('CATEGORIAS', $category->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado de la categoría '.$category->name, $category->id, $before, ['status' => (bool) $category->status]);
+    }
+
+    public function saveAttribute(): void
+    {
+        abort_unless(auth()->user()->can('gestionar-atributos'), 403);
+        abort_unless($this->selectedCategoryId, 422, 'Seleccione una categoría.');
+        $category = Category::findOrFail($this->selectedCategoryId);
+        $this->attributeCode = Str::lower(trim($this->attributeCode ?: $category->code.'-'.Str::slug($this->attributeName)));
+        $data = $this->validate([
+            'attributeName' => 'required|string|max:150',
+            'attributeCode' => ['required', 'string', 'max:50', Rule::unique('product_attributes', 'code')->ignore($this->attributeId)],
+            'attributeType' => 'required|in:text,number,select,boolean,date',
+            'attributeScope' => 'required|in:product,variant',
+            'attributeOptions' => 'nullable|string|max:2000', 'attributeStatus' => 'boolean',
+        ]);
+        $options = $this->attributeType === 'select' ? collect(explode(',', $this->attributeOptions))->map(fn ($v) => trim($v))->filter()->values()->all() : null;
+        $before = $this->attributeId ? $this->attributeSnapshot(ProductAttribute::findOrFail($this->attributeId), $category) : null;
+        $attribute = ProductAttribute::updateOrCreate(['id' => $this->attributeId], [
+            'name' => $data['attributeName'], 'code' => $data['attributeCode'], 'type' => $data['attributeType'],
+            'scope' => $data['attributeScope'], 'options' => $options, 'status' => $data['attributeStatus'],
+        ]);
+        $category->attributes()->syncWithoutDetaching([$attribute->id => [
+            'required' => (bool) $this->attributeRequired,
+            'position' => $category->attributes()->count(),
+        ]]);
+        $category->attributes()->updateExistingPivot($attribute->id, ['required' => (bool) $this->attributeRequired]);
+        $this->logActivity('CATEGORIAS', $this->attributeId ? 'EDITAR' : 'CREAR', 'Atributo '.$attribute->name.' de la categoría '.$category->name, $attribute->id, $before, $this->attributeSnapshot($attribute->fresh(), $category));
+        $this->resetAttribute();
+        $this->dispatch('alert', 'Atributo guardado correctamente.', 'success');
+    }
+
+    public function editAttribute(int $id): void
+    {
+        abort_unless(auth()->user()->can('gestionar-atributos'), 403);
+        $a = ProductAttribute::findOrFail($id);
+        $this->attributeId = $id;
+        $this->attributeName = $a->name;
+        $this->attributeCode = $a->code;
+        $this->attributeType = $a->type;
+        $this->attributeScope = $a->scope;
+        $this->attributeOptions = implode(', ', $a->options ?? []);
+        $this->attributeStatus = (int) $a->status;
+        $this->attributeRequired = (bool) Category::findOrFail($this->selectedCategoryId)->attributes()->whereKey($id)->firstOrFail()->pivot->required;
+    }
+
+    public function selectCategory(int $id): void
+    {
+        $this->selectedCategoryId = Category::findOrFail($id)->id;
+        $this->resetAttribute();
+    }
+
+    public function removeAttribute(int $id): void
+    {
+        abort_unless(auth()->user()->can('gestionar-atributos'), 403);
+        $category = Category::findOrFail($this->selectedCategoryId);
+        $attribute = $category->attributes()->whereKey($id)->firstOrFail();
+        $before = $this->attributeSnapshot($attribute, $category);
+        $category->attributes()->detach($id);
+        $this->logActivity('CATEGORIAS', 'ELIMINAR', 'Atributo '.$attribute->name.' retirado de la categoría '.$category->name, $attribute->id, $before, null);
+        $this->resetAttribute();
+    }
+
+    public function resetCategory(): void
+    {
+        $this->reset(['categoryId', 'name', 'code', 'description']);
+        $this->status = 1;
         $this->resetValidation();
-        $this->name = '';
-        $this->categorie_id = '';
-        $this->isEditMode = false;
     }
 
-    public function storeOrUpdate()
+    public function resetAttribute(): void
     {
-        $rules = [
-            'name' => 'required|min:2|max:100|unique:categories,name,' . ($this->isEditMode ? $this->categorie_id : ''),
-        ];
-
-        $messages = [
-            'name.required' => 'El nombre es requerido',
-            'name.min'      => 'El nombre debe tener al menos 2 caracteres',
-            'name.max'      => 'El nombre no puede superar los 100 caracteres',
-            'name.unique'   => 'El nombre ya está en uso',
-        ];
-
-        $this->validate($rules, $messages);
-
-        $categories = [
-            'name' => $this->name
-        ];
-
-        $isEdit = $this->isEditMode;
-        $categorie = Categorie::updateOrCreate(
-            ['id' => $this->categorie_id],
-            $categories
-        );
-
-        $this->logActivity(
-            'CATEGORIAS', $isEdit ? 'EDITAR' : 'CREAR',
-            ($isEdit ? 'Editó' : 'Creó') . " categoría: {$categorie->name}",
-            $categorie->id
-        );
-
-        $message = $isEdit ? 'CATEGORIA ACTUALIZADA EXITOSAMENTE.' : 'CATEGORIA CREADA CON ÉXITO.';
-
-        $this->resetInputFields();
-        $this->dispatch('categorieStoreOrUpdate', $message);
-    }
-
-    public function edit($id)
-    {
+        $this->reset(['attributeId', 'attributeName', 'attributeCode', 'attributeOptions']);
+        $this->attributeType = 'text';
+        $this->attributeScope = 'product';
+        $this->attributeStatus = 1;
+        $this->attributeRequired = true;
         $this->resetValidation();
-        
-        $categorie = Categorie::findOrFail($id);
-        $this->categorie_id = $id;
-        $this->name = $categorie->name;
-        $this->status = $categorie->status;
-        $this->isEditMode = true;
     }
 
-    public function delete($id)
+    private function attributeSnapshot(ProductAttribute $attribute, Category $category): array
     {
-        $categorie = Categorie::find($id);
+        $pivot = $category->attributes()->whereKey($attribute->id)->first()?->pivot;
 
-        if ($categorie) {
-            $newEstado = $categorie->status == 1 ? 0 : 1;
-            $categorie->update(['status' => $newEstado]);
-            $this->logActivity(
-                'CATEGORIAS', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
-                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " categoría: {$categorie->name}",
-                $categorie->id
-            );
-            $message = $newEstado == 1 ? 'CATEGORIA RESTAURADA EXITOSAMENTE.' : 'CATEGORIA ELIMINADA EXITOSAMENTE.';
-            $this->dispatch('categorieDeleted', $message);
-        } else {
-            session()->flash('message', 'CATEGORIA NO ENCONTRADA.');
+        return [
+            'categoría' => $category->name,
+            'nombre' => $attribute->name,
+            'tipo' => $attribute->type,
+            'uso' => $attribute->scope,
+            'opciones' => $attribute->options,
+            'obligatorio' => (bool) ($pivot?->required ?? $this->attributeRequired),
+            'estado' => (bool) $attribute->status,
+        ];
+    }
+
+    private function makeCategoryCode(): string
+    {
+        $words = collect(preg_split('/\s+/', Str::ascii(trim($this->name))))
+            ->filter(fn ($word) => ! in_array(strtolower($word), ['de', 'del', 'la', 'las', 'el', 'los', 'y'], true));
+        $base = $words->count() > 1
+            ? $words->map(fn ($word) => strtoupper(substr($word, 0, 1)))->join('')
+            : strtoupper(substr($words->first() ?: 'CAT', 0, 3));
+        $code = $base;
+        $number = 2;
+        while (Category::where('code', $code)->where('id', '!=', $this->categoryId)->exists()) {
+            $code = $base.$number++;
         }
+
+        return $code;
     }
 }

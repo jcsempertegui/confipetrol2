@@ -4,12 +4,12 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
+use App\Models\Log;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use App\Models\Log;
-use Illuminate\View\View;
 use Illuminate\Support\Facades\DB;
+use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
@@ -42,22 +42,21 @@ class AuthenticatedSessionController extends Controller
             $deletedCount = $sessionsToDelete->count();
             $idsToDelete = $sessionsToDelete->pluck('id')->toArray();
 
-            if (!empty($idsToDelete)) {
+            if (! empty($idsToDelete)) {
                 DB::table('sessions')->whereIn('id', $idsToDelete)->delete();
                 $message = "Atención: Se ha cerrado sesión en {$deletedCount} dispositivo(s) antiguo(s) por límite de seguridad.";
             }
         }
         // --- FIN LOGICA ---
 
-        session(['branch_user_id' => $user->branch_id]);
-
         Log::create([
-            'user_id'        => $user->id,
-            'modulo'         => 'ACCESO',
-            'accion'         => 'INICIO_SESION',
-            'descripcion'    => 'Inicio de sesión: ' . $user->login,
-            'ip'             => $request->ip(),
-            'valores_nuevos' => json_encode(['user_agent' => $request->header('User-Agent')]),
+            'user_id' => $user->id,
+            'actor_login' => $user->login,
+            'modulo' => 'ACCESO',
+            'accion' => 'INICIO_SESION',
+            'descripcion' => 'Inicio de sesión: '.$user->login,
+            'ip' => $request->ip(),
+            'valores_nuevos' => ['navegador' => $request->header('User-Agent'), 'sesión' => $currentSessionId],
         ]);
 
         if ($message) {
@@ -71,11 +70,12 @@ class AuthenticatedSessionController extends Controller
     {
         if (Auth::user()) {
             Log::create([
-                'user_id'     => Auth::user()->id,
-                'modulo'      => 'ACCESO',
-                'accion'      => 'CIERRE_SESION',
-                'descripcion' => 'Cierre de sesión: ' . Auth::user()->login,
-                'ip'          => $request->ip(),
+                'user_id' => Auth::user()->id,
+                'actor_login' => Auth::user()->login,
+                'modulo' => 'ACCESO',
+                'accion' => 'CIERRE_SESION',
+                'descripcion' => 'Cierre de sesión: '.Auth::user()->login,
+                'ip' => $request->ip(),
             ]);
         }
 

@@ -2,560 +2,217 @@
 
 namespace App\Livewire;
 
+use App\Models\Category;
 use App\Models\Product;
-use App\Models\Brand;
-use App\Models\Categorie;
-use App\Models\Unit;
-use App\Models\Branche;
-use App\Models\Inventorie;
-use App\Models\ProductSku;
-use App\Models\Kardex;
-use App\Models\Warehouse;
-use App\Models\Color;
-use App\Models\Size;
 use App\Traits\AuditLog;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class ProductsController extends Component
 {
-    use WithPagination, AuditLog;
+    use AuditLog, WithPagination;
 
     protected $paginationTheme = 'bootstrap';
 
-    public $code, $name, $features, $model;
-    public $categorie_id, $brand_id, $unit_id, $product_id;
-    public $minimum_stock = 0, $initial_stock = 0;
-    public $isEditMode = false;
+    public $productId;
 
-    public $filter_category = '';
-    public $filter_brand = '';
-    public $filter_type = '';
-    public $filter_status = '1';
+    public $category_id = '';
 
-    public $searchTerm;
+    public $code = '';
 
-    public $categories, $brands, $units;
+    public $name = '';
 
-    public $name_category, $name_brand, $name_unit, $unit_base_unit, $unit_factor;
+    public $description = '';
 
-    public $type = 2;
+    public $tracking_type = 'bulk';
 
-    public $branch_id, $pos_type, $openAccordion = null;
+    public $status = 1;
 
-    public $colors = [], $sizes = [];
-    public $color_id = '', $size_id = '';
-    public $skus = [];
+    public $searchTerm = '';
 
-    public $perPage = 20;
-    public $perPageOptions = [20, 50, 100];
+    public array $productValues = [];
 
-    protected $listeners = ['delete'];
+    public array $variants = [];
 
-    public function updatedPerPage()
+    public function mount(): void
     {
-        $this->resetPage();
-    }
-    public function updatedFilterCategory()
-    {
-        $this->resetPage();
-    }
-    public function updatedFilterBrand()
-    {
-        $this->resetPage();
-    }
-    public function updatedFilterType()
-    {
-        $this->resetPage();
-    }
-    public function updatedFilterStatus()
-    {
-        $this->resetPage();
-    }
-
-    public function updatedType($value)
-    {
-        if ($value != 3) {
-            $this->skus = [];
-            $this->color_id = '';
-            $this->size_id = '';
-        }
-        if ($value == 1) {
-            $this->categorie_id = null;
-        } else {
-            $this->model = '';
-        }
-    }
-
-    public function clearFilters()
-    {
-        $this->filter_category = '';
-        $this->filter_brand = '';
-        $this->filter_type = '';
-        $this->filter_status = '1';
-        $this->resetPage();
-    }
-
-    private function getDefaultWarehouseId()
-    {
-        $defaultWarehouse = Warehouse::where('branch_id', $this->branch_id)->where('is_default', 1)->first();
-        return $defaultWarehouse ? $defaultWarehouse->id : 1;
-    }
-
-    public function refreshData($branchId = null)
-    {
-        $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
-        $branch = Branche::find($this->branch_id) ?? Branche::first();
-        $this->pos_type = $branch ? $branch->pos_type : 1;
-        $this->resetPage();
-    }
-
-    public function toggleAccordion($id)
-    {
-        $this->openAccordion = $this->openAccordion === $id ? null : $id;
-    }
-
-    public function mount()
-    {
-        $this->categories = Categorie::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->brands = Brand::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->units = Unit::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->colors = Color::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->sizes = Size::where('status', 1)->orderBy('id', 'asc')->get();
-
-        $this->branch_id = session('branch_user_id', auth()->user()->branch_id);
-        $branch = Branche::find($this->branch_id) ?? Branche::first();
-        $this->pos_type = $branch ? $branch->pos_type : 1;
+        $this->addVariant();
     }
 
     public function render()
     {
-        $warehouseId = $this->getDefaultWarehouseId();
+        $products = Product::with(['category', 'variants.attributeValues', 'variants.serializedItems', 'attributeValues'])
+            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('name', 'like', '%'.$this->searchTerm.'%')->orWhere('code', 'like', '%'.$this->searchTerm.'%')->orWhereHas('variants', fn ($v) => $v->where('sku', 'like', '%'.$this->searchTerm.'%'))))
+            ->latest()->paginate(15);
+        $categories = Category::with(['attributes' => fn ($q) => $q->where('product_attributes.status', true)])->where('status', true)->orderBy('name')->get();
 
-        $products = Product::query()
-            ->select([
-                'products.id',
-                'products.code',
-                'products.name',
-                'products.type',
-                'products.status',
-                'products.brand_id',
-                'products.categorie_id',
-                'products.unit_id',
-                'products.minimum_stock',
-            ])
-            ->with([
-                'brands:id,name',
-                'categories:id,name',
-                'units:id,name',
-                'inventories' => function ($query) use ($warehouseId) {
-                    $query->select('product_id', 'warehouse_id')
-                        ->where('warehouse_id', $warehouseId);
-                },
-            ])
-            ->when($this->filter_status !== '', fn($q) => $q->where('products.status', $this->filter_status))
-            ->when($this->filter_category, fn($q) => $q->where('products.categorie_id', $this->filter_category))
-            ->when($this->filter_brand, fn($q) => $q->where('products.brand_id', $this->filter_brand))
-            ->when($this->filter_type !== '', fn($q) => $q->where('products.type', $this->filter_type))
-            ->when(strlen($this->searchTerm ?? '') > 0, function ($query) {
-                $query->where(function ($q) {
-                    $q->where('products.code', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhere('products.name', 'like', '%' . $this->searchTerm . '%')
-                        ->orWhereHas('brands', fn($q) => $q->where('name', 'like', '%' . $this->searchTerm . '%'))
-                        ->orWhereHas('categories', fn($q) => $q->where('name', 'like', '%' . $this->searchTerm . '%'));
-                });
-            })
-            ->orderBy('id', 'desc')
-            ->paginate($this->perPage);
-
-        return view('livewire.products.products', [
-            'products' => $products,
-            'startCount' => $products->total() - ($products->currentPage() - 1) * $products->perPage(),
-        ])->extends('layouts.theme.app');
+        return view('livewire.products.products', compact('products', 'categories'))->extends('layouts.theme.app');
     }
 
-    public function paginationView()
+    public function updatedSearchTerm(): void
     {
-        return 'vendor.livewire.bootstrap';
+        $this->resetPage();
     }
 
-    public function resetInputFields()
+    public function updatedCategoryId(): void
     {
-        $this->resetValidation();
-        $this->code = '';
-        $this->name = '';
-        $this->features = '';
-        $this->model = '';
-        $this->categorie_id = null;
-        $this->brand_id = null;
-        $this->unit_id = null;
-        $this->product_id = '';
-        $this->minimum_stock = 0;
-        $this->initial_stock = 0;
-        $this->type = 2;
-        $this->skus = [];
-        $this->color_id = '';
-        $this->size_id = '';
-        $this->openAccordion = null;
-        $this->isEditMode = false;
+        $this->productValues = [];
+        foreach ($this->variants as &$v) {
+            $v['values'] = [];
+        }
+        $this->variants = [];
+        $this->addVariant();
     }
 
-    public function storeOrUpdate()
+    public function addVariant(): void
     {
-        ini_set('memory_limit', '256M');
-        set_time_limit(120);
+        $this->variants[] = ['id' => null, 'sku' => '', 'name' => '', 'values' => [], 'serials' => ''];
+    }
 
+    public function removeVariant(int $index): void
+    {
+        if (count($this->variants) > 1) {
+            array_splice($this->variants, $index, 1);
+        }
+    }
+
+    public function save(): void
+    {
+        abort_unless(auth()->user()->can($this->productId ? 'editar-producto' : 'crear-producto'), 403);
         $rules = [
-            'code' => 'required|unique:products,code,' . ($this->isEditMode ? $this->product_id : ''),
-            'name' => 'required|min:3',
-            'minimum_stock' => 'required|numeric|min:0',
-            'brand_id' => 'required|numeric',
-            'unit_id' => 'required|numeric',
+            'category_id' => 'required|exists:categories,id', 'code' => ['nullable', 'string', 'max:80', Rule::unique('products')->ignore($this->productId)],
+            'name' => 'required|string|max:200', 'description' => 'nullable|string|max:2000', 'tracking_type' => 'required|in:bulk,serialized', 'status' => 'boolean',
+            'variants' => 'required|array|min:1', 'variants.*.name' => 'nullable|string|max:150',
         ];
-
-        if ($this->type == 1) {
-            $rules['model'] = 'required|min:1';
-            $rules['categorie_id'] = 'nullable';
-        } else {
-            $rules['categorie_id'] = 'required|numeric';
-            $rules['model'] = 'nullable';
+        $category = Category::with('attributes')->findOrFail($this->category_id);
+        $hasVariants = $category->attributes->where('scope', 'variant')->isNotEmpty();
+        $this->code = $this->code ?: $this->makeCode($category);
+        if (! $hasVariants) {
+            $this->variants = [[
+                'id' => $this->variants[0]['id'] ?? null,
+                'sku' => $this->code,
+                'name' => '', 'values' => [], 'serials' => '',
+            ]];
         }
-
-        if (!$this->isEditMode) {
-            $rules['initial_stock'] = 'nullable|numeric|min:0';
+        foreach ($this->variants as $index => &$variant) {
+            if (blank($variant['sku'])) {
+                $suffix = collect($variant['values'] ?? [])->filter()->map(fn ($value) => Str::upper(Str::slug((string) $value, '')))->join('-');
+                $variant['sku'] = $this->code.'-'.($suffix ?: 'V'.($index + 1));
+            }
         }
-
-        $messages = [
-            'code.required' => 'El código es requerido',
-            'code.unique' => 'El código ya está en uso',
-            'name.required' => 'El producto es requerido',
-            'name.min' => 'El nombre debe tener al menos 3 caracteres',
-            'model.required' => 'El modelo es requerido',
-            'minimum_stock.required' => 'El stock mínimo es requerido',
-            'categorie_id.required' => 'La categoría es requerida',
-            'brand_id.required' => 'La marca es requerida',
-            'unit_id.required' => 'La unidad es requerida',
-        ];
-
-        $this->validate($rules, $messages);
-
-        if ($this->type == 3 && empty($this->skus)) {
-            $this->dispatch('alert', 'AGREGAR AL MENOS UNA (Talla/Color) PARA EPPS.', 'warning');
+        unset($variant);
+        foreach ($this->variants as $i => $variant) {
+            $rules["variants.$i.sku"] = ['required', 'string', 'max:100', 'distinct', Rule::unique('product_variants', 'sku')->ignore($variant['id'] ?? null)];
+        }
+        $this->validate($rules);
+        foreach ($category->attributes as $attribute) {
+            if (! $attribute->pivot->required) {
+                continue;
+            }
+            if ($attribute->scope === 'product' && blank($this->productValues[$attribute->id] ?? null)) {
+                $this->addError('productValues.'.$attribute->id, 'Este atributo es obligatorio.');
+            }
+            if ($attribute->scope === 'variant') {
+                foreach ($this->variants as $i => $variant) {
+                    if (blank($variant['values'][$attribute->id] ?? null)) {
+                        $this->addError("variants.$i.values.$attribute->id", 'Este atributo es obligatorio.');
+                    }
+                }
+            }
+        }
+        if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
 
-        DB::beginTransaction();
-
-        try {
-            $productsData = [
-                'code' => $this->code,
-                'name' => $this->name,
-                'features' => $this->features,
-                'model' => ($this->type == 1) ? $this->model : null,
-                'minimum_stock' => $this->minimum_stock,
-                'type' => $this->type,
-                'categorie_id' => ($this->type == 1) ? null : $this->categorie_id,
-                'brand_id' => $this->brand_id,
-                'unit_id' => $this->unit_id,
-            ];
-
-            $product = Product::updateOrCreate(['id' => $this->product_id], $productsData);
-
-            $warehouseId = $this->getDefaultWarehouseId();
-            $allWarehouses = Warehouse::pluck('id')->toArray();
-
-            if ($this->isEditMode) {
-                foreach ($allWarehouses as $wId) {
-                    Inventorie::firstOrCreate(
-                        ['product_id' => $product->id, 'warehouse_id' => $wId],
-                        ['stock_lot' => 0, 'stock_nolot' => 0]
-                    );
+        $before = $this->productId ? $this->productSnapshot(Product::findOrFail($this->productId)) : null;
+        DB::transaction(function () use ($category, $before) {
+            $product = Product::updateOrCreate(['id' => $this->productId], $this->only(['category_id', 'code', 'name', 'description', 'tracking_type', 'status']));
+            foreach ($category->attributes->where('scope', 'product') as $attribute) {
+                $product->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $this->productValues[$attribute->id] ?? null]);
+            }
+            $kept = [];
+            foreach ($this->variants as $row) {
+                $variant = $product->variants()->updateOrCreate(['id' => $row['id'] ?? null], ['sku' => $row['sku'], 'name' => $row['name'] ?: null, 'status' => true]);
+                $kept[] = $variant->id;
+                foreach ($category->attributes->where('scope', 'variant') as $attribute) {
+                    $variant->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $row['values'][$attribute->id] ?? null]);
                 }
-            } else {
-                foreach ($allWarehouses as $wId) {
-                    Inventorie::firstOrCreate(
-                        ['product_id' => $product->id, 'warehouse_id' => $wId],
-                        ['stock_lot' => 0, 'stock_nolot' => 0]
-                    );
-                }
-
-                $totalInitialStock = ($this->type == 3 && count($this->skus) > 0)
-                    ? collect($this->skus)->sum('stock')
-                    : ($this->initial_stock ?: 0);
-
-                if ($totalInitialStock > 0) {
-                    $invToUpdate = Inventorie::where('product_id', $product->id)->where('warehouse_id', $warehouseId)->first();
-                    if ($invToUpdate) {
-                        $invToUpdate->stock_nolot += $totalInitialStock;
-                        $invToUpdate->save();
-
-                        Kardex::create([
-                            'type' => 'ENTRADA',
-                            'description' => 'STOCK INICIAL',
-                            'quantity_in' => $totalInitialStock,
-                            'balance' => $totalInitialStock,
-                            'product_id' => $product->id,
-                            'user_id' => auth()->id(),
-                            'warehouse_id' => $warehouseId,
-                            'transaction_type' => 'initial_stock',
-                            'transaction_id' => $product->id,
-                            'status' => 1,
-                        ]);
+                if ($product->tracking_type === 'serialized') {
+                    $serials = collect(preg_split('/[\r\n,]+/', $row['serials'] ?? ''))->map(fn ($v) => trim($v))->filter()->unique();
+                    foreach ($serials as $serial) {
+                        $variant->serializedItems()->firstOrCreate(['serial_number' => $serial]);
                     }
                 }
             }
-
-            if ($this->type == 3 && count($this->skus) > 0) {
-                $existingCombos = collect($this->skus)->map(fn($s) => ($s['color_id'] ?: 'null') . '-' . ($s['size_id'] ?: 'null'))->toArray();
-                $branches = [$this->branch_id];
-
-                foreach ($branches as $bId) {
-                    foreach (ProductSku::where('product_id', $product->id)->where('branch_id', $bId)->get() as $dbSku) {
-                        $combo = ($dbSku->color_id ?: 'null') . '-' . ($dbSku->size_id ?: 'null');
-                        if (!in_array($combo, $existingCombos))
-                            $dbSku->delete();
-                    }
-
-                    foreach ($this->skus as $sku) {
-                        $skuModel = ProductSku::where('product_id', $product->id)
-                            ->where('branch_id', $bId)
-                            ->where('color_id', $sku['color_id'])
-                            ->where('size_id', $sku['size_id'])
-                            ->first();
-
-                        if ($skuModel) {
-                            $skuModel->update(['sku' => $sku['sku'], 'price' => $sku['price'] ?? null]);
-                        } else {
-                            $initStock = (!$this->isEditMode && $bId == $this->branch_id) ? ($sku['stock'] ?? 0) : 0;
-                            ProductSku::create([
-                                'product_id' => $product->id,
-                                'branch_id' => $bId,
-                                'color_id' => $sku['color_id'],
-                                'size_id' => $sku['size_id'],
-                                'sku' => $sku['sku'],
-                                'price' => $sku['price'] ?? null,
-                                'stock' => $initStock,
-                            ]);
-                        }
-                    }
-                }
-            }
-
-            DB::commit();
-
-            $isEdit = $this->isEditMode;
-            $accion = $isEdit ? 'EDITAR' : 'CREAR';
-            $desc = $isEdit
-                ? "Editó producto: [{$product->code}] {$product->name}"
-                : "Creó producto: [{$product->code}] {$product->name}";
-            $this->logActivity('PRODUCTOS', $accion, $desc, $product->id, null,
-                ['code' => $product->code, 'name' => $product->name, 'type' => $product->type]);
-
-            $message = $isEdit ? 'PRODUCTO ACTUALIZADO EXITOSAMENTE.' : 'PRODUCTO CREADO CON ÉXITO.';
-            $this->resetInputFields();
-            $this->dispatch('productStoreOrUpdate', $message);
-
-        } catch (\Throwable $e) {
-            DB::rollBack();
-            Log::error('ERROR AL GUARDAR PRODUCTO: ' . $e->getMessage() . ' | ' . $e->getFile() . ':' . $e->getLine());
-            $this->dispatch('alert', 'Error al guardar: ' . $e->getMessage(), 'error');
-        }
+            $product->variants()->whereNotIn('id', $kept)->delete();
+            $this->logActivity('PRODUCTOS', $this->productId ? 'EDITAR' : 'CREAR', 'Producto '.$product->name, $product->id, $before, $this->productSnapshot($product));
+        });
+        $this->resetForm();
+        $this->dispatch('alert', 'Producto guardado correctamente.', 'success');
     }
 
-    public function edit($id)
+    public function edit(int $id): void
     {
+        abort_unless(auth()->user()->can('editar-producto'), 403);
+        $p = Product::with(['attributeValues', 'variants.attributeValues', 'variants.serializedItems'])->findOrFail($id);
+        foreach (['category_id', 'code', 'name', 'description', 'tracking_type', 'status'] as $field) {
+            $this->{$field} = $p->{$field};
+        }
+        $this->productId = $id;
+        $this->productValues = $p->attributeValues->pluck('value', 'product_attribute_id')->all();
+        $this->variants = $p->variants->map(fn ($v) => ['id' => $v->id, 'sku' => $v->sku, 'name' => $v->name ?? '', 'values' => $v->attributeValues->pluck('value', 'product_attribute_id')->all(), 'serials' => $v->serializedItems->pluck('serial_number')->join("\n")])->all();
+    }
+
+    public function toggle(int $id): void
+    {
+        abort_unless(auth()->user()->can('eliminar-producto'), 403);
+        $p = Product::findOrFail($id);
+        $before = ['status' => (bool) $p->status];
+        $p->update(['status' => ! $p->status]);
+        $this->logActivity('PRODUCTOS', $p->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado del producto '.$p->name, $p->id, $before, ['status' => (bool) $p->status]);
+    }
+
+    public function resetForm(): void
+    {
+        $this->reset(['productId', 'category_id', 'code', 'name', 'description', 'productValues', 'variants']);
+        $this->tracking_type = 'bulk';
+        $this->status = 1;
+        $this->addVariant();
         $this->resetValidation();
-
-        $product = Product::findOrFail($id);
-
-        $this->product_id = $product->id;
-        $this->code = $product->code;
-        $this->name = $product->name;
-        $this->features = $product->features;
-        $this->model = $product->model;
-        $this->minimum_stock = $product->minimum_stock;
-        $this->categorie_id = $product->categorie_id;
-        $this->brand_id = $product->brand_id;
-        $this->unit_id = $product->unit_id;
-        $this->type = $product->type;
-        $this->isEditMode = true;
-
-        if ($product->type == 3) {
-            $this->skus = ProductSku::with(['color', 'size'])
-                ->where('product_id', $product->id)
-                ->where('branch_id', $this->branch_id)
-                ->get()
-                ->map(fn($item) => [
-                    'color_id' => $item->color_id,
-                    'color_name' => $item->color ? $item->color->name : '-',
-                    'size_id' => $item->size_id,
-                    'size_name' => $item->size ? $item->size->name : '-',
-                    'sku' => $item->sku,
-                    'price' => $item->price,
-                    'is_custom_price' => !is_null($item->price),
-                    'stock' => $item->stock,
-                ])->toArray();
-        }
     }
 
-    public function addSkuToProduct()
+    private function makeCode(Category $category): string
     {
-        if (!$this->color_id && !$this->size_id) {
-            $this->dispatch('alert', 'Debe seleccionar al menos una Talla o un Color.', 'warning');
-            return;
-        }
+        $base = Str::upper($category->code).'-';
+        $lastNumber = Product::where('category_id', $category->id)->pluck('code')
+            ->map(fn ($code) => preg_match('/^'.preg_quote($base, '/').'(\d+)$/', $code, $matches) ? (int) $matches[1] : 0)
+            ->max() ?? 0;
+        $code = $base.str_pad((string) ($lastNumber + 1), 4, '0', STR_PAD_LEFT);
 
-        foreach ($this->skus as $sku) {
-            if ($sku['color_id'] == $this->color_id && $sku['size_id'] == $this->size_id) {
-                $this->dispatch('alert', 'Esta combinación ya fue agregada.', 'warning');
-                return;
-            }
-        }
+        return $code;
+    }
 
-        $colorName = '-';
-        $colorPrefix = '';
-        if ($this->color_id) {
-            $colorName = collect($this->colors)->firstWhere('id', $this->color_id)->name ?? '-';
-            $colorPrefix = '-' . strtoupper(substr($colorName, 0, 3));
-        }
+    private function productSnapshot(Product $product): array
+    {
+        $product->load(['category', 'category.attributes', 'attributeValues', 'variants.attributeValues', 'variants.serializedItems']);
+        $attributeNames = $product->category->attributes->pluck('name', 'id');
 
-        $sizeName = '-';
-        $sizePrefix = '';
-        if ($this->size_id) {
-            $sizeName = collect($this->sizes)->firstWhere('id', $this->size_id)->name ?? '-';
-            $sizePrefix = '-' . strtoupper(substr($sizeName, 0, 3));
-        }
-
-        $baseCode = $this->code ? (strlen($this->code) > 6 ? substr($this->code, -5) : $this->code) : 'PRD';
-
-        $this->skus[] = [
-            'color_id' => $this->color_id ?: null,
-            'color_name' => $colorName,
-            'size_id' => $this->size_id ?: null,
-            'size_name' => $sizeName,
-            'sku' => strtoupper($baseCode . $colorPrefix . $sizePrefix),
-            'price' => null,
-            'is_custom_price' => false,
-            'stock' => 0,
+        return [
+            'categoría' => $product->category->name,
+            'código' => $product->code,
+            'nombre' => $product->name,
+            'descripción' => $product->description,
+            'estado' => (bool) $product->status,
+            'atributos' => $product->attributeValues->mapWithKeys(fn ($value) => [$attributeNames[$value->product_attribute_id] ?? $value->product_attribute_id => $value->value])->all(),
+            'variantes' => $product->variants->map(fn ($variant) => [
+                'sku' => $variant->sku,
+                'nombre' => $variant->name,
+                'atributos' => $variant->attributeValues->mapWithKeys(fn ($value) => [$attributeNames[$value->product_attribute_id] ?? $value->product_attribute_id => $value->value])->all(),
+                'números_de_serie' => $variant->serializedItems->pluck('serial_number')->all(),
+            ])->all(),
         ];
-
-        $this->color_id = '';
-        $this->size_id = '';
-        $this->dispatch('alert', 'Combinación agregada.', 'success');
-    }
-
-    public function updateSkuCode($index, $value)
-    {
-        if (isset($this->skus[$index]))
-            $this->skus[$index]['sku'] = $value;
-    }
-
-    public function toggleCustomPrice($index)
-    {
-        if (!isset($this->skus[$index]))
-            return;
-        $this->skus[$index]['is_custom_price'] = !($this->skus[$index]['is_custom_price'] ?? false);
-        if (!$this->skus[$index]['is_custom_price'])
-            $this->skus[$index]['price'] = null;
-    }
-
-    public function updateSkuPrice($index, $value)
-    {
-        if (isset($this->skus[$index]))
-            $this->skus[$index]['price'] = $value === '' ? null : floatval($value);
-    }
-
-    public function updateSkuStock($index, $value)
-    {
-        if (isset($this->skus[$index]))
-            $this->skus[$index]['stock'] = $value === '' ? 0 : intval($value);
-    }
-
-    public function removeSku($index)
-    {
-        unset($this->skus[$index]);
-        $this->skus = array_values($this->skus);
-    }
-
-    public function delete($id)
-    {
-        $product = Product::find($id);
-        if ($product) {
-            $newStatus = $product->status == 1 ? 0 : 1;
-            $product->update(['status' => $newStatus]);
-
-            $accion = $newStatus == 1 ? 'RESTAURAR' : 'ELIMINAR';
-            $this->logActivity(
-                'PRODUCTOS', $accion,
-                ($newStatus == 1 ? 'Restauró' : 'Eliminó') . " producto: [{$product->code}] {$product->name}",
-                $product->id,
-                ['status' => $newStatus == 1 ? 0 : 1],
-                ['status' => $newStatus]
-            );
-
-            $message = $newStatus == 1 ? 'PRODUCTO RESTAURADO EXITOSAMENTE.' : 'PRODUCTO ELIMINADO EXITOSAMENTE.';
-            $this->dispatch('productDeleted', $message);
-        }
-    }
-
-    public function generateCode()
-    {
-        $this->code = substr(now()->format('YmHisv') . uniqid(), 0, 15);
-        $this->dispatch('alert', 'CÓDIGO GENERADO CON ÉXITO.', 'success');
-    }
-
-    public function storeCategory()
-    {
-        $this->validate(
-            ['name_category' => 'required|unique:categories,name'],
-            ['name_category.required' => 'La categoría es requerida', 'name_category.unique' => 'La categoría ya existe']
-        );
-        $category = Categorie::updateOrCreate(['name' => $this->name_category]);
-        $this->resetInputCategoryBrandUnit();
-        $this->categories = Categorie::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->categorie_id = $category->id;
-        $this->dispatch('alert', 'CATEGORÍA CREADA CON ÉXITO.', 'success', 'category');
-    }
-
-    public function storeBrand()
-    {
-        $this->validate(
-            ['name_brand' => 'required|unique:brands,name'],
-            ['name_brand.required' => 'La marca es requerida', 'name_brand.unique' => 'La marca ya existe']
-        );
-        $brand = Brand::updateOrCreate(['name' => $this->name_brand]);
-        $this->resetInputCategoryBrandUnit();
-        $this->brands = Brand::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->brand_id = $brand->id;
-        $this->dispatch('alert', 'MARCA CREADA CON ÉXITO.', 'success', 'brand');
-    }
-
-    public function storeUnit()
-    {
-        $this->validate(
-            ['name_unit' => 'required|unique:units,name'],
-            ['name_unit.required' => 'La unidad es requerida', 'name_unit.unique' => 'La unidad ya existe']
-        );
-        $unit = Unit::updateOrCreate(['name' => $this->name_unit], [
-            'name' => $this->name_unit,
-            'base_unit' => $this->unit_base_unit ?: null,
-            'factor' => $this->unit_factor ?: null,
-        ]);
-        $this->resetInputCategoryBrandUnit();
-        $this->units = Unit::where('status', 1)->orderBy('id', 'asc')->get();
-        $this->unit_id = $unit->id;
-        $this->dispatch('alert', 'UNIDAD CREADA CON ÉXITO.', 'success', 'unit');
-    }
-
-    public function resetInputCategoryBrandUnit()
-    {
-        $this->resetErrorBag(['name_category', 'name_brand', 'name_unit']);
-        $this->name_category = '';
-        $this->name_brand = '';
-        $this->name_unit = '';
-        $this->unit_base_unit = '';
-        $this->unit_factor = '';
     }
 }

@@ -1,14 +1,25 @@
-## Instalar Dependencias de Composer. (activar la extensión zip en php.ini)
+# Confipetrol 2
 
-Primero, asegúrate de tener Composer instalado. Luego, ejecuta el siguiente comando para instalar las dependencias del proyecto:
+Base administrativa construida con Laravel 12, Livewire 3 y MySQL.
 
--   composer install
--   cp .env.example .env
--   DB_CONNECTION=mysql
-    DB_HOST=127.0.0.1
-    DB_PORT=3306
-    DB_DATABASE=bd
-    DB_USERNAME=root
-    DB_PASSWORD=
--   php artisan key:generate
--   php artisan migrate --seed
+## Módulos disponibles
+
+- Autenticación y recuperación de contraseña
+- Panel inicial
+- Usuarios
+- Roles y permisos
+- Logs de auditoría
+- Backups de MySQL
+- Categorías y atributos configurables
+- Productos con codificación automática y variantes
+
+## Instalación
+
+1. Ejecutar `composer install`.
+2. Copiar `.env.example` a `.env` y configurar MySQL.
+3. Definir `ADMIN_LOGIN`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` en `.env`.
+4. Ejecutar `php artisan key:generate`.
+5. Ejecutar `php artisan migrate --seed`.
+6. Ejecutar `npm install` y `npm run build`.
+
+Las pruebas usan exclusivamente la base MySQL `confipetrol_testing`, configurada en `phpunit.xml`.

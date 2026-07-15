@@ -1,173 +1,30 @@
-@push('title', 'Categorias')
-
 <div class="page-content">
-    <div class="row align-items-center mb-3 px-2">
-        <div class="col-12 d-flex justify-content-between align-items-center">
-            <ol class="breadcrumb mb-0 d-flex align-items-center">
-                <li class="breadcrumb-item">Administracion</li>
-                <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Categorias</li>
-            </ol>
-            @can('crear-categorias')
-                @include('components.tools.buttonRegister')
-            @endcan
-        </div>
-    </div>
+    <div class="mb-4"><h4 class="mb-1">Paso 1 y 2: Categorías y sus atributos</h4><p class="text-muted mb-0">Primero crea una categoría. Después selecciónala para agregar los datos que pedirán sus productos.</p></div>
 
-    <div class="card">
-        <div class="card-body px-4 mt-2">
-            <div
-                class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
-                <h5 class="card-title mb-0">Listar Categorías</h5>
-                @include('components.tools.searchbox')
+    <div class="card"><div class="card-body">
+        <div class="d-flex align-items-center mb-3"><span class="badge rounded-pill bg-primary me-2">1</span><h5 class="mb-0">Crear categoría</h5></div>
+        @canany(['crear-categoria','editar-categoria'])<form wire:submit="saveCategory"><div class="row g-3 align-items-end">
+            <div class="col-md-4"><label class="form-label">Nombre de la categoría</label><input wire:model="name" placeholder="Ejemplo: Activo" class="form-control @error('name') is-invalid @enderror">@error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+            <div class="col-md-3"><label class="form-label">Código corto <small class="text-muted">(opcional)</small></label><input wire:model="code" placeholder="Automático: ACT" class="form-control @error('code') is-invalid @enderror">@error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+            <div class="col-md-3"><label class="form-label">Descripción <small class="text-muted">(opcional)</small></label><input wire:model="description" class="form-control"></div>
+            <div class="col-md-2 d-flex gap-2"><button class="btn btn-primary flex-grow-1">{{ $categoryId ? 'Actualizar' : 'Crear' }}</button>@if($categoryId)<button type="button" wire:click="resetCategory" class="btn btn-light">×</button>@endif</div>
+        </div></form>@endcanany
+        <div class="row g-2 mt-3">@forelse($categories as $category)<div class="col-md-4"><div class="border rounded p-3 h-100 {{ $selectedCategoryId == $category->id ? 'border-primary bg-light' : '' }}"><div class="d-flex justify-content-between"><div><strong>{{ $category->name }}</strong><div class="small text-muted">{{ $category->code }} · {{ $category->products_count }} productos</div></div><span class="badge bg-{{ $category->status ? 'success' : 'secondary' }}">{{ $category->status ? 'Activa' : 'Inactiva' }}</span></div><div class="mt-3 d-flex gap-2"><button wire:click="selectCategory({{ $category->id }})" class="btn btn-sm btn-primary">Gestionar atributos</button>@can('editar-categoria')<button wire:click="editCategory({{ $category->id }})" class="btn btn-sm btn-outline-secondary"><i class="bx bx-edit"></i></button>@endcan</div></div></div>@empty<div class="col-12 text-center text-muted py-3">Crea tu primera categoría para continuar.</div>@endforelse</div>
+    </div></div>
 
-            </div>
-
-            <hr>
-            <div class="table-responsive">
-                <table class="table" id="theTable" style="width: 100%;">
-                    <thead>
-                        <tr>
-                            <th>N°</th>
-                            <th>NOMBRES</th>
-                            <th>FECHA </th>
-                            <th>ESTADO</th>
-                            <th>ACCIONES</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        @if ($categories->isEmpty())
-                            <tr>
-                                <td colspan="7" class="text-center">No se encontraron registros.</td>
-                            </tr>
-                        @else
-                            @foreach ($categories as $index => $categorie)
-                                <tr>
-                                    <td>{{ $startCount - $index }}</td>
-
-                                    <td>{{ $categorie->name ?: 'S/N' }}</td>
-                                    <td>{{ $categorie->created_at ?: 'S/N' }}</td>
-                                    <td>
-                                        @if ($categorie->status == 1)
-                                            <div class="badge rounded-pill text-success bg-light-success text-uppercase">
-                                                ACTIVO
-                                            </div>
-                                        @else
-                                            <div class="badge rounded-pill text-danger bg-light-danger text-uppercase">
-                                                INACTIVO
-                                            </div>
-                                        @endif
-                                    </td>
-
-                                    <td>
-                                        <div class="d-flex order-actions">
-                                            @can('editar-categorias')
-                                            <a href="javascript:;" wire:click="edit({{ $categorie->id }})"
-                                                data-bs-toggle="modal" data-bs-target="#theModal" class="btn-action-primary"><i
-                                                    class="bx bxs-edit-alt"></i></a>
-                                            @endcan
-                                            @if ($categorie->status == 1)
-                                                @can('eliminar-categorias')
-                                                    <a href="javascript:;" onclick="confirmDelete({{ $categorie->id }}, 'delete')"
-                                                        class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
-                                                @endcan
-                                            @else
-                                                @can('restaurar-categorias')
-                                                    <a href="javascript:;" onclick="confirmDelete({{ $categorie->id }}, 'restore')"
-                                                        class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
-                                                @endcan
-                                            @endif
-                                        </div>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        @endif
-                    </tbody>
-                </table>
-            </div>
-            {{ $categories->links() }}
-
-            <!-- Modal de Categorias -->
-            <div wire:ignore.self class="modal fade" id="theModal" tabindex="-1" aria-labelledby="theModalLabel"
-                aria-hidden="true">
-                <div class="modal-dialog" role="document">
-                    <div class="modal-content">
-                        <div class="modal-header">
-                            <h5 class="modal-title" id="theModalLabel">
-                                <i class="bx bx-folder"></i>
-                                {{ $isEditMode ? 'ACTUALIZAR CATEGORIAS' : 'REGISTRAR CATEGORIAS' }}
-                            </h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
-                            </button>
-                        </div>
-                        <div class="modal-body">
-                            <div class="row mb-2 p-2">
-                                <div class="col-lg-12 col-sm-6 mb-2">
-                                    <label>Nombre</label>
-                                    <div class="input-group">
-                                        <input type="text" wire:model.lazy="name" class="form-control"
-                                            placeholder="Nombre" maxlength="30">
-                                    </div>
-                                    @error('name')
-                                        <span class="text-danger er">{{ $message }}</span>
-                                    @enderror
-                                </div>
-
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-
-                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal"
-                                wire:click="resetInputFields">
-                                Cerrar
-                            </button>
-
-                            <button type="button" wire:click.prevent="storeOrUpdate()" class="btn btn-danger"
-                                wire:loading.attr="disabled" wire:target="storeOrUpdate">
-                                <span wire:loading.remove wire:target="storeOrUpdate">
-                                    {{ $isEditMode ? 'Actualizar' : 'Guardar' }}
-                                </span>
-                                <span wire:loading wire:target="storeOrUpdate">
-                                    <i class="bx bx-spin bx-loader"></i> Procesando...
-                                </span>
-                            </button>
-
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+    @if($selectedCategory)
+    <div class="card border-primary"><div class="card-body">
+        <div class="d-flex align-items-center mb-1"><span class="badge rounded-pill bg-primary me-2">2</span><h5 class="mb-0">Atributos de “{{ $selectedCategory->name }}”</h5></div>
+        <p class="text-muted">¿Qué datos quieres pedir al registrar un producto de esta categoría?</p>
+        @can('gestionar-atributos')<form wire:submit="saveAttribute"><div class="row g-3 align-items-end">
+            <div class="col-md-3"><label class="form-label">Nombre del dato</label><input wire:model="attributeName" placeholder="Ejemplo: Marca" class="form-control @error('attributeName') is-invalid @enderror">@error('attributeName')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+            <div class="col-md-2"><label class="form-label">Tipo de respuesta</label><select wire:model.live="attributeType" class="form-select"><option value="text">Texto</option><option value="number">Número</option><option value="select">Elegir de una lista</option><option value="date">Fecha</option><option value="boolean">Sí / No</option></select></div>
+            @if($attributeType === 'select')<div class="col-md-3"><label class="form-label">Opciones</label><input wire:model="attributeOptions" placeholder="7, 8, 9, 10" class="form-control"></div>@endif
+            <div class="col-md-3"><label class="form-label">¿El dato cambia dentro del mismo producto?</label><select wire:model="attributeScope" class="form-select"><option value="product">No, es un dato del producto</option><option value="variant">Sí, por ejemplo talla o color</option></select></div>
+            <div class="col-md-2"><label class="form-check mb-2"><input wire:model="attributeRequired" type="checkbox" class="form-check-input"> Obligatorio</label><button class="btn btn-primary w-100">{{ $attributeId ? 'Actualizar' : 'Agregar atributo' }}</button></div>
+        </div></form>@endcan
+        <div class="table-responsive mt-4"><table class="table align-middle"><thead><tr><th>Atributo</th><th>Respuesta</th><th>Uso</th><th>Obligatorio</th><th></th></tr></thead><tbody>@forelse($selectedCategory->attributes as $a)<tr><td><strong>{{ $a->name }}</strong></td><td>{{ ['text'=>'Texto','number'=>'Número','select'=>'Lista','date'=>'Fecha','boolean'=>'Sí / No'][$a->type] }}</td><td>{{ $a->scope === 'variant' ? 'Variantes (talla/color)' : 'Dato del producto' }}</td><td>{{ $a->pivot->required ? 'Sí' : 'No' }}</td><td class="text-end">@can('gestionar-atributos')<button wire:click="editAttribute({{ $a->id }})" class="btn btn-sm btn-outline-primary"><i class="bx bx-edit"></i></button><button wire:click="removeAttribute({{ $a->id }})" wire:confirm="¿Quitar este atributo de la categoría?" class="btn btn-sm btn-outline-danger"><i class="bx bx-trash"></i></button>@endcan</td></tr>@empty<tr><td colspan="5" class="text-center text-muted py-3">Agrega Marca, Modelo y Número de serie, por ejemplo.</td></tr>@endforelse</tbody></table></div>
+        <div class="alert alert-info mb-0"><i class="bx bx-info-circle"></i> Cuando termines, abre <a href="{{ route('products') }}" class="alert-link">Productos</a> para registrar tus productos.</div>
+    </div></div>
+    @endif
 </div>
-
-<script>
-    document.addEventListener('livewire:init', function () {
-        Livewire.on('categorieStoreOrUpdate', (Msg, type) => {
-            $('#theModal').modal('hide');
-            toast(Msg, 'success')
-        });
-
-        //ACTION DELETE
-        Livewire.on('categorieDeleted', (Msg, type) => {
-            toast(Msg, 'success')
-        });
-
-    });
-
-    function confirmDelete(id, action) {
-        Swal.fire({
-            title: action === 'delete' ? "¿Está seguro de eliminar?" : "¿Está seguro de restaurar?",
-            text: action === 'delete' ?
-                "El registro no se eliminará de forma permanente, solo cambiará el estado!" :
-                "El registro será restaurado, cambiando su estado a activo!",
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: "#3085d6",
-            cancelButtonColor: "#d33",
-            confirmButtonText: action === 'delete' ? "Si, Eliminar!" : "Si, Restaurar!",
-        }).then((result) => {
-            if (result.isConfirmed) {
-                @this.call('delete', id);
-            }
-        });
-    }
-</script>

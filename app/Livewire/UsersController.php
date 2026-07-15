@@ -3,328 +3,126 @@
 namespace App\Livewire;
 
 use App\Models\User;
-use App\Models\Branche;
 use App\Traits\AuditLog;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
-use Illuminate\Support\Facades\Hash;
 
 class UsersController extends Component
 {
-    use WithPagination, AuditLog;
+    use AuditLog, WithPagination;
+
     protected $paginationTheme = 'bootstrap';
 
-    public $login, $name, $lastname, $document, $email, $phone, $role, $status, $user_id, $branch_id;
-    public $isEditMode = false;
-    public $searchTerm;
-    public $roles;
-    public $branches; // Faltaba definir esta propiedad pública
+    public $user_id;
 
-    // Variables para cambio de contraseña
-    public $password_user_id;
-    public $password_name;
-    public $password_lastname;
-    public $password_login;
-    public $new_password;
+    public $login = '';
 
-    protected $listeners = ['delete'];
+    public $name = '';
 
-    ///////// ----------- Pagination------------- ////////////
+    public $lastname = '';
+
+    public $document = '';
+
+    public $email = '';
+
+    public $phone = '';
+
+    public $password = '';
+
+    public $password_confirmation = '';
+
+    public $role = '';
+
+    public $status = 1;
+
+    public $searchTerm = '';
+
     public $perPage = 20;
-    public $perPageOptions = [20, 50, 100];
 
-    public function updatedPerPage()
-    {
-        $this->resetPage();
-    }
-    ///////// ----------- Fin------------- ////////////
-
-
-    public function mount()
-    {
-        $this->roles = Role::where('status', 1)
-            ->where('id', '!=', 1)
-            ->orderByDesc('id')
-            ->get();
-
-        $this->branches = Branche::where('status', 1)
-            ->orderBy('id', 'desc')
-            ->get();
-    }
+    public $isEditMode = false;
 
     public function render()
     {
-        $users = User::with('branche')
-            ->where('id', '!=', 1)
-            ->where(function ($query) {
-                $query->where('name', 'like', '%' . $this->searchTerm . '%')
-                    ->orWhere('email', 'like', '%' . $this->searchTerm . '%')
-                    ->orWhere('login', 'like', '%' . $this->searchTerm . '%')
-                    ->orWhere('document', 'like', '%' . $this->searchTerm . '%');
-            })
-            ->orderBy('id', 'desc')
-            ->paginate($this->perPage);
+        $users = User::with('roles')->when($this->searchTerm, function ($query) {
+            $term = '%'.$this->searchTerm.'%';
+            $query->where(fn ($q) => $q->where('login', 'like', $term)->orWhere('name', 'like', $term)
+                ->orWhere('lastname', 'like', $term)->orWhere('email', 'like', $term)->orWhere('document', 'like', $term));
+        })->latest('id')->paginate($this->perPage);
 
-        return view('livewire.users.users', [
-            'users' => $users,
-            'roles' => Role::orderBy('name', 'asc')->get(),
-            'startCount' => $users->total() - ($users->currentPage() - 1) * $users->perPage()
-
-        ])
+        return view('livewire.users.users', ['users' => $users, 'roles' => Role::orderBy('name')->get()])
             ->extends('layouts.theme.app');
     }
 
-    public function paginationView()
+    public function updatedSearchTerm(): void
     {
-        return 'vendor.livewire.bootstrap';
+        $this->resetPage();
     }
 
-    public function resetInputFields()
+    public function create(): void
     {
-        $this->resetValidation();
-        $this->login = '';
-        $this->name = '';
-        $this->lastname = '';
-        $this->document = '';
-        $this->email = '';
-        $this->phone = '';
-        $this->role = '';
-        $this->branch_id = '';
-        $this->user_id = '';
-        $this->isEditMode = false;
+        abort_unless(auth()->user()->can('crear-usuario'), 403);
+        $this->resetForm();
+        $this->dispatch('show-user-modal');
     }
 
-    public function resetPasswordFields()
+    public function edit(int $id): void
     {
-        $this->resetValidation();
-        $this->password_user_id = '';
-        $this->password_name = '';
-        $this->password_lastname = '';
-        $this->password_login = '';
-        $this->new_password = '';
-    }
-
-    public function storeOrUpdate()
-    {
-        $rules = [
-            'login' => 'required|unique:users,login,' . ($this->isEditMode ? $this->user_id : ''),
-            'email' => 'required|email|unique:users,email,' . ($this->isEditMode ? $this->user_id : ''),
-            'name' => 'required|min:3',
-            'lastname' => 'required|min:3',
-            'document' => 'required|numeric|digits_between:7,12|unique:users,document,' . ($this->isEditMode ? $this->user_id : ''),
-            'phone' => 'nullable|numeric|digits_between:7,8',
-            'role' => 'required',
-            'branch_id' => 'required',
-        ];
-
-        $messages = [
-            'login.required' => 'El login es requerido',
-            'email.required' => 'El correo electrónico es requerido',
-            'email.email' => 'El correo electrónico debe tener un formato válido',
-            'email.unique' => 'El correo electrónico ya está en uso',
-            'name.required' => 'El nombre es requerido',
-            'name.min' => 'El nombre debe tener al menos 3 caracteres',
-            'lastname.required' => 'El apellido es requerido',
-            'lastname.min' => 'El apellido debe tener al menos 3 caracteres',
-            'document.required' => 'La cédula de identidad es requerida',
-            'document.digits_between' => 'La cédula de identidad debe tener al menos entre 7 y 9 dígitos.',
-            'document.numeric' => 'La cédula de identidad  debe contener solo números.',
-            'document.unique' => 'La cédula de identidad ya está en uso',
-            'phone.numeric' => 'El teléfono debe contener solo números.',
-            'phone.digits_between' => 'El teléfono debe tener entre 7 y 8 dígitos.',
-            'role.required' => 'El rol es requerido',
-            'branch_id.required' => 'La sucursal es requerido'
-        ];
-
-        // VALIDAR DATOS
-        $this->validate($rules, $messages);
-
-        // =================================================================
-        // INICIO LÓGICA DE LÍMITE DE USUARIOS (MAX_USERS)
-        // =================================================================
-
-        // Solo verificamos si estamos CREANDO un usuario nuevo (no editando)
-        if (!$this->isEditMode) {
-            $branch = Branche::find($this->branch_id);
-
-            if ($branch) {
-                // Contamos cuántos usuarios tiene actualmente esa sucursal
-                $currentUsersCount = User::where('branch_id', $this->branch_id)->count();
-                $limit = $branch->max_users; // Este dato viene de settings->adicionales
-
-                // Si ya alcanzamos o superamos el límite, detenemos y mostramos error
-                if ($currentUsersCount >= $limit) {
-                    $this->dispatch('userStoreOrUpdate', "Error: Esta sucursal ha alcanzado el límite de {$limit} usuarios permitidos.", 'error');
-                    return; // Detiene la ejecución, no crea el usuario
-                }
-            }
-        }
-        // =================================================================
-        // FIN LÓGICA
-        // =================================================================
-
-        $userData = [
-            'login' => $this->login,
-            'name' => $this->name,
-            'lastname' => $this->lastname,
-            'document' => $this->document,
-            'email' => $this->email,
-            'phone' => $this->phone,
-            'role' => $this->role,
-            'branch_id' => $this->branch_id,
-        ];
-        if (!$this->isEditMode) {
-            $userData['password'] = $this->document; // Contraseña por defecto el documento
-
-            // También asignamos el límite de sesiones por defecto que tenga la sucursal configurada
-            // Esto es opcional, pero útil si quieres que herede la config actual
-            $branchConfig = Branche::find($this->branch_id);
-            // Asumimos que guardaste branch_max_sessions en la tabla branches o settings, 
-            // Si no tienes el campo directo en branches, usa un default:
-            // $userData['max_sessions'] = $branchConfig->max_sessions ?? 1; 
-        }
-
-        $isEdit = $this->isEditMode;
-        $oldUser = $isEdit ? User::find($this->user_id) : null;
-
-        $user = User::updateOrCreate(
-            ['id' => $this->user_id],
-            $userData
-        );
-        $user->syncRoles([$this->role]);
-
-        if ($isEdit) {
-            $this->logActivity(
-                'USUARIOS', 'EDITAR',
-                "Editó usuario: {$user->login} ({$user->name} {$user->lastname})",
-                $user->id,
-                $oldUser ? ['login' => $oldUser->login, 'name' => $oldUser->name, 'email' => $oldUser->email, 'branch_id' => $oldUser->branch_id] : null,
-                ['login' => $user->login, 'name' => $user->name, 'email' => $user->email, 'branch_id' => $user->branch_id]
-            );
-        } else {
-            $this->logActivity(
-                'USUARIOS', 'CREAR',
-                "Creó usuario: {$user->login} ({$user->name} {$user->lastname})",
-                $user->id,
-                null,
-                ['login' => $user->login, 'name' => $user->name, 'email' => $user->email, 'branch_id' => $user->branch_id]
-            );
-        }
-
-        $message = $isEdit ? 'USUARIO ACTUALIZADO EXITOSAMENTE.' : 'USUARIO CREADO CON ÉXITO.';
-
-        $this->resetInputFields();
-        $this->dispatch('userStoreOrUpdate', $message, 'success');
-    }
-
-    public function openPasswordModal($id)
-    {
-        $this->resetPasswordFields();
-
+        abort_unless(auth()->user()->can('editar-usuario'), 403);
         $user = User::findOrFail($id);
-        $this->password_user_id = $id;
-        $this->password_name = $user->name;
-        $this->password_lastname = $user->lastname;
-        $this->password_login = $user->login;
-    }
-
-    public function changePassword()
-    {
-        $this->validate([
-            'new_password' => 'required|min:2'
-        ], [
-            'new_password.required' => 'La contraseña es requerida',
-            'new_password.min' => 'La contraseña debe tener al menos 2 caracteres'
-        ]);
-
-        $user = User::findOrFail($this->password_user_id);
-        $user->update([
-            'password' => Hash::make($this->new_password)
-        ]);
-
-        $this->logActivity(
-            'USUARIOS', 'CAMBIO_CONTRASENA',
-            "Cambió contraseña del usuario: {$user->login} ({$user->name} {$user->lastname})",
-            $user->id
-        );
-
-        $this->resetPasswordFields();
-        $this->dispatch('passwordChanged', 'CONTRASEÑA ACTUALIZADA EXITOSAMENTE.', 'success');
-    }
-
-    public function updatedName($value)
-    {
-        $this->generateLogin();
-    }
-
-    public function updatedLastname($value)
-    {
-        $this->generateLogin();
-    }
-
-    private function generateLogin()
-    {
-        if ($this->isEditMode) {
-            return;
+        foreach (['login', 'name', 'lastname', 'document', 'email', 'phone', 'status'] as $field) {
+            $this->{$field} = $user->{$field};
         }
-        $firstName = explode(' ', $this->name)[0] ?? '';
-        $lastName = explode(' ', $this->lastname)[0] ?? '';
-        $baseLogin = strtolower($firstName . '.' . $lastName);
-
-        $existingUser = User::where('login', $baseLogin)->exists();
-
-        if (!$existingUser) {
-            $this->login = $baseLogin;
-        } else {
-            $suffix = 1;
-            while (User::where('login', $baseLogin . $suffix)->exists()) {
-                $suffix++;
-            }
-            $this->login = $baseLogin . $suffix;
-        }
-    }
-
-    public function edit($id)
-    {
-        $this->resetValidation();
-
-        $user = User::findOrFail($id);
-        $this->user_id = $id;
-        $this->login = $user->login;
-        $this->name = $user->name;
-        $this->lastname = $user->lastname;
-        $this->document = $user->document;
-        $this->email = $user->email;
-        $this->phone = $user->phone;
-        $this->role = $user->roles->pluck('name')->toArray();
-        $this->branch_id = $user->branch_id;
-        $this->status = $user->status;
+        $this->user_id = $user->id;
+        $this->role = $user->roles->first()?->name ?? '';
         $this->isEditMode = true;
+        $this->resetValidation();
+        $this->dispatch('show-user-modal');
     }
 
-    public function delete($id)
+    public function save(): void
     {
-        $user = User::find($id);
-
-        if ($user) {
-            $newEstado = $user->status == 1 ? 0 : 1;
-            $user->update(['status' => $newEstado]);
-
-            $accion = $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR';
-            $message = $newEstado == 1 ? 'USUARIO RESTAURADO EXITOSAMENTE.' : 'USUARIO ELIMINADO EXITOSAMENTE.';
-
-            $this->logActivity(
-                'USUARIOS', $accion,
-                ($newEstado == 1 ? 'Restauró' : 'Eliminó') . " usuario: {$user->login} ({$user->name} {$user->lastname})",
-                $user->id,
-                ['status' => $newEstado == 1 ? 0 : 1],
-                ['status' => $newEstado]
-            );
-
-            $this->dispatch('userDeleted', $message, 'success');
-        } else {
-            session()->flash('message', 'USUARIO NO ENCONTRADO.');
+        abort_unless(auth()->user()->can($this->isEditMode ? 'editar-usuario' : 'crear-usuario'), 403);
+        $id = $this->user_id;
+        $this->validate([
+            'login' => ['required', 'string', 'max:100', Rule::unique('users')->ignore($id)],
+            'name' => ['required', 'string', 'max:150'], 'lastname' => ['nullable', 'string', 'max:150'],
+            'document' => ['required', 'string', 'max:50', Rule::unique('users')->ignore($id)],
+            'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($id)],
+            'phone' => ['nullable', 'string', 'max:30'], 'role' => ['required', Rule::exists('roles', 'name')],
+            'status' => ['required', 'boolean'], 'password' => [$this->isEditMode ? 'nullable' : 'required', 'confirmed', 'min:8'],
+        ]);
+        $user = $this->isEditMode ? User::findOrFail($id) : new User;
+        $before = $user->exists ? array_merge($user->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $user->roles->pluck('name')->all()]) : null;
+        $user->fill(['login' => $this->login, 'name' => $this->name, 'lastname' => $this->lastname ?: null,
+            'document' => $this->document, 'email' => $this->email, 'phone' => $this->phone ?: null, 'status' => $this->status]);
+        if ($this->password !== '') {
+            $user->password = $this->password;
         }
+        $user->save();
+        $user->syncRoles([$this->role]);
+        $after = array_merge($user->fresh()->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $user->fresh()->roles->pluck('name')->all()]);
+        $this->logActivity('USUARIOS', $this->isEditMode ? 'EDITAR' : 'CREAR', 'Usuario '.$user->login, $user->id, $before, $after);
+        $this->dispatch('hide-user-modal');
+        $this->dispatch('alert', 'Usuario guardado correctamente.', 'success');
+        $this->resetForm();
+    }
+
+    public function toggleStatus(int $id): void
+    {
+        abort_unless(auth()->user()->can('eliminar-usuario'), 403);
+        abort_if($id === auth()->id(), 422, 'No puede desactivar su propia cuenta.');
+        $user = User::findOrFail($id);
+        $before = ['status' => (bool) $user->status];
+        $user->update(['status' => $user->status ? 0 : 1]);
+        $this->logActivity('USUARIOS', $user->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado de '.$user->login, $user->id, $before, ['status' => (bool) $user->status]);
+    }
+
+    private function resetForm(): void
+    {
+        $this->reset(['user_id', 'login', 'name', 'lastname', 'document', 'email', 'phone', 'password', 'password_confirmation', 'role', 'isEditMode']);
+        $this->status = 1;
+        $this->resetValidation();
     }
 }

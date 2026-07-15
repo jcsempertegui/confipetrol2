@@ -8131,3 +8131,30 @@ body.dark-mode .branch-option .badge-current {
     background-color: #fc0038 !important;
     color: #ffffff !important;
 }
+/* Ajustes responsivos del sistema Confipetrol */
+.page-wrapper > .page-wrapper { margin: 0 !important; }
+.page-content { width: 100%; max-width: 1600px; margin-inline: auto; }
+.table-responsive { border-radius: .5rem; }
+.table td, .table th { vertical-align: middle; }
+.modal-dialog { margin-inline: auto; }
+
+@media (max-width: 991.98px) {
+    .page-content { padding: 1rem !important; }
+    .card-body { padding: 1rem; }
+    .table-responsive { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+    .table { min-width: 720px; }
+    .modal-dialog { width: auto; margin: .75rem; }
+}
+
+@media (max-width: 575.98px) {
+    .page-content { padding: .75rem !important; }
+    .page-content h4 { font-size: 1.25rem; }
+    .card { margin-bottom: .75rem; }
+    .card-body { padding: .85rem; }
+    .btn:not(.btn-sm):not(.btn-close) { min-height: 42px; }
+    .d-flex.justify-content-between { gap: .65rem; flex-wrap: wrap; }
+    .d-flex.justify-content-between > .form-control { max-width: none !important; width: 100%; }
+    .modal-dialog { margin: .5rem; }
+    .modal-body { padding: .85rem; }
+    .pagination { flex-wrap: wrap; }
+}

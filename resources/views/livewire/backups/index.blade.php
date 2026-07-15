@@ -68,6 +68,7 @@
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge bg-secondary">{{ count($backups) }} archivos</span>
+                    @can('restaurar-backup')
                     <button type="button"
                         data-bs-toggle="modal" data-bs-target="#uploadRestoreModal"
                         class="btn btn-outline-warning btn-sm"
@@ -75,6 +76,8 @@
                         wire:target="confirmRestoreFromList,uploadAndRestore">
                         <i class="bx bx-upload me-1"></i> RESTAURAR ARCHIVO
                     </button>
+                    @endcan
+                    @can('crear-backup')
                     <button wire:click="createBackup"
                         wire:loading.attr="disabled"
                         wire:target="createBackup"
@@ -86,6 +89,7 @@
                             <i class="bx bx-spin bx-loader me-1"></i> GENERANDO...
                         </span>
                     </button>
+                    @endcan
                 </div>
             </div>
 
@@ -136,18 +140,22 @@
                                             title="Descargar backup">
                                             <i class="bx bx-download"></i>
                                         </a>
+                                        @can('restaurar-backup')
                                         <button type="button"
                                             class="btn btn-outline-warning btn-sm p-0 px-1 me-1"
                                             title="Restaurar este backup"
                                             onclick="confirmRestoreBackup('{{ $backup['filename'] }}')">
                                             <i class="bx bx-reset"></i>
                                         </button>
+                                        @endcan
+                                        @can('eliminar-backup')
                                         <button type="button"
                                             class="btn btn-outline-danger btn-sm p-0 px-1"
                                             title="Eliminar backup"
                                             onclick="confirmDeleteBackup('{{ $backup['filename'] }}')">
                                             <i class="bx bx-trash"></i>
                                         </button>
+                                        @endcan
                                     </td>
                                 </tr>
                             @empty
@@ -167,7 +175,7 @@
                     <div class="row g-2 small text-muted">
                         <div class="col-md-6">
                             <i class="bx bx-info-circle me-1"></i>
-                            Los backups se generan automáticamente cada día al iniciar sesión y a la 1:00 AM.
+                            El backup automático se ejecuta diariamente a la 1:00 AM.
                         </div>
                         <div class="col-md-6 text-md-end">
                             <i class="bx bx-folder me-1"></i>
@@ -178,6 +186,7 @@
             </div>
         </div>
 
+        @can('restaurar-backup')
         <div class="card mt-2 mb-2" style="flex-shrink: 0;">
             <div class="card-header px-3 py-2">
                 <div class="d-flex align-items-center gap-2">
@@ -217,8 +226,10 @@
                 </div>
             </div>
         </div>
+        @endcan
     </div>
 
+    @can('restaurar-backup')
     <div wire:ignore.self class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -255,6 +266,7 @@
             </div>
         </div>
     </div>
+    @endcan
 
     <script>
     function confirmDeleteBackup(filename) {

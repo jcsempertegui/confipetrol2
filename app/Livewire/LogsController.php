@@ -3,22 +3,28 @@
 namespace App\Livewire;
 
 use App\Models\Log;
+use Carbon\Carbon;
 use Livewire\Component;
 use Livewire\WithPagination;
-use Carbon\Carbon;
 
 class LogsController extends Component
 {
     use WithPagination;
+
     protected $paginationTheme = 'bootstrap';
 
     public $searchTerm;
+
     public $fromDate;
+
     public $toDate;
+
     public $filter_modulo = '';
+
     public $filter_accion = '';
 
     public $perPage = 20;
+
     public $perPageOptions = [20, 50, 100];
 
     public $moduloOptions = [
@@ -56,47 +62,61 @@ class LogsController extends Component
     public function mount()
     {
         $this->fromDate = now()->format('Y-m-d');
-        $this->toDate   = now()->format('Y-m-d');
+        $this->toDate = now()->format('Y-m-d');
     }
 
-    public function updatedPerPage() { $this->resetPage(); }
-    public function updatedFilterModulo() { $this->resetPage(); }
-    public function updatedFilterAccion() { $this->resetPage(); }
+    public function updatedPerPage()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterModulo()
+    {
+        $this->resetPage();
+    }
+
+    public function updatedFilterAccion()
+    {
+        $this->resetPage();
+    }
 
     public function render()
     {
         $query = Log::with('user');
 
-        if (!empty($this->searchTerm)) {
+        if (! empty($this->searchTerm)) {
             $query->where(function ($sub) {
-                $sub->where('descripcion', 'like', '%' . $this->searchTerm . '%')
-                    ->orWhere('modulo', 'like', '%' . $this->searchTerm . '%')
-                    ->orWhere('accion', 'like', '%' . $this->searchTerm . '%')
+                $sub->where('descripcion', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('actor_login', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('valores_anteriores', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('valores_nuevos', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('modulo', 'like', '%'.$this->searchTerm.'%')
+                    ->orWhere('accion', 'like', '%'.$this->searchTerm.'%')
                     ->orWhereHas('user', function ($q) {
-                        $q->where('login', 'like', '%' . $this->searchTerm . '%')
-                          ->orWhere('name', 'like', '%' . $this->searchTerm . '%');
+                        $q->where('login', 'like', '%'.$this->searchTerm.'%')
+                            ->orWhere('name', 'like', '%'.$this->searchTerm.'%');
                     });
             });
         }
 
-        if (!empty($this->filter_modulo)) {
+        if (! empty($this->filter_modulo)) {
             $query->where('modulo', $this->filter_modulo);
         }
 
-        if (!empty($this->filter_accion)) {
+        if (! empty($this->filter_accion)) {
             $query->where('accion', $this->filter_accion);
         }
 
-        if (!empty($this->fromDate) && !empty($this->toDate)) {
+        if (! empty($this->fromDate) && ! empty($this->toDate)) {
             $fromDate = Carbon::parse($this->fromDate)->startOfDay();
-            $toDate   = Carbon::parse($this->toDate)->endOfDay();
+            $toDate = Carbon::parse($this->toDate)->endOfDay();
             $query->whereBetween('created_at', [$fromDate, $toDate]);
         }
 
         $logs = $query->orderBy('id', 'desc')->paginate($this->perPage);
 
         return view('livewire.logs.logs', [
-            'logs'       => $logs,
+            'logs' => $logs,
             'startCount' => $logs->total() - ($logs->currentPage() - 1) * $logs->perPage(),
         ])->extends('layouts.theme.app');
     }
@@ -110,11 +130,13 @@ class LogsController extends Component
     {
         if (empty($this->fromDate) || empty($this->toDate)) {
             $this->dispatch('errorDate', 'DEBE INGRESAR AMBAS FECHAS PARA EL REPORTE.');
+
             return;
         }
 
         if (Carbon::parse($this->fromDate)->gt(Carbon::parse($this->toDate))) {
             $this->dispatch('errorDate', 'LA FECHA INICIAL NO PUEDE SER POSTERIOR A LA FINAL.');
+
             return;
         }
 

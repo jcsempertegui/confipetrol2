@@ -3,52 +3,25 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Product extends Model
 {
-    use HasFactory;
+    protected $fillable = ['category_id', 'code', 'name', 'description', 'tracking_type', 'status'];
 
-    protected $fillable = [
-        'code',
-        'name',
-        'features',
-        'model',
-        'type',
-        'minimum_stock',
-        'status',
-        'categorie_id',
-        'brand_id',
-        'unit_id',
-    ];
+    protected $casts = ['status' => 'boolean'];
 
-    public function categories()
+    public function category()
     {
-        return $this->belongsTo(Categorie::class, 'categorie_id');
+        return $this->belongsTo(Category::class);
     }
 
-    public function brands()
+    public function variants()
     {
-        return $this->belongsTo(Brand::class, 'brand_id');
+        return $this->hasMany(ProductVariant::class);
     }
 
-    public function units()
+    public function attributeValues()
     {
-        return $this->belongsTo(Unit::class, 'unit_id');
-    }
-
-    public function inventories()
-    {
-        return $this->hasOne(Inventorie::class);
-    }
-
-    public function skus()
-    {
-        return $this->hasMany(ProductSku::class);
-    }
-
-    public function prices()
-    {
-        return $this->hasMany(ProductPrice::class);
+        return $this->hasMany(ProductAttributeValue::class);
     }
 }
