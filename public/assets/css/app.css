@@ -8158,3 +8158,68 @@ body.dark-mode .branch-option .badge-current {
     .modal-body { padding: .85rem; }
     .pagination { flex-wrap: wrap; }
 }
+
+/* Pantalla de auditoría */
+.audit-table thead th { background: #f7f8fa; color: #5f6670; font-size: .75rem; text-transform: uppercase; letter-spacing: .03em; white-space: nowrap; }
+.audit-avatar { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-right: .65rem; background: #e8f1ff; color: #0d6efd; font-weight: 700; }
+.audit-detail-row > td { padding: 0 !important; background: #f8fafc; }
+.audit-detail { padding: 1rem 1.25rem; border-left: 4px solid #0d6efd; }
+.audit-inline-detail { padding: .85rem; background: #f8fafc; border: 1px solid #dce6f2; border-left: 4px solid #0d6efd; border-radius: .4rem; }
+.audit-change-table { min-width: 600px; }
+.audit-change-table th { font-size: .78rem; color: #6c757d; }
+.audit-old-value, .audit-new-value { display: inline-block; padding: .2rem .45rem; border-radius: .3rem; word-break: break-word; }
+.audit-old-value { color: #b02a37; background: #fbeaec; }
+.audit-new-value { color: #146c43; background: #e7f5ed; }
+.audit-mobile-card { padding: 1rem 0; border-bottom: 1px solid #e9ecef; }
+.audit-mobile-card:first-child { padding-top: 0; }
+.audit-mobile-card:last-child { border-bottom: 0; }
+.audit-responsive-history ~ .table-responsive,
+.audit-responsive-history ~ .d-xl-none { display: none !important; }
+.audit-responsive-history { display: flex; flex-direction: column; gap: .75rem; }
+.audit-event-card { display: grid; grid-template-columns: 105px minmax(150px, .8fr) minmax(145px, .7fr) minmax(190px, 1fr) minmax(260px, 1.35fr); gap: 1rem; align-items: center; padding: 1rem; border: 1px solid #e3e8ef; border-radius: .65rem; background: var(--bs-body-bg, #fff); }
+.audit-event-card:hover { border-color: #b8cce4; box-shadow: 0 3px 12px rgba(31, 54, 78, .07); }
+.audit-field-label { display: block; margin-bottom: .35rem; color: #6c757d; font-size: .7rem; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+.audit-change-button { width: 100%; white-space: normal; }
+.audit-event-detail { grid-column: 1 / -1; min-width: 0; padding: 1rem; background: #f8fafc; border-left: 4px solid #0d6efd; border-radius: .4rem; }
+
+@media (max-width: 1399.98px) {
+    .audit-event-card { grid-template-columns: 110px minmax(160px, 1fr) minmax(150px, .8fr); align-items: start; }
+    .audit-event-change { grid-column: 2 / -1; }
+}
+
+@media (max-width: 767.98px) {
+    .audit-event-card { grid-template-columns: 1fr 1fr; gap: .85rem; }
+    .audit-event-change, .audit-event-detail { grid-column: 1 / -1; }
+}
+
+@media (max-width: 479.98px) {
+    .audit-event-card { grid-template-columns: 1fr; }
+    .audit-event-change, .audit-event-detail { grid-column: 1; }
+}
+
+/* Mantiene visibles las acciones cuando una tabla necesita desplazamiento horizontal. */
+@media (max-width: 1199.98px) {
+    .table-responsive > .table:not(.audit-change-table) th:last-child,
+    .table-responsive > .table:not(.audit-change-table) td:last-child {
+        position: sticky;
+        right: 0;
+        z-index: 2;
+        background: var(--bs-body-bg, #fff);
+        box-shadow: -5px 0 8px rgba(0, 0, 0, .06);
+    }
+    .table-responsive > .table:not(.audit-change-table) thead th:last-child { z-index: 3; background: #f7f8fa; }
+    .table-responsive > .table:not(.audit-change-table) tbody tr:hover td:last-child { background: #f7f9fc; }
+}
+
+/* En portátiles y pantallas medianas, Logs usa tarjetas para no ocultar acciones. */
+@media (min-width: 1200px) and (max-width: 1399.98px) {
+    .audit-page .d-xl-block { display: none !important; }
+    .audit-page .d-xl-none { display: block !important; }
+}
+
+@media (max-width: 575.98px) {
+    .audit-page > .d-flex:first-child > .badge { display: none; }
+    .audit-page .row.g-3.mb-3 .card-body { padding: .75rem !important; }
+    .audit-page .row.g-3.mb-3 .fs-4 { font-size: 1.25rem !important; }
+    .audit-change-table { min-width: 520px; }
+}
