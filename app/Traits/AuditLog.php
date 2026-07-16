@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Log as AuditModel;
+use Illuminate\Support\Facades\Log as SystemLog;
 
 trait AuditLog
 {
@@ -38,8 +39,16 @@ trait AuditLog
                 'valores_nuevos' => $nuevos ?: null,
                 'ip' => request()->ip(),
             ]);
-        } catch (\Throwable) {
-            // No romper la app por un error de log
+        } catch (\Throwable $exception) {
+            $fallback = [
+                'timestamp' => now()->toIso8601String(), 'user_id' => auth()->id(),
+                'actor_login' => auth()->user()?->login ?? 'Sistema', 'module' => $modulo,
+                'action' => $accion, 'description' => $descripcion, 'model_id' => $modeloId,
+                'before' => $valoresAnteriores, 'after' => $valoresNuevos, 'ip' => request()->ip(),
+                'database_error' => $exception->getMessage(),
+            ];
+            file_put_contents(storage_path('logs/audit-fallback.log'), json_encode($fallback, JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND | LOCK_EX);
+            SystemLog::critical('La auditoría principal falló; se creó un registro alternativo.', ['exception' => $exception]);
         }
     }
 

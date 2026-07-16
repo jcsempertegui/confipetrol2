@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Log;
 use App\Models\User;
 
 test('login screen can be rendered', function () {
@@ -29,6 +30,7 @@ test('users can not authenticate with invalid password', function () {
     ]);
 
     $this->assertGuest();
+    expect(Log::where('actor_login', $user->login)->where('accion', 'INTENTO_FALLIDO')->exists())->toBeTrue();
 });
 
 test('users can logout', function () {

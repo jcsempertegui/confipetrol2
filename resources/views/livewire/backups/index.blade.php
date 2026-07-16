@@ -68,7 +68,7 @@
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <span class="badge bg-secondary">{{ count($backups) }} archivos</span>
-                    @can('restaurar-backup')
+                    @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
                     <button type="button"
                         data-bs-toggle="modal" data-bs-target="#uploadRestoreModal"
                         class="btn btn-outline-warning btn-sm"
@@ -76,7 +76,7 @@
                         wire:target="confirmRestoreFromList,uploadAndRestore">
                         <i class="bx bx-upload me-1"></i> RESTAURAR ARCHIVO
                     </button>
-                    @endcan
+                    @endif
                     @can('crear-backup')
                     <button wire:click="createBackup"
                         wire:loading.attr="disabled"
@@ -107,6 +107,7 @@
                             <tr>
                                 <th style="width: 50px">N°</th>
                                 <th>NOMBRE DEL ARCHIVO</th>
+                                <th style="width: 150px">TIPO</th>
                                 <th style="width: 170px">FECHA Y HORA</th>
                                 <th style="width: 100px">TAMAÑO</th>
                                 <th style="width: 80px">ESTADO</th>
@@ -123,6 +124,7 @@
                                             <span class="small font-monospace">{{ $backup['filename'] }}</span>
                                         </div>
                                     </td>
+                                    <td><span class="badge {{ $backup['type']['class'] }}">{{ $backup['type']['label'] }}</span></td>
                                     <td class="small text-nowrap">
                                         {{ $backup['date']->format('d/m/Y H:i:s') }}
                                     </td>
@@ -140,14 +142,14 @@
                                             title="Descargar backup">
                                             <i class="bx bx-download"></i>
                                         </a>
-                                        @can('restaurar-backup')
+                                        @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
                                         <button type="button"
                                             class="btn btn-outline-warning btn-sm p-0 px-1 me-1"
                                             title="Restaurar este backup"
                                             onclick="confirmRestoreBackup('{{ $backup['filename'] }}')">
                                             <i class="bx bx-reset"></i>
                                         </button>
-                                        @endcan
+                                        @endif
                                         @can('eliminar-backup')
                                         <button type="button"
                                             class="btn btn-outline-danger btn-sm p-0 px-1"
@@ -160,7 +162,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-5">
+                                    <td colspan="7" class="text-center text-muted py-5">
                                         <i class="bx bx-data fs-2 d-block mb-2"></i>
                                         <div>No hay backups disponibles.</div>
                                         <div class="small mt-1">Haga clic en <strong>CREAR BACKUP AHORA</strong> para generar el primer backup.</div>
@@ -181,12 +183,16 @@
                             <i class="bx bx-folder me-1"></i>
                             Se conservan los últimos <strong>30</strong> backups automáticamente.
                         </div>
+                        <div class="col-12">
+                            <i class="bx bx-shield-quarter me-1"></i>
+                            Antes de cada restauración se crea un respaldo de seguridad identificado como <strong>Pre-restauración</strong>.
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        @can('restaurar-backup')
+        @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
         <div class="card mt-2 mb-2" style="flex-shrink: 0;">
             <div class="card-header px-3 py-2">
                 <div class="d-flex align-items-center gap-2">
@@ -226,10 +232,10 @@
                 </div>
             </div>
         </div>
-        @endcan
+        @endif
     </div>
 
-    @can('restaurar-backup')
+    @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
     <div wire:ignore.self class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
@@ -266,7 +272,7 @@
             </div>
         </div>
     </div>
-    @endcan
+    @endif
 
     <script>
     function confirmDeleteBackup(filename) {

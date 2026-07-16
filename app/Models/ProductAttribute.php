@@ -14,4 +14,14 @@ class ProductAttribute extends Model
     {
         return $this->belongsToMany(Category::class)->withPivot(['required', 'position']);
     }
+
+    public function productValues()
+    {
+        return $this->hasMany(ProductAttributeValue::class);
+    }
+
+    public function variantValues()
+    {
+        return $this->hasMany(VariantAttributeValue::class);
+    }
 }

@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Traits\AuditLog;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Permission;
@@ -53,7 +54,7 @@ class RolesController extends Component
     public function render()
     {
         $roles = Role::where('name', 'like', '%'.$this->searchTerm.'%')
-            ->where('id', '!=', 1)
+            ->where('name', '!=', 'SUPER ADMIN')
             ->orderBy('id', 'desc')
             ->paginate($this->perPage);
 
@@ -121,6 +122,7 @@ class RolesController extends Component
         abort_unless(auth()->user()->can('editar-rol'), 403);
         $this->resetInputFields();
         $role = Role::findOrFail($id);
+        abort_if($role->name === 'SUPER ADMIN', 403);
 
         $this->selected_id = $role->id;
         $this->name = $role->name;
@@ -150,6 +152,7 @@ class RolesController extends Component
         $this->validate($rules, $message);
 
         $role = Role::find($this->selected_id);
+        abort_if($role?->name === 'SUPER ADMIN', 403);
         $before = ['nombre' => $role->name, 'permisos' => $role->permissions->pluck('name')->sort()->values()->all()];
         $role->name = $this->name;
         $role->save();
@@ -173,9 +176,14 @@ class RolesController extends Component
         if ($id) {
             $role = Role::find($id);
             if ($role) {
+                abort_if($role->name === 'SUPER ADMIN', 403);
                 $newEstado = $role->status == 1 ? 0 : 1;
                 $before = ['estado' => (bool) $role->status];
                 $role->update(['status' => $newEstado]);
+                if (! $newEstado) {
+                    $userIds = DB::table('model_has_roles')->where('role_id', $role->id)->where('model_type', User::class)->pluck('model_id');
+                    DB::table('sessions')->whereIn('user_id', $userIds)->delete();
+                }
                 $this->logActivity(
                     'ROLES', $newEstado == 1 ? 'RESTAURAR' : 'ELIMINAR',
                     ($newEstado == 1 ? 'Activó' : 'Desactivó')." rol: {$role->name}",

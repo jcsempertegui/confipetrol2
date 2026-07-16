@@ -23,7 +23,7 @@
                     </div>
                 </a>
                 <ul class="dropdown-menu dropdown-menu-end">
-                    <li><a class="dropdown-item d-flex align-items-center" href="{{ url('profiles') }}"><i class="bx bx-user"></i><span>Perfil</span></a></li>
+                    <li><a class="dropdown-item d-flex align-items-center" href="{{ route('profile') }}"><i class="bx bx-user"></i><span>Mi perfil</span></a></li>
                     <li><div class="dropdown-divider mb-0"></div></li>
                     <li>
                         <a class="dropdown-item d-flex align-items-center" href="{{ route('logout') }}"

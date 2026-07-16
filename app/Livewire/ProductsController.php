@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\Category;
 use App\Models\Product;
+use App\Models\SerializedItem;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -83,18 +84,48 @@ class ProductsController extends Component
     {
         abort_unless(auth()->user()->can($this->productId ? 'editar-producto' : 'crear-producto'), 403);
         $rules = [
-            'category_id' => 'required|exists:categories,id', 'code' => ['nullable', 'string', 'max:80', Rule::unique('products')->ignore($this->productId)],
+            'category_id' => ['required', Rule::exists('categories', 'id')->where('status', true)], 'code' => ['nullable', 'string', 'max:80', Rule::unique('products')->ignore($this->productId)],
             'name' => 'required|string|max:200', 'description' => 'nullable|string|max:2000', 'tracking_type' => 'required|in:bulk,serialized', 'status' => 'boolean',
             'variants' => 'required|array|min:1', 'variants.*.name' => 'nullable|string|max:150',
         ];
+        $this->validate($rules);
+        if ($this->productId && (int) Product::findOrFail($this->productId)->category_id !== (int) $this->category_id) {
+            $this->addError('category_id', 'No se puede cambiar la categoría de un producto existente porque afectaría sus atributos y trazabilidad.');
+
+            return;
+        }
         $category = Category::with('attributes')->findOrFail($this->category_id);
         $hasVariants = $category->attributes->where('scope', 'variant')->isNotEmpty();
-        $this->code = $this->code ?: $this->makeCode($category);
+        $unitAttribute = $category->attributes->firstWhere('scope', 'unit');
+        $this->tracking_type = $unitAttribute ? 'serialized' : 'bulk';
+        foreach ($category->attributes as $attribute) {
+            if ($attribute->pivot->required && $attribute->scope === 'product' && blank($this->productValues[$attribute->id] ?? null)) {
+                $this->addError('productValues.'.$attribute->id, 'Este atributo es obligatorio.');
+            }
+            if ($attribute->scope === 'product' && filled($this->productValues[$attribute->id] ?? null)) {
+                $this->validateAttributeValue($attribute, $this->productValues[$attribute->id], 'productValues.'.$attribute->id);
+            }
+            if ($attribute->scope === 'variant') {
+                foreach ($this->variants as $i => $variant) {
+                    if ($attribute->pivot->required && blank($variant['values'][$attribute->id] ?? null)) {
+                        $this->addError("variants.$i.values.$attribute->id", 'Este atributo es obligatorio.');
+                    }
+                    if (filled($variant['values'][$attribute->id] ?? null)) {
+                        $this->validateAttributeValue($attribute, $variant['values'][$attribute->id], "variants.$i.values.$attribute->id");
+                    }
+                }
+            }
+        }
+        if ($this->getErrorBag()->isNotEmpty()) {
+            return;
+        }
+
+        $this->code = $this->code ?: $this->reserveCode($category);
         if (! $hasVariants) {
             $this->variants = [[
                 'id' => $this->variants[0]['id'] ?? null,
                 'sku' => $this->code,
-                'name' => '', 'values' => [], 'serials' => '',
+                'name' => '', 'values' => [], 'serials' => $this->variants[0]['serials'] ?? '',
             ]];
         }
         foreach ($this->variants as $index => &$variant) {
@@ -105,26 +136,34 @@ class ProductsController extends Component
         }
         unset($variant);
         foreach ($this->variants as $i => $variant) {
-            $rules["variants.$i.sku"] = ['required', 'string', 'max:100', 'distinct', Rule::unique('product_variants', 'sku')->ignore($variant['id'] ?? null)];
+            $uniqueSku = Rule::unique('product_variants', 'sku')->ignore($variant['id'] ?? null);
+            if ($this->productId) {
+                $uniqueSku->where(fn ($query) => $query->where('product_id', '!=', $this->productId));
+            }
+            $rules["variants.$i.sku"] = ['required', 'string', 'max:100', 'distinct', $uniqueSku];
         }
         $this->validate($rules);
-        foreach ($category->attributes as $attribute) {
-            if (! $attribute->pivot->required) {
-                continue;
+        if ($unitAttribute) {
+            $allSerials = collect($this->variants)->flatMap(fn ($row) => $this->parseSerials($row['serials'] ?? '', false));
+            if ($unitAttribute->pivot->required && $allSerials->isEmpty()) {
+                $this->addError('variants.0.serials', 'Registra al menos un '.$unitAttribute->name.'.');
             }
-            if ($attribute->scope === 'product' && blank($this->productValues[$attribute->id] ?? null)) {
-                $this->addError('productValues.'.$attribute->id, 'Este atributo es obligatorio.');
+            if ($allSerials->count() !== $allSerials->unique()->count()) {
+                $this->addError('variants.0.serials', 'Hay identificadores repetidos en el formulario.');
             }
-            if ($attribute->scope === 'variant') {
-                foreach ($this->variants as $i => $variant) {
-                    if (blank($variant['values'][$attribute->id] ?? null)) {
-                        $this->addError("variants.$i.values.$attribute->id", 'Este atributo es obligatorio.');
-                    }
+            foreach ($allSerials as $serial) {
+                if (mb_strlen($serial) > 150 || ! preg_match('/^[\pL\pN._\/-]+$/u', $serial)) {
+                    $this->addError('variants.0.serials', 'Los identificadores admiten hasta 150 caracteres y solo letras, números, punto, guion, guion bajo o barra.');
+                    break;
                 }
             }
-        }
-        if ($this->getErrorBag()->isNotEmpty()) {
-            return;
+            $ownVariantIds = $this->productId ? Product::findOrFail($this->productId)->variants()->pluck('id') : collect();
+            if (SerializedItem::whereIn('serial_number', $allSerials)->when($ownVariantIds->isNotEmpty(), fn ($query) => $query->whereNotIn('product_variant_id', $ownVariantIds))->exists()) {
+                $this->addError('variants.0.serials', 'Uno de los identificadores ya está registrado en otro producto.');
+            }
+            if ($this->getErrorBag()->isNotEmpty()) {
+                return;
+            }
         }
 
         $before = $this->productId ? $this->productSnapshot(Product::findOrFail($this->productId)) : null;
@@ -135,19 +174,25 @@ class ProductsController extends Component
             }
             $kept = [];
             foreach ($this->variants as $row) {
-                $variant = $product->variants()->updateOrCreate(['id' => $row['id'] ?? null], ['sku' => $row['sku'], 'name' => $row['name'] ?: null, 'status' => true]);
+                $variant = filled($row['id'] ?? null)
+                    ? $product->variants()->whereKey($row['id'])->first()
+                    : $product->variants()->where('sku', $row['sku'])->first();
+                $variant ??= $product->variants()->make();
+                $variant->fill(['sku' => $row['sku'], 'name' => $row['name'] ?: null, 'status' => true])->save();
                 $kept[] = $variant->id;
                 foreach ($category->attributes->where('scope', 'variant') as $attribute) {
                     $variant->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $row['values'][$attribute->id] ?? null]);
                 }
                 if ($product->tracking_type === 'serialized') {
-                    $serials = collect(preg_split('/[\r\n,]+/', $row['serials'] ?? ''))->map(fn ($v) => trim($v))->filter()->unique();
+                    $serials = $this->parseSerials($row['serials'] ?? '');
+                    $variant->serializedItems()->whereNotIn('serial_number', $serials)->update(['status' => 'inactive']);
                     foreach ($serials as $serial) {
-                        $variant->serializedItems()->firstOrCreate(['serial_number' => $serial]);
+                        $item = SerializedItem::where('serial_number', $serial)->first() ?? new SerializedItem;
+                        $item->fill(['product_variant_id' => $variant->id, 'serial_number' => $serial, 'status' => 'available'])->save();
                     }
                 }
             }
-            $product->variants()->whereNotIn('id', $kept)->delete();
+            $product->variants()->whereNotIn('id', $kept)->update(['status' => false]);
             $this->logActivity('PRODUCTOS', $this->productId ? 'EDITAR' : 'CREAR', 'Producto '.$product->name, $product->id, $before, $this->productSnapshot($product));
         });
         $this->resetForm();
@@ -163,7 +208,7 @@ class ProductsController extends Component
         }
         $this->productId = $id;
         $this->productValues = $p->attributeValues->pluck('value', 'product_attribute_id')->all();
-        $this->variants = $p->variants->map(fn ($v) => ['id' => $v->id, 'sku' => $v->sku, 'name' => $v->name ?? '', 'values' => $v->attributeValues->pluck('value', 'product_attribute_id')->all(), 'serials' => $v->serializedItems->pluck('serial_number')->join("\n")])->all();
+        $this->variants = $p->variants->where('status', true)->map(fn ($v) => ['id' => $v->id, 'sku' => $v->sku, 'name' => $v->name ?? '', 'values' => $v->attributeValues->pluck('value', 'product_attribute_id')->all(), 'serials' => $v->serializedItems->where('status', '!=', 'inactive')->pluck('serial_number')->join("\n")])->values()->all();
     }
 
     public function toggle(int $id): void
@@ -184,15 +229,39 @@ class ProductsController extends Component
         $this->resetValidation();
     }
 
-    private function makeCode(Category $category): string
+    private function reserveCode(Category $category): string
     {
-        $base = Str::upper($category->code).'-';
-        $lastNumber = Product::where('category_id', $category->id)->pluck('code')
-            ->map(fn ($code) => preg_match('/^'.preg_quote($base, '/').'(\d+)$/', $code, $matches) ? (int) $matches[1] : 0)
-            ->max() ?? 0;
-        $code = $base.str_pad((string) ($lastNumber + 1), 4, '0', STR_PAD_LEFT);
+        return DB::transaction(function () use ($category) {
+            $locked = Category::whereKey($category->id)->lockForUpdate()->firstOrFail();
+            $number = $locked->next_product_number;
+            do {
+                $code = Str::upper($locked->code).'-'.str_pad((string) $number++, 4, '0', STR_PAD_LEFT);
+            } while (Product::where('code', $code)->exists());
+            $locked->update(['next_product_number' => $number]);
 
-        return $code;
+            return $code;
+        });
+    }
+
+    private function parseSerials(string $serials, bool $unique = true)
+    {
+        $values = collect(preg_split('/[\r\n,]+/', $serials))->map(fn ($value) => trim($value))->filter();
+
+        return ($unique ? $values->unique() : $values)->values();
+    }
+
+    private function validateAttributeValue($attribute, mixed $value, string $field): void
+    {
+        $valid = match ($attribute->type) {
+            'number' => is_numeric($value),
+            'date' => strtotime((string) $value) !== false,
+            'select' => in_array((string) $value, array_map('strval', $attribute->options ?? []), true),
+            'boolean' => in_array($value, [0, 1, '0', '1', true, false], true),
+            default => is_scalar($value) && mb_strlen((string) $value) <= 2000,
+        };
+        if (! $valid) {
+            $this->addError($field, 'El valor no corresponde al tipo configurado para '.$attribute->name.'.');
+        }
     }
 
     private function productSnapshot(Product $product): array
@@ -211,7 +280,7 @@ class ProductsController extends Component
                 'sku' => $variant->sku,
                 'nombre' => $variant->name,
                 'atributos' => $variant->attributeValues->mapWithKeys(fn ($value) => [$attributeNames[$value->product_attribute_id] ?? $value->product_attribute_id => $value->value])->all(),
-                'números_de_serie' => $variant->serializedItems->pluck('serial_number')->all(),
+                'identificadores_únicos' => $variant->serializedItems->mapWithKeys(fn ($item) => [$item->serial_number => $item->status])->all(),
             ])->all(),
         ];
     }

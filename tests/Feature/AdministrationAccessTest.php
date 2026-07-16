@@ -1,6 +1,8 @@
 <?php
 
+use App\Livewire\BackupsController;
 use App\Livewire\LogsController;
+use App\Livewire\UsersController;
 use App\Models\Log;
 use App\Models\User;
 use Database\Seeders\PermissionSeeder;
@@ -49,8 +51,48 @@ test('an auditor can expand and see every changed field', function () {
     ]);
 
     Livewire::actingAs($user)->test(LogsController::class)
-        ->assertSee('+ 1 cambio(s) adicional(es)')
+        ->assertSee('Ver todos los cambios (2)')
         ->call('toggleDetails', $log->id)
         ->assertSet("expandedLogs.$log->id", true)
         ->assertSee('Toshiba')->assertSee('Lenovo')->assertSee('A1')->assertSee('T14');
+});
+
+test('only super admin can start a database restore', function () {
+    $role = Role::create(['name' => 'OPERADOR BACKUP', 'guard_name' => 'web']);
+    $role->syncPermissions(['ver-backup', 'crear-backup', 'restaurar-backup']);
+    $user = User::factory()->create();
+    $user->assignRole($role);
+
+    Livewire::actingAs($user)->test(BackupsController::class)
+        ->call('confirmRestoreFromList', 'backup_fake.sql')->assertForbidden();
+});
+
+test('authenticated users can open their profile', function () {
+    $this->actingAs(User::factory()->create())->get('/profile')->assertOk()->assertSee('Mi perfil');
+});
+
+test('a user manager cannot assign the super admin role', function () {
+    Role::create(['name' => 'SUPER ADMIN', 'guard_name' => 'web']);
+    $managerRole = Role::create(['name' => 'GESTOR', 'guard_name' => 'web']);
+    $managerRole->syncPermissions(['ver-usuario', 'crear-usuario']);
+    $manager = User::factory()->create();
+    $manager->assignRole($managerRole);
+
+    Livewire::actingAs($manager)->test(UsersController::class)
+        ->set('role', 'SUPER ADMIN')->call('save')->assertForbidden();
+});
+
+test('inactive users and inactive roles lose access immediately', function () {
+    $user = User::factory()->create(['status' => false]);
+    $this->actingAs($user)->get('/home')->assertRedirect(route('login'));
+
+    $role = Role::create(['name' => 'INACTIVO', 'guard_name' => 'web', 'status' => false]);
+    $activeUser = User::factory()->create(['status' => true]);
+    $activeUser->assignRole($role);
+    $this->actingAs($activeUser)->get('/home')->assertRedirect(route('login'));
+});
+
+test('dashboard hides administrative metrics without permissions', function () {
+    $this->actingAs(User::factory()->create())->get('/home')->assertOk()
+        ->assertDontSee('Usuarios activos')->assertDontSee('Actividad reciente');
 });

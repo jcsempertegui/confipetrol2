@@ -9,4 +9,4 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote')->hourly();
 
 // Backup automático diario a la 1:00 AM
-Schedule::command('backup:database')->dailyAt('01:00');
+Schedule::command('backup:database --type=automatico')->dailyAt('01:00');

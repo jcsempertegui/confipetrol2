@@ -7,12 +7,7 @@
         </div>
 
         <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4">
-            @foreach ([
-                ['Usuarios activos', $activeUsers, 'bx-user-check', 'success'],
-                ['Usuarios inactivos', $inactiveUsers, 'bx-user-x', 'danger'],
-                ['Roles', $rolesCount, 'bx-shield-quarter', 'primary'],
-                ['Acciones de hoy', $todayLogs, 'bx-history', 'warning'],
-            ] as [$label, $value, $icon, $color])
+            @forelse ($metrics as [$label, $value, $icon, $color])
                 <div class="col">
                     <div class="card radius-10">
                         <div class="card-body d-flex align-items-center">
@@ -21,10 +16,10 @@
                         </div>
                     </div>
                 </div>
-            @endforeach
+            @empty<div class="col-12"><div class="alert alert-info">Tu cuenta está activa. Utiliza el menú para acceder a los módulos que tienes asignados.</div></div>@endforelse
         </div>
 
-        <div class="card radius-10">
+        @if($canViewLogs)<div class="card radius-10">
             <div class="card-body">
                 <h5 class="mb-3">Actividad reciente</h5>
                 <div class="table-responsive">
@@ -40,5 +35,5 @@
                     </table>
                 </div>
             </div>
-        </div>
+        </div>@endif
 </div>

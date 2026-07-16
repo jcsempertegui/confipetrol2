@@ -99,10 +99,36 @@ class CategoriesController extends Component
             'attributeName' => 'required|string|max:150',
             'attributeCode' => ['required', 'string', 'max:50', Rule::unique('product_attributes', 'code')->ignore($this->attributeId)],
             'attributeType' => 'required|in:text,number,select,boolean,date',
-            'attributeScope' => 'required|in:product,variant',
+            'attributeScope' => 'required|in:product,variant,unit',
             'attributeOptions' => 'nullable|string|max:2000', 'attributeStatus' => 'boolean',
         ]);
+        if ($this->attributeScope === 'unit') {
+            $existingUnitAttribute = $category->attributes()->where('scope', 'unit')->where('product_attributes.id', '!=', $this->attributeId)->exists();
+            if ($existingUnitAttribute) {
+                $this->addError('attributeScope', 'La categoría ya tiene un identificador único por unidad.');
+
+                return;
+            }
+            $data['attributeType'] = 'text';
+        }
         $options = $this->attributeType === 'select' ? collect(explode(',', $this->attributeOptions))->map(fn ($v) => trim($v))->filter()->values()->all() : null;
+        if ($this->attributeId) {
+            $current = ProductAttribute::findOrFail($this->attributeId);
+            $isUsed = $current->productValues()->exists() || $current->variantValues()->exists() || ($current->scope === 'unit' && $current->categories()->whereHas('products.variants.serializedItems')->exists());
+            if ($isUsed && ($current->type !== $data['attributeType'] || $current->scope !== $data['attributeScope'])) {
+                $this->addError('attributeScope', 'No se puede cambiar el tipo o uso porque este atributo ya tiene información registrada. Puede desactivarlo y crear otro.');
+
+                return;
+            }
+            if ($isUsed && $current->type === 'select') {
+                $usedValues = $current->productValues()->pluck('value')->merge($current->variantValues()->pluck('value'))->filter()->unique();
+                if ($usedValues->diff($options ?? [])->isNotEmpty()) {
+                    $this->addError('attributeOptions', 'No puede retirar opciones que ya están utilizadas por productos.');
+
+                    return;
+                }
+            }
+        }
         $before = $this->attributeId ? $this->attributeSnapshot(ProductAttribute::findOrFail($this->attributeId), $category) : null;
         $attribute = ProductAttribute::updateOrCreate(['id' => $this->attributeId], [
             'name' => $data['attributeName'], 'code' => $data['attributeCode'], 'type' => $data['attributeType'],
@@ -143,6 +169,13 @@ class CategoriesController extends Component
         abort_unless(auth()->user()->can('gestionar-atributos'), 403);
         $category = Category::findOrFail($this->selectedCategoryId);
         $attribute = $category->attributes()->whereKey($id)->firstOrFail();
+        $isUsed = $attribute->productValues()->exists() || $attribute->variantValues()->exists()
+            || ($attribute->scope === 'unit' && $category->products()->whereHas('variants.serializedItems')->exists());
+        if ($isUsed) {
+            $this->dispatch('alert', 'Este atributo ya contiene información y no puede retirarse. Puede editarlo sin cambiar su tipo.', 'warning');
+
+            return;
+        }
         $before = $this->attributeSnapshot($attribute, $category);
         $category->attributes()->detach($id);
         $this->logActivity('CATEGORIAS', 'ELIMINAR', 'Atributo '.$attribute->name.' retirado de la categoría '.$category->name, $attribute->id, $before, null);

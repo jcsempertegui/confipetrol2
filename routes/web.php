@@ -5,6 +5,7 @@ use App\Livewire\CategoriesController;
 use App\Livewire\HomeController;
 use App\Livewire\LogsController;
 use App\Livewire\ProductsController;
+use App\Livewire\ProfileController;
 use App\Livewire\RolesController;
 use App\Livewire\UsersController;
 use Illuminate\Support\Facades\Route;
@@ -19,6 +20,7 @@ Route::middleware('auth')->group(function () {
     Route::get('backups', BackupsController::class)->middleware('permission:ver-backup')->name('backups');
     Route::get('categories', CategoriesController::class)->middleware('permission:ver-categoria')->name('categories');
     Route::get('products', ProductsController::class)->middleware('permission:ver-producto')->name('products');
+    Route::get('profile', ProfileController::class)->name('profile');
     Route::get('backup/download/{filename}', [BackupsController::class, 'download'])
         ->middleware('permission:ver-backup')
         ->name('backup.download');

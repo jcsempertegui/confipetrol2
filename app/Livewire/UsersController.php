@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Traits\AuditLog;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -51,7 +52,9 @@ class UsersController extends Component
                 ->orWhere('lastname', 'like', $term)->orWhere('email', 'like', $term)->orWhere('document', 'like', $term));
         })->latest('id')->paginate($this->perPage);
 
-        return view('livewire.users.users', ['users' => $users, 'roles' => Role::orderBy('name')->get()])
+        $roles = Role::when(! auth()->user()->hasRole('SUPER ADMIN'), fn ($query) => $query->where('name', '!=', 'SUPER ADMIN'))->orderBy('name')->get();
+
+        return view('livewire.users.users', ['users' => $users, 'roles' => $roles])
             ->extends('layouts.theme.app');
     }
 
@@ -71,6 +74,7 @@ class UsersController extends Component
     {
         abort_unless(auth()->user()->can('editar-usuario'), 403);
         $user = User::findOrFail($id);
+        abort_if($user->hasRole('SUPER ADMIN') && ! auth()->user()->hasRole('SUPER ADMIN'), 403);
         foreach (['login', 'name', 'lastname', 'document', 'email', 'phone', 'status'] as $field) {
             $this->{$field} = $user->{$field};
         }
@@ -85,6 +89,7 @@ class UsersController extends Component
     {
         abort_unless(auth()->user()->can($this->isEditMode ? 'editar-usuario' : 'crear-usuario'), 403);
         $id = $this->user_id;
+        abort_if($this->role === 'SUPER ADMIN' && ! auth()->user()->hasRole('SUPER ADMIN'), 403);
         $this->validate([
             'login' => ['required', 'string', 'max:100', Rule::unique('users')->ignore($id)],
             'name' => ['required', 'string', 'max:150'], 'lastname' => ['nullable', 'string', 'max:150'],
@@ -114,8 +119,12 @@ class UsersController extends Component
         abort_unless(auth()->user()->can('eliminar-usuario'), 403);
         abort_if($id === auth()->id(), 422, 'No puede desactivar su propia cuenta.');
         $user = User::findOrFail($id);
+        abort_if($user->hasRole('SUPER ADMIN'), 403, 'La cuenta SUPER ADMIN no puede desactivarse.');
         $before = ['status' => (bool) $user->status];
         $user->update(['status' => $user->status ? 0 : 1]);
+        if (! $user->status) {
+            DB::table('sessions')->where('user_id', $user->id)->delete();
+        }
         $this->logActivity('USUARIOS', $user->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado de '.$user->login, $user->id, $before, ['status' => (bool) $user->status]);
     }
 

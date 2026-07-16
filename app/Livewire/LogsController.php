@@ -48,6 +48,10 @@ class LogsController extends Component
         'ELIMINAR' => 'Desactivación / eliminación',
         'RESTAURAR' => 'Activación / restauración',
         'CAMBIO_CONTRASENA' => 'Cambio de contraseña',
+        'RESTABLECER_CONTRASENA' => 'Restablecimiento de contraseña',
+        'INTENTO_FALLIDO' => 'Intento de acceso fallido',
+        'EDITAR_PERFIL' => 'Actualización de perfil',
+        'DESCARGAR' => 'Descarga',
     ];
 
     public function mount(): void

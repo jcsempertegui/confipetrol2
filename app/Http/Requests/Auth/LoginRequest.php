@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Auth;
 
+use App\Models\Log;
 use App\Models\User;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -47,6 +48,20 @@ class LoginRequest extends FormRequest
 
         if (! Auth::validate($credentials)) {
             RateLimiter::hit($this->throttleKey());
+            try {
+                Log::create([
+                    'user_id' => User::where('login', $this->input('login'))->value('id'),
+                    'actor_login' => $this->input('login'), 'modulo' => 'ACCESO', 'accion' => 'INTENTO_FALLIDO',
+                    'descripcion' => 'Intento de inicio de sesión con credenciales incorrectas', 'ip' => $this->ip(),
+                    'valores_nuevos' => ['navegador' => $this->userAgent()],
+                ]);
+            } catch (\Throwable $exception) {
+                file_put_contents(storage_path('logs/audit-fallback.log'), json_encode([
+                    'timestamp' => now()->toIso8601String(), 'actor_login' => $this->input('login'),
+                    'module' => 'ACCESO', 'action' => 'INTENTO_FALLIDO', 'ip' => $this->ip(),
+                    'database_error' => $exception->getMessage(),
+                ], JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND | LOCK_EX);
+            }
 
             throw ValidationException::withMessages([
                 'login' => trans('auth.failed'),

@@ -7,7 +7,7 @@ use Illuminate\Console\Command;
 
 class DatabaseBackupCommand extends Command
 {
-    protected $signature = 'backup:database';
+    protected $signature = 'backup:database {--type=manual : Tipo de respaldo: manual, automatico o pre_restauracion}';
 
     protected $description = 'Crea un backup completo de la base de datos MySQL';
 
@@ -26,7 +26,14 @@ class DatabaseBackupCommand extends Command
             mkdir($backupDir, 0755, true);
         }
 
-        $filename = 'backup_'.Carbon::now()->format('Y-m-d_H-i-s').'.sql';
+        $type = (string) $this->option('type');
+        if (! in_array($type, ['manual', 'automatico', 'pre_restauracion'], true)) {
+            $this->error('Tipo de respaldo inválido.');
+
+            return 1;
+        }
+
+        $filename = 'backup_'.$type.'_'.Carbon::now(config('app.timezone'))->format('Y-m-d_H-i-s').'.sql';
         $filepath = $backupDir.DIRECTORY_SEPARATOR.$filename;
 
         $mysqldump = $this->findMysqldump();

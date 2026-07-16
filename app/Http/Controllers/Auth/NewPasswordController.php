@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Log;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
@@ -46,6 +48,21 @@ class NewPasswordController extends Controller
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
                 ])->save();
+                DB::table('sessions')->where('user_id', $user->id)->delete();
+
+                try {
+                    Log::create([
+                        'user_id' => $user->id, 'actor_login' => $user->login, 'modulo' => 'ACCESO',
+                        'accion' => 'RESTABLECER_CONTRASENA', 'descripcion' => 'Contraseña restablecida mediante enlace de recuperación',
+                        'modelo_id' => $user->id, 'valores_nuevos' => ['contraseña' => 'actualizada'], 'ip' => $request->ip(),
+                    ]);
+                } catch (\Throwable $exception) {
+                    file_put_contents(storage_path('logs/audit-fallback.log'), json_encode([
+                        'timestamp' => now()->toIso8601String(), 'user_id' => $user->id, 'actor_login' => $user->login,
+                        'module' => 'ACCESO', 'action' => 'RESTABLECER_CONTRASENA', 'ip' => $request->ip(),
+                        'database_error' => $exception->getMessage(),
+                    ], JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND | LOCK_EX);
+                }
 
                 event(new PasswordReset($user));
             }

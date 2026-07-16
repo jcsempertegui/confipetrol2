@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Log;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
 
@@ -20,6 +21,7 @@ test('password can be updated', function () {
         ->assertRedirect('/profile');
 
     $this->assertTrue(Hash::check('new-password', $user->refresh()->password));
+    expect(Log::where('user_id', $user->id)->where('accion', 'CAMBIO_CONTRASENA')->exists())->toBeTrue();
 });
 
 test('correct password must be provided to update password', function () {
