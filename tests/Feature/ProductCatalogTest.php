@@ -35,6 +35,16 @@ it('configures category attributes at different levels', function () {
     expect((bool) Category::first()->attributes->first()->pivot->required)->toBeTrue();
 });
 
+it('can deactivate categories and rejects the removed color field', function () {
+    $category = Category::create(['name' => 'Ropa', 'code' => 'ROP', 'status' => true]);
+    Livewire::test(CategoriesController::class)->call('toggleCategory', $category->id);
+    expect($category->fresh()->status)->toBeFalse();
+
+    Livewire::test(CategoriesController::class)->set('selectedCategoryId', $category->id)
+        ->set('attributeName', 'Color')->set('attributeCode', 'color')->call('saveAttribute')
+        ->assertHasErrors('attributeName');
+});
+
 it('creates a simple asset without exposing variants', function () {
     $category = Category::create(['name' => 'Activo', 'code' => 'ACT', 'status' => true]);
     foreach (['Marca', 'Modelo', 'Número de serie'] as $name) {
@@ -42,12 +52,12 @@ it('creates a simple asset without exposing variants', function () {
         $category->attributes()->attach($attribute, ['required' => true]);
     }
     $values = $category->attributes->pluck('id')->mapWithKeys(fn ($id, $i) => [$id => ['Toshiba', 'Satellite', 'SN-001'][$i]])->all();
-    Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', 'Laptop Toshiba')
+    Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', 'Laptop Toshiba')->set('unit', 'unidad')
         ->set('productValues', $values)->call('save')->assertHasNoErrors();
-    expect(Product::first()->code)->toBe('ACT-0001')->and(Product::first()->variants)->toHaveCount(1);
+    expect(Product::first()->code)->toBe('ACT-0001')->and(Product::first()->unit)->toBe('unidad')->and(Product::first()->variants)->toHaveCount(1);
     $log = Log::where('modulo', 'PRODUCTOS')->latest()->first();
     expect($log->actor_login)->toBe($this->user->login)
-        ->and(collect($log->changes())->pluck('field'))->toContain('nombre', 'atributos › Marca', 'atributos › Modelo', 'atributos › Número de serie');
+        ->and(collect($log->changes())->pluck('field'))->toContain('nombre', 'unidad', 'atributos › Marca', 'atributos › Modelo', 'atributos › Número de serie');
 });
 
 it('creates one product with multiple size variants', function () {
@@ -61,7 +71,7 @@ it('creates one product with multiple size variants', function () {
             ['id' => null, 'sku' => '', 'name' => 'Talla 8', 'values' => [$size->id => '8'], 'serials' => ''],
         ])->call('save')->assertHasNoErrors();
     expect(Product::first()->variants)->toHaveCount(2)
-        ->and(Product::first()->variants->pluck('sku')->all())->toBe([$prefix.'-7', $prefix.'-8']);
+        ->and(Product::first()->variants->pluck('sku')->all())->toBe([strtoupper($prefix).'-7', strtoupper($prefix).'-8']);
 });
 
 it('enforces globally unique serial numbers', function () {
@@ -70,9 +80,11 @@ it('enforces globally unique serial numbers', function () {
     $category->attributes()->attach($serial, ['required' => true]);
 
     Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', 'Laptop Toshiba')
-        ->set('variants.0.serials', 'SN-001')->call('save')->assertHasNoErrors();
+        ->set('variants.0.minimum_stock', 25)->set('variants.0.serials', 'SN-001')
+        ->assertDontSee('Stock mínimo')->call('save')->assertHasNoErrors();
 
     expect(Product::first()->tracking_type)->toBe('serialized')
+        ->and((float) Product::first()->variants->first()->minimum_stock)->toBe(0.0)
         ->and(SerializedItem::where('serial_number', 'SN-001')->exists())->toBeTrue();
 
     Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', 'Laptop Lenovo')

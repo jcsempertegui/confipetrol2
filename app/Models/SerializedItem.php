@@ -17,4 +17,9 @@ class SerializedItem extends Model
     {
         return $this->hasMany(SerializedItemAttributeValue::class);
     }
+
+    public function inventoryMovements()
+    {
+        return $this->hasMany(InventoryMovement::class);
+    }
 }

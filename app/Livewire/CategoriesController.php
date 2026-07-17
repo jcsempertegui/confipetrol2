@@ -102,6 +102,11 @@ class CategoriesController extends Component
             'attributeScope' => 'required|in:product,variant,unit',
             'attributeOptions' => 'nullable|string|max:2000', 'attributeStatus' => 'boolean',
         ]);
+        if (Str::lower(trim($this->attributeName)) === 'color' || Str::lower(trim($this->attributeCode)) === 'color' || str_ends_with(Str::lower(trim($this->attributeCode)), '-color')) {
+            $this->addError('attributeName', 'El campo Color fue retirado del catálogo y no puede volver a agregarse.');
+
+            return;
+        }
         if ($this->attributeScope === 'unit') {
             $existingUnitAttribute = $category->attributes()->where('scope', 'unit')->where('product_attributes.id', '!=', $this->attributeId)->exists();
             if ($existingUnitAttribute) {

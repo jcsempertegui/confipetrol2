@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductVariant extends Model
 {
-    protected $fillable = ['product_id', 'sku', 'name', 'status'];
+    protected $fillable = ['product_id', 'sku', 'name', 'minimum_stock', 'status'];
 
-    protected $casts = ['status' => 'boolean'];
+    protected $casts = ['minimum_stock' => 'decimal:3', 'status' => 'boolean'];
 
     public function product()
     {
@@ -23,5 +23,15 @@ class ProductVariant extends Model
     public function serializedItems()
     {
         return $this->hasMany(SerializedItem::class);
+    }
+
+    public function inventoryMovements()
+    {
+        return $this->hasMany(InventoryMovement::class);
+    }
+
+    public function getCurrentStockAttribute(): float
+    {
+        return (float) $this->inventoryMovements()->sum('quantity');
     }
 }

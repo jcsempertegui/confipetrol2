@@ -28,6 +28,8 @@ class ProductsController extends Component
 
     public $description = '';
 
+    public $unit = 'unidad';
+
     public $tracking_type = 'bulk';
 
     public $status = 1;
@@ -50,7 +52,10 @@ class ProductsController extends Component
             ->latest()->paginate(15);
         $categories = Category::with(['attributes' => fn ($q) => $q->where('product_attributes.status', true)])->where('status', true)->orderBy('name')->get();
 
-        return view('livewire.products.products', compact('products', 'categories'))->extends('layouts.theme.app');
+        $selected = $categories->firstWhere('id', (int) $this->category_id);
+        $codePreview = $selected ? Str::upper($selected->code).'-'.str_pad((string) $selected->next_product_number, 4, '0', STR_PAD_LEFT) : null;
+
+        return view('livewire.products.products', compact('products', 'categories', 'codePreview'))->extends('layouts.theme.app');
     }
 
     public function updatedSearchTerm(): void
@@ -70,7 +75,7 @@ class ProductsController extends Component
 
     public function addVariant(): void
     {
-        $this->variants[] = ['id' => null, 'sku' => '', 'name' => '', 'values' => [], 'serials' => ''];
+        $this->variants[] = ['id' => null, 'sku' => '', 'name' => '', 'minimum_stock' => 0, 'values' => [], 'serials' => ''];
     }
 
     public function removeVariant(int $index): void
@@ -83,10 +88,12 @@ class ProductsController extends Component
     public function save(): void
     {
         abort_unless(auth()->user()->can($this->productId ? 'editar-producto' : 'crear-producto'), 403);
+        $this->code = Str::upper(trim($this->code));
         $rules = [
-            'category_id' => ['required', Rule::exists('categories', 'id')->where('status', true)], 'code' => ['nullable', 'string', 'max:80', Rule::unique('products')->ignore($this->productId)],
-            'name' => 'required|string|max:200', 'description' => 'nullable|string|max:2000', 'tracking_type' => 'required|in:bulk,serialized', 'status' => 'boolean',
+            'category_id' => ['required', Rule::exists('categories', 'id')->where('status', true)], 'code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('products')->ignore($this->productId)],
+            'name' => 'required|string|max:200', 'description' => 'nullable|string|max:2000', 'unit' => ['required', 'string', 'max:40', 'regex:/^[\pL\pN .\/-]+$/u'], 'tracking_type' => 'required|in:bulk,serialized', 'status' => 'boolean',
             'variants' => 'required|array|min:1', 'variants.*.name' => 'nullable|string|max:150',
+            'variants.*.minimum_stock' => 'nullable|numeric|min:0|max:999999999',
         ];
         $this->validate($rules);
         if ($this->productId && (int) Product::findOrFail($this->productId)->category_id !== (int) $this->category_id) {
@@ -125,7 +132,7 @@ class ProductsController extends Component
             $this->variants = [[
                 'id' => $this->variants[0]['id'] ?? null,
                 'sku' => $this->code,
-                'name' => '', 'values' => [], 'serials' => $this->variants[0]['serials'] ?? '',
+                'name' => '', 'minimum_stock' => $this->variants[0]['minimum_stock'] ?? 0, 'values' => [], 'serials' => $this->variants[0]['serials'] ?? '',
             ]];
         }
         foreach ($this->variants as $index => &$variant) {
@@ -168,7 +175,7 @@ class ProductsController extends Component
 
         $before = $this->productId ? $this->productSnapshot(Product::findOrFail($this->productId)) : null;
         DB::transaction(function () use ($category, $before) {
-            $product = Product::updateOrCreate(['id' => $this->productId], $this->only(['category_id', 'code', 'name', 'description', 'tracking_type', 'status']));
+            $product = Product::updateOrCreate(['id' => $this->productId], $this->only(['category_id', 'code', 'name', 'description', 'unit', 'tracking_type', 'status']));
             foreach ($category->attributes->where('scope', 'product') as $attribute) {
                 $product->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $this->productValues[$attribute->id] ?? null]);
             }
@@ -178,7 +185,7 @@ class ProductsController extends Component
                     ? $product->variants()->whereKey($row['id'])->first()
                     : $product->variants()->where('sku', $row['sku'])->first();
                 $variant ??= $product->variants()->make();
-                $variant->fill(['sku' => $row['sku'], 'name' => $row['name'] ?: null, 'status' => true])->save();
+                $variant->fill(['sku' => $row['sku'], 'name' => $row['name'] ?: null, 'minimum_stock' => $product->tracking_type === 'serialized' ? 0 : ($row['minimum_stock'] ?? 0), 'status' => true])->save();
                 $kept[] = $variant->id;
                 foreach ($category->attributes->where('scope', 'variant') as $attribute) {
                     $variant->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $row['values'][$attribute->id] ?? null]);
@@ -203,12 +210,12 @@ class ProductsController extends Component
     {
         abort_unless(auth()->user()->can('editar-producto'), 403);
         $p = Product::with(['attributeValues', 'variants.attributeValues', 'variants.serializedItems'])->findOrFail($id);
-        foreach (['category_id', 'code', 'name', 'description', 'tracking_type', 'status'] as $field) {
+        foreach (['category_id', 'code', 'name', 'description', 'unit', 'tracking_type', 'status'] as $field) {
             $this->{$field} = $p->{$field};
         }
         $this->productId = $id;
         $this->productValues = $p->attributeValues->pluck('value', 'product_attribute_id')->all();
-        $this->variants = $p->variants->where('status', true)->map(fn ($v) => ['id' => $v->id, 'sku' => $v->sku, 'name' => $v->name ?? '', 'values' => $v->attributeValues->pluck('value', 'product_attribute_id')->all(), 'serials' => $v->serializedItems->where('status', '!=', 'inactive')->pluck('serial_number')->join("\n")])->values()->all();
+        $this->variants = $p->variants->where('status', true)->map(fn ($v) => ['id' => $v->id, 'sku' => $v->sku, 'name' => $v->name ?? '', 'minimum_stock' => (float) $v->minimum_stock, 'values' => $v->attributeValues->pluck('value', 'product_attribute_id')->all(), 'serials' => $v->serializedItems->where('status', '!=', 'inactive')->pluck('serial_number')->join("\n")])->values()->all();
     }
 
     public function toggle(int $id): void
@@ -224,6 +231,7 @@ class ProductsController extends Component
     {
         $this->reset(['productId', 'category_id', 'code', 'name', 'description', 'productValues', 'variants']);
         $this->tracking_type = 'bulk';
+        $this->unit = 'unidad';
         $this->status = 1;
         $this->addVariant();
         $this->resetValidation();
@@ -273,12 +281,14 @@ class ProductsController extends Component
             'categoría' => $product->category->name,
             'código' => $product->code,
             'nombre' => $product->name,
+            'unidad' => $product->unit,
             'descripción' => $product->description,
             'estado' => (bool) $product->status,
             'atributos' => $product->attributeValues->mapWithKeys(fn ($value) => [$attributeNames[$value->product_attribute_id] ?? $value->product_attribute_id => $value->value])->all(),
             'variantes' => $product->variants->map(fn ($variant) => [
                 'sku' => $variant->sku,
                 'nombre' => $variant->name,
+                'stock_mínimo' => (float) $variant->minimum_stock,
                 'atributos' => $variant->attributeValues->mapWithKeys(fn ($value) => [$attributeNames[$value->product_attribute_id] ?? $value->product_attribute_id => $value->value])->all(),
                 'identificadores_únicos' => $variant->serializedItems->mapWithKeys(fn ($item) => [$item->serial_number => $item->status])->all(),
             ])->all(),

@@ -9,6 +9,12 @@ class Log extends Model
 {
     use HasFactory;
 
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \LogicException('Los registros de auditoría son inmutables.'));
+        static::deleting(fn () => throw new \LogicException('Los registros de auditoría no pueden eliminarse.'));
+    }
+
     protected $fillable = [
         'user_id',
         'actor_login',

@@ -64,6 +64,9 @@ class BackupsController extends Component
         if (file_exists($path)) {
             $before = ['archivo' => $filename, 'tamaño_bytes' => filesize($path), 'fecha' => date('Y-m-d H:i:s', filemtime($path))];
             unlink($path);
+            if (is_file($path.'.sha256')) {
+                unlink($path.'.sha256');
+            }
             $this->logActivity('BACKUPS', 'ELIMINAR', 'Eliminación del respaldo '.$filename, null, $before, null);
             $this->dispatch('backupSuccess', 'Backup eliminado correctamente.');
         }
@@ -87,10 +90,10 @@ class BackupsController extends Component
 
             return;
         }
-
         $this->isRestoring = true;
 
         try {
+            $this->verifyBackupChecksum($path);
             $this->prepareRestore($filename);
             $this->executeRestoreFile($path);
             $this->writeRestoreAudit('COMPLETADA', $filename);
@@ -181,17 +184,30 @@ class BackupsController extends Component
         }
     }
 
+    private function verifyBackupChecksum(string $path): void
+    {
+        $checksumFile = $path.'.sha256';
+        if (! is_file($checksumFile)) {
+            return;
+        }
+        $expected = strtok(trim((string) file_get_contents($checksumFile)), " \t");
+        if (! hash_equals((string) $expected, hash_file('sha256', $path))) {
+            throw new \RuntimeException('El respaldo no superó la verificación de integridad SHA-256.');
+        }
+    }
+
     private function runMysqlRestore(string $path, string $database): void
     {
         $mysql = $this->findMysqlClient();
         $config = config('database.connections.mysql');
         $args = [$mysql, '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username']];
-        if (filled($config['password'])) {
-            $args[] = '--password='.$config['password'];
-        }
         $args[] = '--default-character-set=utf8mb4';
         $args[] = $database;
-        $process = proc_open($args, [0 => ['file', $path, 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        $environment = getenv();
+        if (filled($config['password'])) {
+            $environment['MYSQL_PWD'] = $config['password'];
+        }
+        $process = proc_open($args, [0 => ['file', $path, 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes, null, $environment);
         if (! is_resource($process)) {
             throw new \RuntimeException('No se pudo iniciar el cliente de MySQL.');
         }

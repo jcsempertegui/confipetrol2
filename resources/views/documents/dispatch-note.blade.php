@@ -1,0 +1,12 @@
+@extends('documents.layout')
+@section('title', 'Remito '.($dispatchNote->number ?: '#'.$dispatchNote->id))
+@section('content')
+<div class="head"><div><h1>Remito de {{ $dispatchNote->type === 'entry' ? 'ingreso' : 'salida' }}</h1><div class="muted">CONFIPETROL</div></div><div><strong>{{ $dispatchNote->number ?: 'BORRADOR #'.$dispatchNote->id }}</strong><br>{{ $dispatchNote->document_date->format('d/m/Y') }}</div></div>
+<div class="grid"><div><strong>Contraparte:</strong> {{ $dispatchNote->counterparty }}</div><div><strong>Estado:</strong> {{ ['draft'=>'Borrador','confirmed'=>'Confirmado','annulled'=>'Anulado'][$dispatchNote->status] }}</div><div><strong>Motivo:</strong> {{ $dispatchNote->reason ?: '—' }}</div><div><strong>Registrado por:</strong> {{ $dispatchNote->creator?->login }}</div><div><strong>Confirmado por:</strong> {{ $dispatchNote->confirmer?->login ?: '—' }}</div><div><strong>Fecha confirmación:</strong> {{ $dispatchNote->confirmed_at?->format('d/m/Y H:i') ?: '—' }}</div></div>
+@if($dispatchNote->correctedFrom)<div class="box"><strong>Documento corregido:</strong> esta versión sustituye al remito {{ $dispatchNote->correctedFrom->number }}.</div>@endif
+@if($dispatchNote->correction)<div class="box"><strong>Documento inactivo:</strong> fue sustituido por {{ $dispatchNote->correction->number ?: 'el borrador #'.$dispatchNote->correction->id }}.</div>@endif
+@if($dispatchNote->notes)<div class="box"><strong>Observaciones:</strong> {{ $dispatchNote->notes }}</div>@endif
+<table><thead><tr><th>#</th><th>Producto</th><th>SKU / variante</th><th>Series</th><th class="right">Cantidad</th></tr></thead><tbody>@foreach($dispatchNote->items as $item)<tr><td>{{ $loop->iteration }}</td><td>{{ $item->variant->product->name }}</td><td>{{ $item->variant->sku }}<br><span class="muted">{{ $item->variant->name }}</span></td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="right">{{ number_format((float)$item->quantity,3) }}</td></tr>@endforeach</tbody></table>
+@if($dispatchNote->annul_reason)<div class="box" style="margin-top:16px"><strong>Motivo de anulación:</strong> {{ $dispatchNote->annul_reason }}</div>@endif
+<div class="signatures"><div class="line">Responsable de almacén</div><div class="line">Entrega / recepción contraparte</div></div>
+@endsection

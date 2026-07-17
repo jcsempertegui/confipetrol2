@@ -1,102 +1,137 @@
 @push('title', 'Roles')
 
 <div class="page-content">
-    <div class="row align-items-center mb-3 px-2">
-        <div class="col-12 d-flex justify-content-between align-items-center">
-            <ol class="breadcrumb mb-0 d-flex align-items-center">
-                <li class="breadcrumb-item text-primary">Administracion</li>
-                <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Roles</li>
-            </ol>
+    <div class="module-header">
+        <div>
+            <h4 class="mb-1">Roles y permisos</h4>
+            <p class="text-muted mb-0">Define qué acciones puede realizar cada perfil dentro del sistema.</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="module-counter">{{ $roles->total() }} registrados</span>
             @can('crear-rol')
-            @include('components.tools.buttonRegister')
+                <button type="button" wire:click="resetInputFields" data-bs-toggle="modal" data-bs-target="#theModal" class="btn btn-primary">
+                    <i class="bx bx-plus me-1"></i>Nuevo rol
+                </button>
             @endcan
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header d-flex justify-content-between align-items-center px-3 py-2">
-            <div class="d-flex align-items-center gap-2">
-                <i class="bx bx-box"></i>
-                <span class="fw-semibold">Listar Roles</span>
+    <div class="card module-list-card">
+        <div class="card-header filter-header">
+            <div class="row g-2 align-items-center">
+                <div class="col-md-8">
+                    <div class="input-group">
+                        <span class="input-group-text"><i class="bx bx-search"></i></span>
+                        <input
+                            type="search"
+                            wire:model.live.debounce.500ms="searchTerm"
+                            class="form-control"
+                            placeholder="Buscar por nombre del rol"
+                            maxlength="55"
+                            autocomplete="off"
+                            aria-label="Buscar roles"
+                        >
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="input-group">
+                        <label class="input-group-text" for="roles-per-page">Mostrar</label>
+                        <select id="roles-per-page" wire:model.live="perPage" class="form-select" aria-label="Registros por página">
+                            @foreach($perPageOptions as $option)
+                                <option value="{{ $option }}">{{ $option }} registros</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="card-body px-3">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2 mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="text-muted">Mostrar</span>
-                    <select wire:model.live="perPage" class="form-select form-select-sm" style="width: auto;">
-                        @foreach ($perPageOptions as $option)
-                        <option value="{{ $option }}">{{ $option }}</option>
-                        @endforeach
-                    </select>
-                    <span class="text-muted">registros</span>
-                </div> @include('components.tools.searchbox')
-            </div>
-
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover align-middle table-striped" style="width: 100%;">                    <thead>
+                <table class="table table-hover align-middle mb-0 table-with-actions">
+                    <thead>
                         <tr>
-                            <th>N°</th>
-                            <th>ROL</th>
-                            <th>FECHA</th>
-                            <th>ESTADO</th>
-                            <th>ACCIONES</th>
+                            <th>Rol</th>
+                            <th>Fecha de creación</th>
+                            <th>Estado</th>
+                            <th class="text-end">Acciones</th>
                         </tr>
                     </thead>
                     <tbody>
-                        @if ($roles->isEmpty())
-                        <tr>
-                            <td colspan="7" class="text-center">No se encontraron registros.</td>
-                        </tr>
-                        @else
-                        @foreach($roles as $index => $role)
-                        <tr>
-                            <td>{{ $startCount - $index }}</td>
-
-                            <td>{{$role->name}}</td>
-                            <td>{{$role->created_at}}</td>
-                            <td>
-                                @if($role->status == 1)
-                                <div class="badge rounded-pill text-success bg-light-success text-uppercase">
-                                    ACTIVO
-                                </div>
-                                @else
-                                <div class="badge rounded-pill text-danger bg-light-danger text-uppercase">
-                                    INACTIVO
-                                </div>
-                                @endif
-                            </td>
-                            <td>
-                                <div class="d-flex order-actions">
+                        @forelse($roles as $role)
+                            <tr wire:key="role-row-{{ $role->id }}">
+                                <td>
+                                    <strong>{{ $role->name }}</strong>
+                                    <div class="small text-muted">Perfil de acceso del sistema</div>
+                                </td>
+                                <td class="text-nowrap">{{ $role->created_at?->format('d/m/Y H:i') ?? '—' }}</td>
+                                <td>
+                                    <span class="badge bg-{{ $role->status ? 'success' : 'secondary' }}">
+                                        {{ $role->status ? 'Activo' : 'Inactivo' }}
+                                    </span>
+                                </td>
+                                <td class="text-end text-nowrap">
                                     @can('editar-rol')
-                                    <a href="javascript:;" wire:click="edit({{ $role->id }})" data-bs-toggle="modal"
-                                        data-bs-target="#theModal" class="btn-action-primary"><i
-                                            class="bx bxs-edit-alt"></i></a>
+                                        <button
+                                            type="button"
+                                            wire:click="edit({{ $role->id }})"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#theModal"
+                                            class="btn btn-sm btn-outline-primary"
+                                            title="Editar rol"
+                                            aria-label="Editar rol {{ $role->name }}"
+                                        >
+                                            <i class="bx bx-edit"></i>
+                                        </button>
                                     @endcan
-                                    @if($role->status == 1)
-                                    @can('eliminar-rol')
-                                    <a href="javascript:;" wire:click="$dispatch('delete-confirme', {{$role->id}})"
-                                        class="btn-action-danger ms-1"><i class="bx bxs-trash"></i></a>
-                                    @endcan
-                                    @else
-                                    @can('restaurar-rol')
-                                    <a href="javascript:;" wire:click="$dispatch('delete-confirme', {{$role->id}})"
-                                        class="btn-action-warning ms-1"><i class="bx bx-refresh"></i></a>
 
-                                    @endcan
+                                    @if($role->status)
+                                        @can('eliminar-rol')
+                                            <button
+                                                type="button"
+                                                wire:click="$dispatch('delete-confirme', {{ $role->id }})"
+                                                class="btn btn-sm btn-outline-danger"
+                                                title="Desactivar rol"
+                                                aria-label="Desactivar rol {{ $role->name }}"
+                                            >
+                                                <i class="bx bx-power-off"></i>
+                                            </button>
+                                        @endcan
+                                    @else
+                                        @can('restaurar-rol')
+                                            <button
+                                                type="button"
+                                                wire:click="$dispatch('delete-confirme', {{ $role->id }})"
+                                                class="btn btn-sm btn-outline-success"
+                                                title="Activar rol"
+                                                aria-label="Activar rol {{ $role->name }}"
+                                            >
+                                                <i class="bx bx-refresh"></i>
+                                            </button>
+                                        @endcan
                                     @endif
-                                </div>
-                            </td>
-                        </tr>
-                        @endforeach
-                        @endif
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="4" class="text-center text-muted py-5">
+                                    <i class="bx bx-search-alt fs-2 d-block mb-2"></i>
+                                    No se encontraron roles.
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
-            {{ $roles->links() }}
         </div>
+
+        @if($roles->hasPages())
+            <div class="card-footer">{{ $roles->links() }}</div>
+        @endif
     </div>
+
     @include('livewire.roles.form')
 </div>
 
@@ -125,17 +160,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
     Livewire.on('delete-confirme', id => {
         Swal.fire({
-            title: "Esta seguro de eliminar?",
-            text: "El registro no se eliminará de forma permanente, solo cambiará el estado!",
-            icon: "warning",
+            title: '¿Cambiar el estado del rol?',
+            text: 'Los usuarios asociados perderán o recuperarán el acceso correspondiente.',
+            icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: "#3085d6",
-            cancelButtonColor: "#d33",
-            confirmButtonText: "Si, Eliminar!"
+            confirmButtonColor: '#0d6efd',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Sí, continuar',
+            cancelButtonText: 'Cancelar'
         }).then((result) => {
             if (result.isConfirmed) {
                 @this.call('Destroy', id)
-                swal.close();
+                Swal.close();
             }
         });
     });

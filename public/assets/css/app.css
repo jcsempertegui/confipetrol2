@@ -1,5 +1,5 @@
 /*
-Template Name: MASTEC DIGITAL
+Template Name: CONFIPETROL
 Author: LSM
 Email: luissantander2002@gmail.com
 Color Base:: #0057a7 -> minimalista | #fe082f -> elegante
@@ -8199,16 +8199,18 @@ body.dark-mode .branch-option .badge-current {
 
 /* Mantiene visibles las acciones cuando una tabla necesita desplazamiento horizontal. */
 @media (max-width: 1199.98px) {
-    .table-responsive > .table:not(.audit-change-table) th:last-child,
-    .table-responsive > .table:not(.audit-change-table) td:last-child {
+    .table-responsive > .table.table-with-actions th:last-child,
+    .table-responsive > .table.table-with-actions td:last-child {
         position: sticky;
         right: 0;
         z-index: 2;
         background: var(--bs-body-bg, #fff);
         box-shadow: -5px 0 8px rgba(0, 0, 0, .06);
     }
-    .table-responsive > .table:not(.audit-change-table) thead th:last-child { z-index: 3; background: #f7f8fa; }
-    .table-responsive > .table:not(.audit-change-table) tbody tr:hover td:last-child { background: #f7f9fc; }
+    .table-responsive > .table.table-with-actions thead th:last-child { z-index: 3; background: #f7f8fa; }
+    .table-responsive > .table.table-with-actions tbody tr:hover td:last-child { background: #f7f9fc; }
+    body.dark-mode .table-responsive > .table.table-with-actions thead th:last-child,
+    body.dark-mode .table-responsive > .table.table-with-actions td:last-child { background: #272b30; }
 }
 
 /* En portátiles y pantallas medianas, Logs usa tarjetas para no ocultar acciones. */

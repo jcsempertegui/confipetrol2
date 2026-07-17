@@ -1,5 +1,5 @@
 <div class="page-content audit-page">
-    <div class="d-flex justify-content-between align-items-start mb-4"><div><h4 class="mb-1">Trazabilidad del sistema</h4><p class="text-muted mb-0">Consulta quién realizó cada acción y qué información cambió.</p></div></div>
+    <div class="module-header"><div><h4 class="mb-1">Trazabilidad del sistema</h4><p class="text-muted mb-0">Consulta quién realizó cada acción y qué información cambió.</p></div>@can('exportar-log')<button wire:click="exportCsv" wire:loading.attr="disabled" class="btn btn-success"><i class="bx bx-download me-1"></i>Guardar registros CSV</button>@endcan</div>
     <div class="row g-3 mb-3">
         <div class="col-6 col-lg-4"><div class="card h-100 mb-0"><div class="card-body py-3"><small class="text-muted">Eventos encontrados</small><div class="fs-4 fw-bold">{{ $summary['total'] }}</div></div></div></div>
         <div class="col-6 col-lg-4"><div class="card h-100 mb-0"><div class="card-body py-3"><small class="text-muted">Modificaciones</small><div class="fs-4 fw-bold text-primary">{{ $summary['changes'] }}</div></div></div></div>

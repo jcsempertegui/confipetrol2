@@ -49,10 +49,6 @@ class DatabaseBackupCommand extends Command
         $args[] = '--port='.$port;
         $args[] = '--user='.$username;
 
-        if (! empty($password)) {
-            $args[] = '--password='.$password;
-        }
-
         $args[] = '--single-transaction';
         $args[] = '--routines';
         $args[] = '--triggers';
@@ -65,7 +61,11 @@ class DatabaseBackupCommand extends Command
             2 => ['pipe', 'w'],
         ];
 
-        $process = proc_open($args, $descriptors, $pipes);
+        $environment = getenv();
+        if (! empty($password)) {
+            $environment['MYSQL_PWD'] = $password;
+        }
+        $process = proc_open($args, $descriptors, $pipes, null, $environment);
 
         if (! is_resource($process)) {
             $this->error('No se pudo iniciar el proceso de backup.');
@@ -86,6 +86,8 @@ class DatabaseBackupCommand extends Command
 
             return 1;
         }
+
+        file_put_contents($filepath.'.sha256', hash_file('sha256', $filepath)."  {$filename}\n", LOCK_EX);
 
         $this->cleanOldBackups($backupDir);
 
@@ -141,6 +143,9 @@ class DatabaseBackupCommand extends Command
 
         foreach (array_slice($files, 0, count($files) - 30) as $old) {
             unlink($old);
+            if (is_file($old.'.sha256')) {
+                unlink($old.'.sha256');
+            }
         }
     }
 

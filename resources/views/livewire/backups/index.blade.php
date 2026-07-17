@@ -1,122 +1,134 @@
 @push('title', 'Backups de Base de Datos')
-<div>
-    <div class="page-content"
-        style="height: calc(100vh - 60px); overflow-y: auto; display: flex; flex-direction: column; padding-bottom: 0;">
 
-        <div class="row align-items-center mb-2 px-2" style="flex-shrink: 0;">
-            <div class="col-12 d-flex justify-content-between align-items-center">
-                <ol class="breadcrumb mb-0 d-flex align-items-center">
-                    <li class="breadcrumb-item">Administración</li>
-                    <li class="breadcrumb-item" style="font-weight: 500; font-size: 18px;">Backups de Base de Datos</li>
-                </ol>
+<div>
+    <div class="page-content">
+        <div class="module-header">
+            <div>
+                <h4 class="mb-1">Backups de base de datos</h4>
+                <p class="text-muted mb-0">Crea, descarga y administra los respaldos de seguridad del sistema.</p>
+            </div>
+
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <span class="module-counter">{{ count($backups) }} archivos</span>
+
+                @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
+                    <button
+                        type="button"
+                        data-bs-toggle="modal"
+                        data-bs-target="#uploadRestoreModal"
+                        class="btn btn-outline-warning"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmRestoreFromList,uploadAndRestore"
+                    >
+                        <i class="bx bx-upload me-1"></i>Restaurar archivo
+                    </button>
+                @endif
+
+                @can('crear-backup')
+                    <button
+                        type="button"
+                        wire:click="createBackup"
+                        wire:loading.attr="disabled"
+                        wire:target="createBackup"
+                        class="btn btn-primary"
+                    >
+                        <span wire:loading.remove wire:target="createBackup">
+                            <i class="bx bx-plus-circle me-1"></i>Crear backup
+                        </span>
+                        <span wire:loading wire:target="createBackup">
+                            <i class="bx bx-spin bx-loader me-1"></i>Generando...
+                        </span>
+                    </button>
+                @endcan
             </div>
         </div>
 
-        <div class="row g-2 mb-2 px-1" style="flex-shrink: 0;">
-            <div class="col-6 col-md-3">
-                <div class="card text-center py-2">
-                    <div class="card-body py-1 px-2">
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <span class="detail-label">Backups guardados</span>
                         <div class="fs-4 fw-bold text-primary">{{ count($backups) }}</div>
-                        <div class="small text-muted">Backups guardados</div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="card text-center py-2">
-                    <div class="card-body py-1 px-2">
+
+            <div class="col-6 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <span class="detail-label">Espacio total</span>
                         <div class="fs-5 fw-bold text-success">{{ $backupDirSize }}</div>
-                        <div class="small text-muted">Espacio total</div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="card text-center py-2">
-                    <div class="card-body py-1 px-2">
-                        <div class="fs-6 fw-bold text-info">
+
+            <div class="col-6 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <span class="detail-label">Último backup</span>
+                        <div class="fw-semibold text-info">
                             @if(count($backups) > 0)
                                 {{ $backups[0]['date']->format('d/m/Y H:i') }}
                             @else
                                 Sin backups
                             @endif
                         </div>
-                        <div class="small text-muted">Último backup</div>
                     </div>
                 </div>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="card text-center py-2">
-                    <div class="card-body py-1 px-2">
-                        <div class="fs-6 fw-bold text-warning">
-                            @php $todayHasBackup = collect($backups)->firstWhere('is_today', true); @endphp
+
+            <div class="col-6 col-lg-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <span class="detail-label">Backup de hoy</span>
+                        @php $todayHasBackup = collect($backups)->firstWhere('is_today', true); @endphp
+                        <div class="fw-semibold {{ $todayHasBackup ? 'text-success' : 'text-warning' }}">
                             @if($todayHasBackup)
-                                <i class="bx bx-check-circle text-success"></i> Realizado
+                                <i class="bx bx-check-circle me-1"></i>Realizado
                             @else
-                                <i class="bx bx-time-five text-warning"></i> Pendiente
+                                <i class="bx bx-time-five me-1"></i>Pendiente
                             @endif
                         </div>
-                        <div class="small text-muted">Backup de hoy</div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <div class="card" style="flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden;">
-            <div class="card-header d-flex justify-content-between align-items-center px-3 py-2" style="flex-shrink: 0;">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bx bx-data"></i>
-                    <span class="fw-semibold">Historial de Backups (máx. 30 archivos)</span>
+        <div class="card module-list-card">
+            <div class="card-header">
+                <div>
+                    <strong><i class="bx bx-data me-1"></i>Historial de backups</strong>
+                    <div class="form-card-subtitle">Se conservan como máximo 30 archivos.</div>
                 </div>
-                <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="badge bg-secondary">{{ count($backups) }} archivos</span>
-                    @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
-                    <button type="button"
-                        data-bs-toggle="modal" data-bs-target="#uploadRestoreModal"
-                        class="btn btn-outline-warning btn-sm"
-                        wire:loading.attr="disabled"
-                        wire:target="confirmRestoreFromList,uploadAndRestore">
-                        <i class="bx bx-upload me-1"></i> RESTAURAR ARCHIVO
-                    </button>
-                    @endif
-                    @can('crear-backup')
-                    <button wire:click="createBackup"
-                        wire:loading.attr="disabled"
-                        wire:target="createBackup"
-                        class="btn btn-primary btn-sm">
-                        <span wire:loading.remove wire:target="createBackup">
-                            <i class="bx bx-plus-circle me-1"></i> CREAR BACKUP AHORA
-                        </span>
-                        <span wire:loading wire:target="createBackup">
-                            <i class="bx bx-spin bx-loader me-1"></i> GENERANDO...
-                        </span>
-                    </button>
-                    @endcan
-                </div>
+                <span class="module-counter">{{ count($backups) }} archivos</span>
             </div>
 
-            <div class="card-body px-3"
-                style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column;">
-
-                <div wire:loading wire:target="confirmRestoreFromList,uploadAndRestore"
-                    class="alert alert-warning py-2 mb-2 small" style="flex-shrink: 0;">
-                    <i class="bx bx-spin bx-loader me-2"></i> Restaurando base de datos, por favor espere...
+            <div class="card-body p-0">
+                <div
+                    wire:loading
+                    wire:target="confirmRestoreFromList,uploadAndRestore"
+                    class="alert alert-warning m-3 mb-0"
+                    role="status"
+                >
+                    <i class="bx bx-spin bx-loader me-2"></i>Restaurando la base de datos, por favor espera...
                 </div>
 
-                <div class="table-responsive" style="flex: 1; min-height: 0; overflow: auto;">
-                    <table class="table table-hover align-middle table-striped table-sm" style="width: 100%;">
-                        <thead class="sticky-top">
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle table-with-actions">
+                        <thead>
                             <tr>
-                                <th style="width: 50px">N°</th>
-                                <th>NOMBRE DEL ARCHIVO</th>
-                                <th style="width: 150px">TIPO</th>
-                                <th style="width: 170px">FECHA Y HORA</th>
-                                <th style="width: 100px">TAMAÑO</th>
-                                <th style="width: 80px">ESTADO</th>
-                                <th style="width: 140px" class="text-center">ACCIONES</th>
+                                <th>N.º</th>
+                                <th>Nombre del archivo</th>
+                                <th>Tipo</th>
+                                <th>Fecha y hora</th>
+                                <th>Tamaño</th>
+                                <th>Estado</th>
+                                <th class="text-end">Acciones</th>
                             </tr>
                         </thead>
                         <tbody>
                             @forelse($backups as $index => $backup)
-                                <tr>
+                                <tr wire:key="backup-row-{{ md5($backup['filename']) }}">
                                     <td class="text-muted">{{ $index + 1 }}</td>
                                     <td>
                                         <div class="d-flex align-items-center gap-2">
@@ -125,10 +137,8 @@
                                         </div>
                                     </td>
                                     <td><span class="badge {{ $backup['type']['class'] }}">{{ $backup['type']['label'] }}</span></td>
-                                    <td class="small text-nowrap">
-                                        {{ $backup['date']->format('d/m/Y H:i:s') }}
-                                    </td>
-                                    <td class="small">{{ $backup['size'] }}</td>
+                                    <td class="text-nowrap">{{ $backup['date']->format('d/m/Y H:i:s') }}</td>
+                                    <td>{{ $backup['size'] }}</td>
                                     <td>
                                         @if($backup['is_today'])
                                             <span class="badge rounded-pill text-success bg-light-success border border-success">Hoy</span>
@@ -136,27 +146,38 @@
                                             <span class="badge rounded-pill text-muted bg-light">Anterior</span>
                                         @endif
                                     </td>
-                                    <td class="text-center">
-                                        <a href="{{ route('backup.download', ['filename' => $backup['filename']]) }}"
-                                            class="btn btn-outline-primary btn-sm p-0 px-1 me-1"
-                                            title="Descargar backup">
+                                    <td class="text-end text-nowrap">
+                                        <a
+                                            href="{{ route('backup.download', ['filename' => $backup['filename']]) }}"
+                                            class="btn btn-outline-primary btn-sm"
+                                            title="Descargar backup"
+                                            aria-label="Descargar {{ $backup['filename'] }}"
+                                        >
                                             <i class="bx bx-download"></i>
                                         </a>
+
                                         @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
-                                        <button type="button"
-                                            class="btn btn-outline-warning btn-sm p-0 px-1 me-1"
-                                            title="Restaurar este backup"
-                                            onclick="confirmRestoreBackup('{{ $backup['filename'] }}')">
-                                            <i class="bx bx-reset"></i>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-warning btn-sm"
+                                                title="Restaurar este backup"
+                                                aria-label="Restaurar {{ $backup['filename'] }}"
+                                                onclick="confirmRestoreBackup('{{ $backup['filename'] }}')"
+                                            >
+                                                <i class="bx bx-reset"></i>
+                                            </button>
                                         @endif
+
                                         @can('eliminar-backup')
-                                        <button type="button"
-                                            class="btn btn-outline-danger btn-sm p-0 px-1"
-                                            title="Eliminar backup"
-                                            onclick="confirmDeleteBackup('{{ $backup['filename'] }}')">
-                                            <i class="bx bx-trash"></i>
-                                        </button>
+                                            <button
+                                                type="button"
+                                                class="btn btn-outline-danger btn-sm"
+                                                title="Eliminar backup"
+                                                aria-label="Eliminar {{ $backup['filename'] }}"
+                                                onclick="confirmDeleteBackup('{{ $backup['filename'] }}')"
+                                            >
+                                                <i class="bx bx-trash"></i>
+                                            </button>
                                         @endcan
                                     </td>
                                 </tr>
@@ -165,114 +186,90 @@
                                     <td colspan="7" class="text-center text-muted py-5">
                                         <i class="bx bx-data fs-2 d-block mb-2"></i>
                                         <div>No hay backups disponibles.</div>
-                                        <div class="small mt-1">Haga clic en <strong>CREAR BACKUP AHORA</strong> para generar el primer backup.</div>
+                                        <div class="small mt-1">Usa <strong>Crear backup</strong> para generar el primer respaldo.</div>
                                     </td>
                                 </tr>
                             @endforelse
                         </tbody>
                     </table>
                 </div>
+            </div>
 
-                <div class="border-top pt-2 mt-1" style="flex-shrink: 0;">
-                    <div class="row g-2 small text-muted">
-                        <div class="col-md-6">
-                            <i class="bx bx-info-circle me-1"></i>
-                            El backup automático se ejecuta diariamente a la 1:00 AM.
-                        </div>
-                        <div class="col-md-6 text-md-end">
-                            <i class="bx bx-folder me-1"></i>
-                            Se conservan los últimos <strong>30</strong> backups automáticamente.
-                        </div>
-                        <div class="col-12">
-                            <i class="bx bx-shield-quarter me-1"></i>
-                            Antes de cada restauración se crea un respaldo de seguridad identificado como <strong>Pre-restauración</strong>.
-                        </div>
+            <div class="card-footer py-3">
+                <div class="row g-2 small text-muted">
+                    <div class="col-md-6">
+                        <i class="bx bx-info-circle me-1"></i>El backup automático se ejecuta diariamente a la 1:00 a. m.
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <i class="bx bx-folder me-1"></i>Se conservan automáticamente los últimos <strong>30</strong> backups.
+                    </div>
+                    <div class="col-12">
+                        <i class="bx bx-shield-quarter me-1"></i>Antes de restaurar se crea un respaldo de seguridad identificado como <strong>Pre-restauración</strong>.
                     </div>
                 </div>
             </div>
         </div>
 
-        @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
-        <div class="card mt-2 mb-2" style="flex-shrink: 0;">
-            <div class="card-header px-3 py-2">
-                <div class="d-flex align-items-center gap-2">
-                    <i class="bx bx-cloud-upload"></i>
-                    <span class="fw-semibold">Restaurar desde Archivo Externo</span>
-                </div>
-            </div>
-            <div class="card-body px-3 py-3">
-                <div class="row g-3 align-items-end">
-                    <div class="col-md-8">
-                        <label class="form-label small fw-semibold">Seleccionar archivo .sql</label>
-                        <input type="file" wire:model="sqlFile" accept=".sql" class="form-control form-control-sm">
-                        @error('sqlFile')
-                            <span class="text-danger small d-block mt-1">{{ $message }}</span>
-                        @enderror
-                        <div class="small text-muted mt-1">
-                            <i class="bx bx-error-circle text-warning me-1"></i>
-                            Esta acción reemplazará toda la base de datos actual. Use con precaución.
+    @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
+        <div wire:ignore.self class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content module-form-card">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title"><i class="bx bx-upload me-1"></i>Restaurar desde un archivo</h5>
+                            <div class="form-card-subtitle">Selecciona un respaldo SQL externo.</div>
+                        </div>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <div class="alert alert-warning mb-3">
+                            <i class="bx bx-error me-1"></i>Esta acción reemplazará <strong>toda</strong> la base de datos actual. Es irreversible.
+                        </div>
+
+                        <label for="backup-sql-file" class="form-label">Archivo SQL <span class="text-danger">*</span></label>
+                        <input
+                            id="backup-sql-file"
+                            type="file"
+                            wire:model="sqlFile"
+                            accept=".sql"
+                            class="form-control @error('sqlFile') is-invalid @enderror"
+                        >
+                        @error('sqlFile')<div class="invalid-feedback">{{ $message }}</div>@enderror
+
+                        <div class="form-text mt-2">Formato permitido: .sql. Tamaño máximo: 100 MB.</div>
+
+                        <div wire:loading wire:target="sqlFile" class="small text-primary mt-2" role="status">
+                            <i class="bx bx-loader-alt bx-spin me-1"></i>Cargando archivo...
                         </div>
                     </div>
-                    <div class="col-md-4">
-                        <button wire:click="uploadAndRestore"
+
+                    <div class="modal-footer form-actions mt-0">
+                        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancelar</button>
+                        <button
+                            type="button"
+                            wire:click="uploadAndRestore"
                             wire:loading.attr="disabled"
                             wire:target="uploadAndRestore,sqlFile"
-                            class="btn btn-warning btn-sm w-100">
+                            class="btn btn-warning"
+                            onclick="bootstrap.Modal.getInstance(document.getElementById('uploadRestoreModal'))?.hide()"
+                        >
                             <span wire:loading.remove wire:target="uploadAndRestore,sqlFile">
-                                <i class="bx bx-upload me-1"></i> RESTAURAR ARCHIVO
+                                <i class="bx bx-reset me-1"></i>Restaurar backup
                             </span>
                             <span wire:loading wire:target="sqlFile">
-                                <i class="bx bx-spin bx-loader me-1"></i> CARGANDO...
+                                <i class="bx bx-spin bx-loader me-1"></i>Cargando...
                             </span>
                             <span wire:loading wire:target="uploadAndRestore">
-                                <i class="bx bx-spin bx-loader me-1"></i> RESTAURANDO...
+                                <i class="bx bx-spin bx-loader me-1"></i>Restaurando...
                             </span>
                         </button>
                     </div>
                 </div>
             </div>
         </div>
-        @endif
-    </div>
-
-    @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
-    <div wire:ignore.self class="modal fade" id="uploadRestoreModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title"><i class="bx bx-upload me-2"></i>Restaurar desde Archivo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-warning py-2 small mb-3">
-                        <i class="bx bx-error me-1"></i>
-                        Esta acción reemplazará <strong>toda</strong> la base de datos actual. Es irreversible.
-                    </div>
-                    <label class="form-label fw-semibold">Seleccionar archivo .sql</label>
-                    <input type="file" wire:model="sqlFile" accept=".sql" class="form-control">
-                    @error('sqlFile')
-                        <span class="text-danger small d-block mt-1">{{ $message }}</span>
-                    @enderror
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancelar</button>
-                    <button wire:click="uploadAndRestore"
-                        wire:loading.attr="disabled"
-                        wire:target="uploadAndRestore,sqlFile"
-                        class="btn btn-warning btn-sm"
-                        onclick="bootstrap.Modal.getInstance(document.getElementById('uploadRestoreModal'))?.hide()">
-                        <span wire:loading.remove wire:target="uploadAndRestore">
-                            <i class="bx bx-upload me-1"></i> RESTAURAR
-                        </span>
-                        <span wire:loading wire:target="uploadAndRestore">
-                            <i class="bx bx-spin bx-loader me-1"></i> RESTAURANDO...
-                        </span>
-                    </button>
-                </div>
-            </div>
-        </div>
-    </div>
     @endif
+    </div>
 
     <script>
     function confirmDeleteBackup(filename) {
@@ -291,10 +288,8 @@
                     @this.call('confirmDelete', filename);
                 }
             });
-        } else {
-            if (confirm('¿Eliminar este backup?\n' + filename)) {
-                @this.call('confirmDelete', filename);
-            }
+        } else if (confirm('¿Eliminar este backup?\n' + filename)) {
+            @this.call('confirmDelete', filename);
         }
     }
 
@@ -314,10 +309,8 @@
                     @this.call('confirmRestoreFromList', filename);
                 }
             });
-        } else {
-            if (confirm('¿Restaurar la base de datos desde?\n' + filename + '\n\nEsta acción es irreversible.')) {
-                @this.call('confirmRestoreFromList', filename);
-            }
+        } else if (confirm('¿Restaurar la base de datos desde?\n' + filename + '\n\nEsta acción es irreversible.')) {
+            @this.call('confirmRestoreFromList', filename);
         }
     }
 
