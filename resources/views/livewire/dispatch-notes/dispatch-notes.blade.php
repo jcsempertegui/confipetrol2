@@ -45,7 +45,8 @@
                         </div>
                         <div class="col-md-6 col-lg-3">
                             <label class="form-label">Número de remito <span class="field-optional">Opcional</span></label>
-                            <input wire:model="number" maxlength="30" class="form-control text-uppercase @error('number') is-invalid @enderror" placeholder="Se genera al confirmar">
+                            <input wire:model="number" maxlength="30" class="form-control text-uppercase @error('number') is-invalid @enderror" placeholder="Automático: REM-01-18072026-RGD">
+                            <div class="form-text">La secuencia diaria es compartida por remitos de ingreso y salida.</div>
                             @error('number')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-6 col-lg-3">
@@ -187,6 +188,7 @@
                                     @if($note->status === 'draft')
                                         @can('editar-remito')<button wire:click="edit({{ $note->id }})" class="btn btn-sm btn-outline-primary"><i class="bx bx-edit me-1"></i>Editar</button>@endcan
                                         @can('confirmar-remito')<button wire:click="confirm({{ $note->id }})" wire:confirm="¿Confirmar este remito y actualizar el inventario?" class="btn btn-sm btn-success">Confirmar</button>@endcan
+                                        @can('eliminar-remito')<button wire:click="deleteDraft({{ $note->id }})" wire:confirm="¿Eliminar definitivamente este remito en borrador? Sus datos quedarán registrados en el historial." class="btn btn-sm btn-outline-danger"><i class="bx bx-trash me-1"></i>Eliminar</button>@endcan
                                     @elseif($note->status === 'confirmed')
                                         @can('editar-remito')<button wire:click="correct({{ $note->id }})" wire:confirm="Se creará una versión editable. El original seguirá vigente hasta confirmar los cambios. ¿Continuar?" class="btn btn-sm btn-outline-primary"><i class="bx bx-edit me-1"></i>Editar</button>@endcan
                                         @can('anular-remito')<button onclick="const m=prompt('Motivo de anulación (mínimo 10 caracteres):'); if(m){$wire.set('annulReason',m).then(()=>$wire.annul({{ $note->id }}))}" class="btn btn-sm btn-outline-danger">Anular</button>@endcan

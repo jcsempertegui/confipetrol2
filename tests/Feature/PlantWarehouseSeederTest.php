@@ -92,7 +92,9 @@ it('loads a coherent plant warehouse dataset without changing it on a second run
         ->and(SerializedItem::count())->toBe(6)
         ->and(SerializedItem::where('status', 'assigned')->count())->toBe(5)
         ->and(SerializedItem::where('status', 'available')->count())->toBe(1)
-        ->and(Worker::count())->toBe(10);
+        ->and(Worker::count())->toBe(10)
+        ->and(Worker::where('code', 'MTTO-ELEC-01-RGD')->exists())->toBeTrue()
+        ->and(Worker::where('code', 'not like', '%-RGD')->count())->toBe(0);
 
     expect(User::count())->toBe(5)
         ->and(User::where('id', '!=', $admin->id)->count())->toBe(4)

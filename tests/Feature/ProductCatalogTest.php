@@ -54,7 +54,10 @@ it('creates a simple asset without exposing variants', function () {
     $values = $category->attributes->pluck('id')->mapWithKeys(fn ($id, $i) => [$id => ['Toshiba', 'Satellite', 'SN-001'][$i]])->all();
     Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', 'Laptop Toshiba')->set('unit', 'unidad')
         ->set('productValues', $values)->call('save')->assertHasNoErrors();
-    expect(Product::first()->code)->toBe('ACT-0001')->and(Product::first()->unit)->toBe('unidad')->and(Product::first()->variants)->toHaveCount(1);
+    expect(Product::first()->code)->toBe('ACT-001-RGD')
+        ->and(Product::first()->variants->first()->sku)->toBe('ACT-001-01-RGD')
+        ->and(Product::first()->unit)->toBe('unidad')
+        ->and(Product::first()->variants)->toHaveCount(1);
     $log = Log::where('modulo', 'PRODUCTOS')->latest()->first();
     expect($log->actor_login)->toBe($this->user->login)
         ->and(collect($log->changes())->pluck('field'))->toContain('nombre', 'unidad', 'atributos › Marca', 'atributos › Modelo', 'atributos › Número de serie');
@@ -68,10 +71,11 @@ it('creates one product with multiple size variants', function () {
     Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('code', $prefix)->set('name', 'Guante anticorte')
         ->set('variants', [
             ['id' => null, 'sku' => '', 'name' => 'Talla 7', 'values' => [$size->id => '7'], 'serials' => ''],
-            ['id' => null, 'sku' => '', 'name' => 'Talla 8', 'values' => [$size->id => '8'], 'serials' => ''],
+            ['id' => null, 'sku' => '02', 'name' => 'Talla 8', 'values' => [$size->id => '8'], 'serials' => ''],
         ])->call('save')->assertHasNoErrors();
     expect(Product::first()->variants)->toHaveCount(2)
-        ->and(Product::first()->variants->pluck('sku')->all())->toBe([strtoupper($prefix).'-7', strtoupper($prefix).'-8']);
+        ->and(Product::first()->code)->toBe(strtoupper($prefix).'-RGD')
+        ->and(Product::first()->variants->pluck('sku')->all())->toBe([strtoupper($prefix).'-01-RGD', strtoupper($prefix).'-02-RGD']);
 });
 
 it('enforces globally unique serial numbers', function () {
@@ -114,7 +118,7 @@ it('reserves sequential product codes per category', function () {
         Livewire::test(ProductsController::class)->set('category_id', $category->id)->set('name', $name)->call('save')->assertHasNoErrors();
     }
 
-    expect(Product::where('category_id', $category->id)->orderBy('id')->pluck('code')->all())->toBe(['HER-0001', 'HER-0002'])
+    expect(Product::where('category_id', $category->id)->orderBy('id')->pluck('code')->all())->toBe(['HER-001-RGD', 'HER-002-RGD'])
         ->and($category->fresh()->next_product_number)->toBe(3);
 });
 

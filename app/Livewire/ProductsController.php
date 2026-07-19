@@ -5,6 +5,7 @@ namespace App\Livewire;
 use App\Models\Category;
 use App\Models\Product;
 use App\Models\SerializedItem;
+use App\Services\CodeGenerator;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -53,9 +54,11 @@ class ProductsController extends Component
         $categories = Category::with(['attributes' => fn ($q) => $q->where('product_attributes.status', true)])->where('status', true)->orderBy('name')->get();
 
         $selected = $categories->firstWhere('id', (int) $this->category_id);
-        $codePreview = $selected ? Str::upper($selected->code).'-'.str_pad((string) $selected->next_product_number, 4, '0', STR_PAD_LEFT) : null;
+        $codes = app(CodeGenerator::class);
+        $codePreview = $selected ? $codes->productCode($selected, (int) $selected->next_product_number) : null;
+        $skuPreview = $codePreview ? $codes->variantSku($codePreview, 1) : null;
 
-        return view('livewire.products.products', compact('products', 'categories', 'codePreview'))->extends('layouts.theme.app');
+        return view('livewire.products.products', compact('products', 'categories', 'codePreview', 'skuPreview'))->extends('layouts.theme.app');
     }
 
     public function updatedSearchTerm(): void
@@ -89,6 +92,9 @@ class ProductsController extends Component
     {
         abort_unless(auth()->user()->can($this->productId ? 'editar-producto' : 'crear-producto'), 403);
         $this->code = Str::upper(trim($this->code));
+        if (! $this->productId && filled($this->code)) {
+            $this->code = app(CodeGenerator::class)->normalizeSiteSuffix($this->code);
+        }
         $rules = [
             'category_id' => ['required', Rule::exists('categories', 'id')->where('status', true)], 'code' => ['nullable', 'string', 'max:80', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('products')->ignore($this->productId)],
             'name' => 'required|string|max:200', 'description' => 'nullable|string|max:2000', 'unit' => ['required', 'string', 'max:40', 'regex:/^[\pL\pN .\/-]+$/u'], 'tracking_type' => 'required|in:bulk,serialized', 'status' => 'boolean',
@@ -131,15 +137,23 @@ class ProductsController extends Component
         if (! $hasVariants) {
             $this->variants = [[
                 'id' => $this->variants[0]['id'] ?? null,
-                'sku' => $this->code,
+                'sku' => '',
                 'name' => '', 'minimum_stock' => $this->variants[0]['minimum_stock'] ?? 0, 'values' => [], 'serials' => $this->variants[0]['serials'] ?? '',
             ]];
         }
+        $reservedSkus = [];
         foreach ($this->variants as $index => &$variant) {
             if (blank($variant['sku'])) {
-                $suffix = collect($variant['values'] ?? [])->filter()->map(fn ($value) => Str::upper(Str::slug((string) $value, '')))->join('-');
-                $variant['sku'] = $this->code.'-'.($suffix ?: 'V'.($index + 1));
+                $variant['sku'] = $this->availableSku($this->code, $index + 1, $variant['id'] ?? null, $reservedSkus);
+            } elseif (blank($variant['id'] ?? null)) {
+                $manualSku = Str::upper(trim((string) $variant['sku']));
+                $variant['sku'] = ctype_digit($manualSku) && (int) $manualSku > 0
+                    ? app(CodeGenerator::class)->variantSku($this->code, (int) $manualSku)
+                    : app(CodeGenerator::class)->normalizeSiteSuffix($manualSku);
+            } else {
+                $variant['sku'] = Str::upper(trim((string) $variant['sku']));
             }
+            $reservedSkus[] = $variant['sku'];
         }
         unset($variant);
         foreach ($this->variants as $i => $variant) {
@@ -243,12 +257,26 @@ class ProductsController extends Component
             $locked = Category::whereKey($category->id)->lockForUpdate()->firstOrFail();
             $number = $locked->next_product_number;
             do {
-                $code = Str::upper($locked->code).'-'.str_pad((string) $number++, 4, '0', STR_PAD_LEFT);
+                $code = app(CodeGenerator::class)->productCode($locked, $number++);
             } while (Product::where('code', $code)->exists());
             $locked->update(['next_product_number' => $number]);
 
             return $code;
         });
+    }
+
+    private function availableSku(string $productCode, int $preferredSequence, ?int $ignoreId, array $reservedSkus): string
+    {
+        $sequence = max(1, $preferredSequence);
+        do {
+            $sku = app(CodeGenerator::class)->variantSku($productCode, $sequence++);
+            $exists = Product::query()->whereHas('variants', fn ($query) => $query
+                ->where('sku', $sku)
+                ->when($ignoreId, fn ($variant) => $variant->whereKeyNot($ignoreId)))
+                ->exists();
+        } while ($exists || in_array($sku, $reservedSkus, true));
+
+        return $sku;
     }
 
     private function parseSerials(string $serials, bool $unique = true)

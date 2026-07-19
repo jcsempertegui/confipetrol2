@@ -9,6 +9,8 @@ use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Models\Worker;
 use App\Traits\AuditLog;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -33,6 +35,12 @@ class ReportsController extends Component
     public $trackingFilter = '';
 
     public $unitFilter = '';
+
+    public $expiryFrom = '';
+
+    public $expiryTo = '';
+
+    public $expiryStatus = '';
 
     public $movementType = '';
 
@@ -77,6 +85,12 @@ class ReportsController extends Component
                 $this->addError('toDate', 'La fecha final debe ser igual o posterior a la fecha inicial.');
             }
         }
+        if (in_array($property, ['expiryFrom', 'expiryTo'], true)) {
+            $this->resetErrorBag(['expiryFrom', 'expiryTo']);
+            if ($this->expiryFrom && $this->expiryTo && $this->expiryFrom > $this->expiryTo) {
+                $this->addError('expiryTo', 'La fecha final de vencimiento debe ser igual o posterior a la inicial.');
+            }
+        }
         if ($property === 'reportType') {
             $this->searchTerm = '';
             $this->categoryFilter = '';
@@ -101,7 +115,7 @@ class ReportsController extends Component
     public function clearFilters(): void
     {
         $type = $this->reportType;
-        $this->reset(['searchTerm', 'categoryFilter', 'stockStatus', 'trackingFilter', 'unitFilter', 'movementType', 'documentSource', 'areaFilter', 'workerFilter', 'workerSearch']);
+        $this->reset(['searchTerm', 'categoryFilter', 'stockStatus', 'trackingFilter', 'unitFilter', 'expiryFrom', 'expiryTo', 'expiryStatus', 'movementType', 'documentSource', 'areaFilter', 'workerFilter', 'workerSearch']);
         $this->deliveryStatus = 'confirmed';
         $this->reportType = $type;
         $this->setPeriod('month');
@@ -148,11 +162,11 @@ class ReportsController extends Component
                     }
                 });
             } else {
-                fputcsv($out, ['Categoría', 'Código', 'Producto', 'SKU', 'Variante', 'Unidad', 'Control', 'Stock actual', 'Stock mínimo', 'Estado'], ';');
+                fputcsv($out, ['Categoría', 'Código', 'Producto', 'SKU', 'Variante', 'Unidad', 'Control', 'Vencimiento', 'Estado vencimiento', 'Stock actual', 'Stock mínimo', 'Estado stock'], ';');
                 $this->stockQuery()->orderBy('products.name')->chunk(500, function ($rows) use ($out) {
                     foreach ($rows as $r) {
                         $stock = (float) ($r->stock ?? 0);
-                        fputcsv($out, [$this->safe($r->product->category->name), $this->safe($r->product->code), $this->safe($r->product->name), $this->safe($r->sku), $this->safe($r->name), $this->safe($r->product->unit), $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad', $stock, (float) $r->minimum_stock, $this->stockLabel($stock, (float) $r->minimum_stock)], ';');
+                        fputcsv($out, [$this->safe($r->product->category->name), $this->safe($r->product->code), $this->safe($r->product->name), $this->safe($r->sku), $this->safe($r->name), $this->safe($r->product->unit), $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad', $r->expiration_date ? Carbon::parse($r->expiration_date)->format('d/m/Y') : '', $this->expiryLabel($r->expiration_date), $stock, (float) $r->minimum_stock, $this->stockLabel($stock, (float) $r->minimum_stock)], ';');
                     }
                 });
             }
@@ -163,6 +177,11 @@ class ReportsController extends Component
     private function validateReportDates(): void
     {
         if ($this->reportType === 'stock') {
+            $this->validate([
+                'expiryFrom' => ['nullable', 'date'],
+                'expiryTo' => ['nullable', 'date', 'after_or_equal:expiryFrom'],
+            ], ['expiryTo.after_or_equal' => 'La fecha final de vencimiento debe ser igual o posterior a la inicial.']);
+
             return;
         }
         $this->validate([
@@ -175,13 +194,23 @@ class ReportsController extends Component
     {
         $term = '%'.trim($this->searchTerm).'%';
         $stock = '(SELECT COALESCE(SUM(im.quantity), 0) FROM inventory_movements im WHERE im.product_variant_id = product_variants.id)';
+        $expiryDate = $this->expiryDateExpression();
+        $today = now()->toDateString();
 
-        return ProductVariant::query()->with('product.category')->select('product_variants.*')->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
+        return ProductVariant::query()->with('product.category')->select('product_variants.*')->addSelect(DB::raw("{$expiryDate} AS expiration_date"))->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
             ->withSum('inventoryMovements as stock', 'quantity')
             ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('products.name', 'like', $term)->orWhere('products.code', 'like', $term)->orWhere('product_variants.sku', 'like', $term)))
             ->when($this->categoryFilter, fn ($q) => $q->where('products.category_id', $this->categoryFilter))
             ->when($this->trackingFilter, fn ($q) => $q->where('products.tracking_type', $this->trackingFilter))
             ->when($this->unitFilter, fn ($q) => $q->where('products.unit', $this->unitFilter))
+            ->when($this->expiryFrom, fn ($q) => $q->whereRaw("{$expiryDate} >= ?", [$this->expiryFrom]))
+            ->when($this->expiryTo, fn ($q) => $q->whereRaw("{$expiryDate} <= ?", [$this->expiryTo]))
+            ->when($this->expiryStatus === 'expired', fn ($q) => $q->whereRaw("{$expiryDate} < ?", [$today]))
+            ->when($this->expiryStatus === 'today', fn ($q) => $q->whereRaw("{$expiryDate} = ?", [$today]))
+            ->when($this->expiryStatus === 'next30', fn ($q) => $q->whereRaw("{$expiryDate} BETWEEN ? AND ?", [$today, now()->addDays(30)->toDateString()]))
+            ->when($this->expiryStatus === 'next90', fn ($q) => $q->whereRaw("{$expiryDate} BETWEEN ? AND ?", [$today, now()->addDays(90)->toDateString()]))
+            ->when($this->expiryStatus === 'valid', fn ($q) => $q->whereRaw("{$expiryDate} > ?", [$today]))
+            ->when($this->expiryStatus === 'without', fn ($q) => $q->whereRaw("{$expiryDate} IS NULL"))
             ->when($this->stockStatus === 'low', fn ($q) => $q->where('product_variants.minimum_stock', '>', 0)->whereRaw("$stock > 0 AND $stock <= product_variants.minimum_stock"))
             ->when($this->stockStatus === 'out', fn ($q) => $q->whereRaw("$stock <= 0"))
             ->when($this->stockStatus === 'available', fn ($q) => $q->whereRaw("$stock > 0"))
@@ -215,7 +244,7 @@ class ReportsController extends Component
 
     private function activeFilters(): array
     {
-        return collect(['tipo' => $this->reportType, 'búsqueda' => $this->searchTerm, 'categoría' => $this->categoryFilter, 'desde' => $this->fromDate, 'hasta' => $this->toDate, 'estado_stock' => $this->stockStatus, 'control' => $this->trackingFilter, 'unidad' => $this->unitFilter, 'movimiento' => $this->movementType, 'origen' => $this->documentSource, 'estado_entrega' => $this->deliveryStatus, 'área' => $this->areaFilter, 'trabajador_id' => $this->workerFilter])->filter(fn ($value) => filled($value))->all();
+        return collect(['tipo' => $this->reportType, 'búsqueda' => $this->searchTerm, 'categoría' => $this->categoryFilter, 'desde' => $this->fromDate, 'hasta' => $this->toDate, 'estado_stock' => $this->stockStatus, 'control' => $this->trackingFilter, 'unidad' => $this->unitFilter, 'vencimiento_desde' => $this->expiryFrom, 'vencimiento_hasta' => $this->expiryTo, 'estado_vencimiento' => $this->expiryStatus, 'movimiento' => $this->movementType, 'origen' => $this->documentSource, 'estado_entrega' => $this->deliveryStatus, 'área' => $this->areaFilter, 'trabajador_id' => $this->workerFilter])->filter(fn ($value) => filled($value))->all();
     }
 
     private function workerResults()
@@ -239,6 +268,46 @@ class ReportsController extends Component
     public function stockLabel(float $stock, float $minimum): string
     {
         return $stock <= 0 ? 'Agotado' : ($minimum > 0 && $stock <= $minimum ? 'Stock bajo' : 'Normal');
+    }
+
+    public function expiryLabel(?string $date): string
+    {
+        if (! $date) {
+            return 'Sin fecha';
+        }
+
+        $expiration = Carbon::parse($date)->startOfDay();
+        $today = now()->startOfDay();
+
+        if ($expiration->lt($today)) {
+            return 'Vencido';
+        }
+        if ($expiration->equalTo($today)) {
+            return 'Vence hoy';
+        }
+
+        return $expiration->lte($today->copy()->addDays(30)) ? 'Por vencer' : 'Vigente';
+    }
+
+    public function expiryBadge(?string $date): string
+    {
+        return match ($this->expiryLabel($date)) {
+            'Vencido' => 'danger',
+            'Vence hoy' => 'warning',
+            'Por vencer' => 'warning',
+            'Vigente' => 'success',
+            default => 'secondary',
+        };
+    }
+
+    private function expiryDateExpression(): string
+    {
+        $expirationAttribute = "pa.type = 'date' AND (LOWER(pa.code) LIKE '%venc%' OR LOWER(pa.name) LIKE '%venc%' OR LOWER(pa.code) LIKE '%caduc%' OR LOWER(pa.name) LIKE '%caduc%' OR LOWER(pa.code) LIKE '%expir%' OR LOWER(pa.name) LIKE '%expir%')";
+
+        return "COALESCE(
+            (SELECT MIN(vav.value) FROM variant_attribute_values vav INNER JOIN product_attributes pa ON pa.id = vav.product_attribute_id WHERE vav.product_variant_id = product_variants.id AND {$expirationAttribute} AND vav.value <> ''),
+            (SELECT MIN(pav.value) FROM product_attribute_values pav INNER JOIN product_attributes pa ON pa.id = pav.product_attribute_id WHERE pav.product_id = products.id AND {$expirationAttribute} AND pav.value <> '')
+        )";
     }
 
     private function safe(?string $value): string

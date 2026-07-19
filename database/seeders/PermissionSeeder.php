@@ -20,8 +20,8 @@ class PermissionSeeder extends Seeder
             'Categorías' => ['ver-categoria', 'crear-categoria', 'editar-categoria', 'eliminar-categoria', 'gestionar-atributos'],
             'Productos' => ['ver-producto', 'crear-producto', 'editar-producto', 'eliminar-producto'],
             'Trabajadores' => ['ver-trabajador', 'crear-trabajador', 'editar-trabajador', 'eliminar-trabajador', 'restaurar-trabajador'],
-            'Remitos' => ['ver-remito', 'crear-remito', 'editar-remito', 'confirmar-remito', 'anular-remito'],
-            'Entregas' => ['ver-entrega', 'crear-entrega', 'editar-entrega', 'confirmar-entrega', 'anular-entrega'],
+            'Remitos' => ['ver-remito', 'crear-remito', 'editar-remito', 'eliminar-remito', 'confirmar-remito', 'anular-remito'],
+            'Entregas' => ['ver-entrega', 'crear-entrega', 'editar-entrega', 'eliminar-entrega', 'confirmar-entrega', 'anular-entrega'],
             'Inventario' => ['ver-inventario', 'ver-kardex'],
             'Reportes' => ['ver-reporte', 'exportar-reporte'],
         ];

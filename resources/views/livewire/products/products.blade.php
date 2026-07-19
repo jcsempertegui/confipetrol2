@@ -45,8 +45,8 @@
                             @error('unit')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-md-2">
-                            <label for="product-code" class="form-label">Código <span class="field-optional">Opcional</span></label>
-                            <input id="product-code" wire:model="code" maxlength="80" placeholder="Automático" class="form-control text-uppercase @error('code') is-invalid @enderror">
+                            <label for="product-code" class="form-label">Código del producto <span class="field-optional">Opcional</span></label>
+                            <input id="product-code" wire:model="code" maxlength="80" placeholder="Ej.: EPP-005-RGD" class="form-control text-uppercase @error('code') is-invalid @enderror">
                             @error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
 
@@ -54,7 +54,7 @@
                         @if($selectedCategory)
                             <div class="col-12">
                                 <div class="alert alert-info py-2 mb-0">
-                                    <i class="bx bx-barcode me-1"></i><strong>Codificación automática:</strong> si dejas el código vacío se generará <span class="font-monospace">{{ $codePreview }}</span>. Las variantes se completarán con su talla o presentación.
+                                    <i class="bx bx-barcode me-1"></i><strong>Codificación Río Grande:</strong> producto <span class="font-monospace">{{ $codePreview }}</span> y primera variante <span class="font-monospace">{{ $skuPreview }}</span>. Todas las nuevas codificaciones terminan en <strong>RGD</strong>.
                                 </div>
                             </div>
 
@@ -93,7 +93,8 @@
                                                 @if($variantAttributes->isNotEmpty())
                                                     <div class="col-md-3">
                                                         <label for="variant-sku-{{ $index }}" class="form-label">Código / SKU <span class="field-optional">Opcional</span></label>
-                                                        <input id="variant-sku-{{ $index }}" wire:model="variants.{{ $index }}.sku" maxlength="100" placeholder="Automático" class="form-control text-uppercase @error('variants.'.$index.'.sku') is-invalid @enderror">
+                                                        <input id="variant-sku-{{ $index }}" wire:model="variants.{{ $index }}.sku" maxlength="100" placeholder="Automático: {{ $index + 1 }}" class="form-control text-uppercase @error('variants.'.$index.'.sku') is-invalid @enderror">
+                                                        <div class="form-text">Puedes escribir solo 01, 02… o un SKU completo; el sistema añadirá RGD.</div>
                                                         @error('variants.'.$index.'.sku')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                                     </div>
                                                 @endif

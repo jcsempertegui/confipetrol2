@@ -131,15 +131,15 @@ class PlantWarehouseSeeder extends Seeder
                 'ver-categoria', 'crear-categoria', 'editar-categoria', 'gestionar-atributos',
                 'ver-producto', 'crear-producto', 'editar-producto',
                 'ver-trabajador', 'crear-trabajador', 'editar-trabajador', 'restaurar-trabajador',
-                'ver-remito', 'crear-remito', 'editar-remito', 'confirmar-remito', 'anular-remito',
-                'ver-entrega', 'crear-entrega', 'editar-entrega', 'confirmar-entrega', 'anular-entrega',
+                'ver-remito', 'crear-remito', 'editar-remito', 'eliminar-remito', 'confirmar-remito', 'anular-remito',
+                'ver-entrega', 'crear-entrega', 'editar-entrega', 'eliminar-entrega', 'confirmar-entrega', 'anular-entrega',
                 'ver-inventario', 'ver-kardex', 'ver-reporte', 'exportar-reporte',
                 'ver-log', 'exportar-log', 'ver-backup', 'crear-backup',
             ],
             'ALMACENERO' => [
                 'ver-categoria', 'ver-producto', 'ver-trabajador',
-                'ver-remito', 'crear-remito', 'confirmar-remito',
-                'ver-entrega', 'crear-entrega', 'confirmar-entrega',
+                'ver-remito', 'crear-remito', 'eliminar-remito', 'confirmar-remito',
+                'ver-entrega', 'crear-entrega', 'eliminar-entrega', 'confirmar-entrega',
                 'ver-inventario', 'ver-kardex', 'ver-reporte',
                 'ver-backup', 'crear-backup',
             ],
@@ -518,16 +518,16 @@ class PlantWarehouseSeeder extends Seeder
     private function seedWorkers(): void
     {
         $definitions = [
-            ['code' => 'PSL-TR-001', 'document' => 'PSL-CI-0001', 'name' => 'Ana María', 'lastname' => 'Quispe Rojas', 'position' => 'Operadora de Planta', 'area' => 'Operaciones', 'email' => 'ana.quispe@personal-planta.test', 'start_date' => '2021-03-15'],
-            ['code' => 'PSL-TR-002', 'document' => 'PSL-CI-0002', 'name' => 'Luis Fernando', 'lastname' => 'Mamani Choque', 'position' => 'Supervisor de Turno', 'area' => 'Operaciones', 'email' => 'luis.mamani@personal-planta.test', 'start_date' => '2018-09-10'],
-            ['code' => 'PSL-TR-003', 'document' => 'PSL-CI-0003', 'name' => 'Carla Andrea', 'lastname' => 'Vargas Flores', 'position' => 'Ingeniera de Procesos', 'area' => 'Procesos', 'email' => 'carla.vargas@personal-planta.test', 'start_date' => '2020-01-20'],
-            ['code' => 'PSL-TR-004', 'document' => 'PSL-CI-0004', 'name' => 'Diego Alejandro', 'lastname' => 'Flores Lima', 'position' => 'Técnico de Instrumentación', 'area' => 'Instrumentación', 'email' => 'diego.flores@personal-planta.test', 'start_date' => '2019-06-03'],
-            ['code' => 'PSL-TR-005', 'document' => 'PSL-CI-0005', 'name' => 'Mariela Soledad', 'lastname' => 'Rojas Pérez', 'position' => 'Inspectora HSE', 'area' => 'Seguridad, Salud y Medio Ambiente', 'email' => 'mariela.rojas@personal-planta.test', 'start_date' => '2022-02-14'],
-            ['code' => 'PSL-TR-006', 'document' => 'PSL-CI-0006', 'name' => 'José Miguel', 'lastname' => 'Condori Nina', 'position' => 'Técnico Mecánico', 'area' => 'Mantenimiento Mecánico', 'email' => 'jose.condori@personal-planta.test', 'start_date' => '2017-11-06'],
-            ['code' => 'PSL-TR-007', 'document' => 'PSL-CI-0007', 'name' => 'Sandra Paola', 'lastname' => 'López Cruz', 'position' => 'Técnica Electricista', 'area' => 'Mantenimiento Eléctrico', 'email' => 'sandra.lopez@personal-planta.test', 'start_date' => '2023-04-17'],
-            ['code' => 'PSL-TR-008', 'document' => 'PSL-CI-0008', 'name' => 'Rodrigo Javier', 'lastname' => 'Arce Mendoza', 'position' => 'Analista de Laboratorio', 'area' => 'Laboratorio', 'email' => 'rodrigo.arce@personal-planta.test', 'start_date' => '2020-08-24'],
-            ['code' => 'PSL-TR-009', 'document' => 'PSL-CI-0009', 'name' => 'Paola Fernanda', 'lastname' => 'Gutiérrez Salas', 'position' => 'Encargada de Almacén', 'area' => 'Almacén', 'email' => 'paola.gutierrez@personal-planta.test', 'start_date' => '2019-10-07'],
-            ['code' => 'PSL-TR-010', 'document' => 'PSL-CI-0010', 'name' => 'Edwin Marcelo', 'lastname' => 'Ticona Ramos', 'position' => 'Operador de Despacho', 'area' => 'Operaciones', 'email' => 'edwin.ticona@personal-planta.test', 'start_date' => '2021-07-12'],
+            ['code' => 'OPER-PLAN-01-RGD', 'document' => 'PSL-CI-0001', 'name' => 'Ana María', 'lastname' => 'Quispe Rojas', 'position' => 'Operadora de Planta', 'area' => 'Operaciones', 'email' => 'ana.quispe@personal-planta.test', 'start_date' => '2021-03-15'],
+            ['code' => 'OPER-TURN-01-RGD', 'document' => 'PSL-CI-0002', 'name' => 'Luis Fernando', 'lastname' => 'Mamani Choque', 'position' => 'Supervisor de Turno', 'area' => 'Operaciones', 'email' => 'luis.mamani@personal-planta.test', 'start_date' => '2018-09-10'],
+            ['code' => 'PROC-INGE-01-RGD', 'document' => 'PSL-CI-0003', 'name' => 'Carla Andrea', 'lastname' => 'Vargas Flores', 'position' => 'Ingeniera de Procesos', 'area' => 'Procesos', 'email' => 'carla.vargas@personal-planta.test', 'start_date' => '2020-01-20'],
+            ['code' => 'INST-TECN-01-RGD', 'document' => 'PSL-CI-0004', 'name' => 'Diego Alejandro', 'lastname' => 'Flores Lima', 'position' => 'Técnico de Instrumentación', 'area' => 'Instrumentación', 'email' => 'diego.flores@personal-planta.test', 'start_date' => '2019-06-03'],
+            ['code' => 'SEGU-HSE-01-RGD', 'document' => 'PSL-CI-0005', 'name' => 'Mariela Soledad', 'lastname' => 'Rojas Pérez', 'position' => 'Inspectora HSE', 'area' => 'Seguridad, Salud y Medio Ambiente', 'email' => 'mariela.rojas@personal-planta.test', 'start_date' => '2022-02-14'],
+            ['code' => 'MTTO-MECA-01-RGD', 'document' => 'PSL-CI-0006', 'name' => 'José Miguel', 'lastname' => 'Condori Nina', 'position' => 'Técnico Mecánico', 'area' => 'Mantenimiento Mecánico', 'email' => 'jose.condori@personal-planta.test', 'start_date' => '2017-11-06'],
+            ['code' => 'MTTO-ELEC-01-RGD', 'document' => 'PSL-CI-0007', 'name' => 'Sandra Paola', 'lastname' => 'López Cruz', 'position' => 'Técnica Electricista', 'area' => 'Mantenimiento Eléctrico', 'email' => 'sandra.lopez@personal-planta.test', 'start_date' => '2023-04-17'],
+            ['code' => 'LABO-ANAL-01-RGD', 'document' => 'PSL-CI-0008', 'name' => 'Rodrigo Javier', 'lastname' => 'Arce Mendoza', 'position' => 'Analista de Laboratorio', 'area' => 'Laboratorio', 'email' => 'rodrigo.arce@personal-planta.test', 'start_date' => '2020-08-24'],
+            ['code' => 'ALMA-ENCA-01-RGD', 'document' => 'PSL-CI-0009', 'name' => 'Paola Fernanda', 'lastname' => 'Gutiérrez Salas', 'position' => 'Encargada de Almacén', 'area' => 'Almacén', 'email' => 'paola.gutierrez@personal-planta.test', 'start_date' => '2019-10-07'],
+            ['code' => 'OPER-DESP-01-RGD', 'document' => 'PSL-CI-0010', 'name' => 'Edwin Marcelo', 'lastname' => 'Ticona Ramos', 'position' => 'Operador de Despacho', 'area' => 'Operaciones', 'email' => 'edwin.ticona@personal-planta.test', 'start_date' => '2021-07-12'],
         ];
 
         foreach ($definitions as $definition) {
@@ -631,7 +631,7 @@ class PlantWarehouseSeeder extends Seeder
     {
         $definitions = [
             [
-                'number' => 'ENT101160726', 'worker' => 'PSL-TR-001', 'reason' => 'Dotación operativa y asignación de detector multigás',
+                'number' => 'ENT101160726', 'worker' => 'OPER-PLAN-01-RGD', 'reason' => 'Dotación operativa y asignación de detector multigás',
                 'items' => [
                     ['sku' => 'PSL-EQP-001-STD', 'quantity' => 1, 'serials' => ['MSA4XR-PSL-26001']],
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
@@ -641,7 +641,7 @@ class PlantWarehouseSeeder extends Seeder
                 ],
             ],
             [
-                'number' => 'ENT102160726', 'worker' => 'PSL-TR-002', 'reason' => 'Dotación de supervisor y asignación de radio ATEX',
+                'number' => 'ENT102160726', 'worker' => 'OPER-TURN-01-RGD', 'reason' => 'Dotación de supervisor y asignación de radio ATEX',
                 'items' => [
                     ['sku' => 'PSL-EQP-002-STD', 'quantity' => 1, 'serials' => ['MOT-DP48-PSL-26001']],
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
@@ -650,7 +650,7 @@ class PlantWarehouseSeeder extends Seeder
                 ],
             ],
             [
-                'number' => 'ENT103160726', 'worker' => 'PSL-TR-003', 'reason' => 'Asignación de laptop para ingeniería de procesos',
+                'number' => 'ENT103160726', 'worker' => 'PROC-INGE-01-RGD', 'reason' => 'Asignación de laptop para ingeniería de procesos',
                 'items' => [
                     ['sku' => 'PSL-EQP-003-STD', 'quantity' => 1, 'serials' => ['PAN-CF55-PSL-26001']],
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
@@ -659,7 +659,7 @@ class PlantWarehouseSeeder extends Seeder
                 ],
             ],
             [
-                'number' => 'ENT104160726', 'worker' => 'PSL-TR-004', 'reason' => 'Asignación de cámara termográfica y dotación de instrumentación',
+                'number' => 'ENT104160726', 'worker' => 'INST-TECN-01-RGD', 'reason' => 'Asignación de cámara termográfica y dotación de instrumentación',
                 'items' => [
                     ['sku' => 'PSL-EQP-004-STD', 'quantity' => 1, 'serials' => ['FLIR-E8XT-PSL-26001']],
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
@@ -668,7 +668,7 @@ class PlantWarehouseSeeder extends Seeder
                 ],
             ],
             [
-                'number' => 'ENT105160726', 'worker' => 'PSL-TR-005', 'reason' => 'Asignación de tablet para inspecciones HSE',
+                'number' => 'ENT105160726', 'worker' => 'SEGU-HSE-01-RGD', 'reason' => 'Asignación de tablet para inspecciones HSE',
                 'items' => [
                     ['sku' => 'PSL-EQP-006-STD', 'quantity' => 1, 'serials' => ['SAM-TABA4-PSL-26001']],
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
@@ -677,7 +677,7 @@ class PlantWarehouseSeeder extends Seeder
                 ],
             ],
             [
-                'number' => 'ENT106160726', 'worker' => 'PSL-TR-006', 'reason' => 'Dotación de mantenimiento mecánico',
+                'number' => 'ENT106160726', 'worker' => 'MTTO-MECA-01-RGD', 'reason' => 'Dotación de mantenimiento mecánico',
                 'items' => [
                     ['sku' => 'PSL-EPP-001-UNI', 'quantity' => 1], ['sku' => 'PSL-EPP-002-UNI', 'quantity' => 1],
                     ['sku' => 'PSL-EPP-003-T10', 'quantity' => 1], ['sku' => 'PSL-EPP-004-TXL', 'quantity' => 1],

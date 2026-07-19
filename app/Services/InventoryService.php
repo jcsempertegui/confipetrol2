@@ -12,6 +12,8 @@ use Illuminate\Validation\ValidationException;
 
 class InventoryService
 {
+    public function __construct(private readonly CodeGenerator $codes) {}
+
     public function confirm(DispatchNote $note, int $userId): DispatchNote
     {
         return DB::transaction(function () use ($note, $userId) {
@@ -153,11 +155,14 @@ class InventoryService
                 if ($quantity <= 0 || ($serialized && (float) $item->serializedItems->count() !== $quantity)) {
                     throw ValidationException::withMessages(['items' => 'Cantidad o series inválidas para '.$variant->sku.'.']);
                 }
+                if (! $serialized && $item->serializedItems->isNotEmpty()) {
+                    throw ValidationException::withMessages(['items' => 'El producto '.$variant->sku.' se controla por cantidad y no admite números de serie.']);
+                }
                 if ($serialized) {
                     foreach ($item->serializedItems as $selected) {
                         $serial = SerializedItem::whereKey($selected->id)->lockForUpdate()->firstOrFail();
                         $balance = (float) InventoryMovement::where('serialized_item_id', $serial->id)->sum('quantity');
-                        if ($serial->product_variant_id !== $variant->id || $balance !== 1.0) {
+                        if ($serial->product_variant_id !== $variant->id || $serial->status !== 'available' || $balance !== 1.0) {
                             throw ValidationException::withMessages(['items' => 'La serie '.$serial->serial_number.' no está disponible.']);
                         }
                     }
@@ -170,7 +175,7 @@ class InventoryService
             }
             if (! $delivery->number) {
                 $delivery->number = $this->dailyNumber(
-                    'delivery_'.$delivery->delivery_date->format('Ymd'),
+                    $this->codes->sequenceKey('delivery', $delivery->delivery_date),
                     'ENT',
                     $delivery->delivery_date,
                     fn (string $code) => Delivery::where('number', $code)->exists()
@@ -293,7 +298,7 @@ class InventoryService
 
         if (! $delivery->number) {
             $delivery->number = $this->dailyNumber(
-                'delivery_'.$delivery->delivery_date->format('Ymd'),
+                $this->codes->sequenceKey('delivery', $delivery->delivery_date),
                 'ENT',
                 $delivery->delivery_date,
                 fn (string $code) => Delivery::where('number', $code)->exists()
@@ -569,8 +574,8 @@ class InventoryService
     private function nextNumber(string $type, \DateTimeInterface $date): string
     {
         return $this->dailyNumber(
-            'dispatch_'.$type.'_'.$date->format('Ymd'),
-            $type === 'entry' ? 'ING' : 'SAL',
+            $this->codes->sequenceKey('dispatch', $date),
+            'REM',
             $date,
             fn (string $code) => DispatchNote::where('number', $code)->exists()
         );
@@ -587,7 +592,7 @@ class InventoryService
             if ($number > 999) {
                 throw new \RuntimeException('Se alcanzó el límite diario de 999 documentos para '.$prefix.'.');
             }
-            $code = $prefix.str_pad((string) $number++, 3, '0', STR_PAD_LEFT).$date->format('dmy');
+            $code = $this->codes->documentCode($prefix, $number++, $date);
         } while ($exists($code));
         DB::table('document_sequences')->where('key', $key)->update(['next_number' => $number, 'updated_at' => now()]);
 

@@ -40,7 +40,7 @@ it('confirms entries and exits with an immutable inventory ledger', function () 
     $exit->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 3]);
     app(InventoryService::class)->confirm($exit, $this->user->id);
 
-    expect($entry->fresh()->number)->toBe('ING001'.now()->format('dmy'))->and($exit->fresh()->number)->toBe('SAL001'.now()->format('dmy'))
+    expect($entry->fresh()->number)->toBe('REM-01-'.now()->format('dmY').'-RGD')->and($exit->fresh()->number)->toBe('REM-02-'.now()->format('dmY').'-RGD')
         ->and((float) InventoryMovement::where('product_variant_id', $this->bulkVariant->id)->sum('quantity'))->toBe(7.0)
         ->and(InventoryMovement::count())->toBe(2);
 });
@@ -140,14 +140,14 @@ it('rejects a correction atomically when its delta would leave negative stock', 
 
 it('preserves manual document codes and skips them in automatic sequences', function () {
     $manual = inventoryNote('entry', $this->user);
-    $manual->update(['number' => 'ING001'.now()->format('dmy')]);
+    $manual->update(['number' => 'REM-01-'.now()->format('dmY').'-RGD']);
     $manual->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 2]);
     app(InventoryService::class)->confirm($manual, $this->user->id);
     $automatic = inventoryNote('entry', $this->user);
     $automatic->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 2]);
     app(InventoryService::class)->confirm($automatic, $this->user->id);
 
-    expect($manual->fresh()->number)->toBe('ING001'.now()->format('dmy'))->and($automatic->fresh()->number)->toBe('ING002'.now()->format('dmy'));
+    expect($manual->fresh()->number)->toBe('REM-01-'.now()->format('dmY').'-RGD')->and($automatic->fresh()->number)->toBe('REM-02-'.now()->format('dmY').'-RGD');
 });
 
 it('restarts the automatic sequence for each document date', function () {
@@ -158,8 +158,159 @@ it('restarts the automatic sequence for each document date', function () {
     $today->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 1]);
     app(InventoryService::class)->confirm($today, $this->user->id);
 
-    expect($yesterday->fresh()->number)->toBe('ING001'.now()->subDay()->format('dmy'))
-        ->and($today->fresh()->number)->toBe('ING001'.now()->format('dmy'));
+    expect($yesterday->fresh()->number)->toBe('REM-01-'.now()->subDay()->format('dmY').'-RGD')
+        ->and($today->fresh()->number)->toBe('REM-01-'.now()->format('dmY').'-RGD');
+});
+
+it('normalizes manual remito and delivery codes with the Rio Grande suffix', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'CODIFICACIÓN DOCUMENTOS', 'guard_name' => 'web']);
+    $role->givePermissionTo(['crear-remito', 'crear-entrega']);
+    $this->user->assignRole($role);
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->set('number', 'REM-77-18072026-RDG')
+        ->set('type', 'entry')
+        ->set('document_date', now()->format('Y-m-d'))
+        ->set('counterparty', 'Proveedor de prueba')
+        ->set('items', [['variant_id' => $this->bulkVariant->id, 'quantity' => 1, 'serial_ids' => [], 'notes' => '']])
+        ->call('save')->assertHasNoErrors();
+
+    $worker = Worker::create(['code' => 'TRB-COD-1', 'document' => 'COD-1', 'name' => 'Ana', 'lastname' => 'Rojas']);
+    Livewire::actingAs($this->user)->test(DeliveriesController::class)
+        ->set('number', 'ENT-08-18072026')
+        ->set('worker_id', $worker->id)
+        ->set('delivery_date', now()->format('Y-m-d'))
+        ->set('items', [['variant_id' => $this->bulkVariant->id, 'quantity' => 1, 'serial_ids' => [], 'notes' => '']])
+        ->call('save')->assertHasNoErrors();
+
+    expect(DispatchNote::where('number', 'REM-77-18072026-RGD')->exists())->toBeTrue()
+        ->and(Delivery::where('number', 'ENT-08-18072026-RGD')->exists())->toBeTrue();
+});
+
+it('deletes remito and delivery drafts while preserving their complete audit trail', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'ELIMINADOR DE BORRADORES', 'guard_name' => 'web']);
+    $role->givePermissionTo(['eliminar-remito', 'eliminar-entrega']);
+    $this->user->assignRole($role);
+
+    $note = inventoryNote('entry', $this->user);
+    $note->update(['number' => 'REM-BORRADOR-RGD']);
+    $noteItem = $note->items()->create([
+        'product_variant_id' => $this->bulkVariant->id,
+        'quantity' => 4,
+        'notes' => 'Detalle antes de eliminar',
+    ]);
+
+    $worker = Worker::create([
+        'code' => 'TRB-BORRADOR',
+        'document' => 'BORRADOR-1',
+        'name' => 'María',
+        'lastname' => 'Flores',
+    ]);
+    $delivery = Delivery::create([
+        'number' => 'ENT-BORRADOR-RGD',
+        'worker_id' => $worker->id,
+        'delivery_date' => now(),
+        'status' => 'draft',
+        'created_by' => $this->user->id,
+    ]);
+    $deliveryItem = $delivery->items()->create([
+        'product_variant_id' => $this->bulkVariant->id,
+        'quantity' => 2,
+        'notes' => 'Entrega pendiente',
+    ]);
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->call('deleteDraft', $note->id)
+        ->assertHasNoErrors();
+    Livewire::actingAs($this->user)->test(DeliveriesController::class)
+        ->call('deleteDraft', $delivery->id)
+        ->assertHasNoErrors();
+
+    expect(DispatchNote::find($note->id))->toBeNull()
+        ->and($noteItem->fresh())->toBeNull()
+        ->and(Delivery::find($delivery->id))->toBeNull()
+        ->and($deliveryItem->fresh())->toBeNull()
+        ->and(InventoryMovement::count())->toBe(0);
+
+    $noteLog = Log::where('modulo', 'REMITOS')->where('accion', 'ELIMINAR_BORRADOR')->where('modelo_id', $note->id)->firstOrFail();
+    $deliveryLog = Log::where('modulo', 'ENTREGAS')->where('accion', 'ELIMINAR_BORRADOR')->where('modelo_id', $delivery->id)->firstOrFail();
+
+    expect($noteLog->valores_anteriores['número'])->toBe('REM-BORRADOR-RGD')
+        ->and($noteLog->valores_anteriores['detalles'][0]['cantidad'])->toEqual(4.0)
+        ->and($noteLog->valores_anteriores['detalles'][0]['observaciones'])->toBe('Detalle antes de eliminar')
+        ->and($noteLog->valores_nuevos)->toBe(['eliminado' => true])
+        ->and($deliveryLog->valores_anteriores['número'])->toBe('ENT-BORRADOR-RGD')
+        ->and($deliveryLog->valores_anteriores['trabajador'])->toBe($worker->full_name)
+        ->and($deliveryLog->valores_anteriores['detalles'][0]['cantidad'])->toEqual(2.0)
+        ->and($deliveryLog->valores_anteriores['detalles'][0]['observaciones'])->toBe('Entrega pendiente')
+        ->and($deliveryLog->valores_nuevos)->toBe(['eliminado' => true]);
+});
+
+it('never deletes confirmed remitos or deliveries even with draft deletion permission', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'CONTROL DE BORRADORES', 'guard_name' => 'web']);
+    $role->givePermissionTo(['eliminar-remito', 'eliminar-entrega']);
+    $this->user->assignRole($role);
+
+    $entry = inventoryNote('entry', $this->user);
+    $entry->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 5]);
+    app(InventoryService::class)->confirm($entry, $this->user->id);
+
+    $worker = Worker::create([
+        'code' => 'TRB-CONFIRMADO',
+        'document' => 'CONFIRMADO-1',
+        'name' => 'Luis',
+        'lastname' => 'Mamani',
+    ]);
+    $delivery = Delivery::create([
+        'worker_id' => $worker->id,
+        'delivery_date' => now(),
+        'status' => 'draft',
+        'created_by' => $this->user->id,
+    ]);
+    $delivery->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 1]);
+    app(InventoryService::class)->confirmDelivery($delivery, $this->user->id);
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->call('deleteDraft', $entry->id)
+        ->assertHasErrors('document');
+    Livewire::actingAs($this->user)->test(DeliveriesController::class)
+        ->call('deleteDraft', $delivery->id)
+        ->assertHasErrors('document');
+
+    expect($entry->fresh()->status)->toBe('confirmed')
+        ->and($delivery->fresh()->status)->toBe('confirmed')
+        ->and(InventoryMovement::where('dispatch_note_id', $entry->id)->exists())->toBeTrue()
+        ->and(InventoryMovement::where('delivery_id', $delivery->id)->exists())->toBeTrue()
+        ->and(Log::where('accion', 'ELIMINAR_BORRADOR')->exists())->toBeFalse();
+});
+
+it('requires the specific permission to delete document drafts', function () {
+    $note = inventoryNote('entry', $this->user);
+    $worker = Worker::create([
+        'code' => 'TRB-SIN-PERMISO',
+        'document' => 'SIN-PERMISO-1',
+        'name' => 'Eva',
+        'lastname' => 'Rojas',
+    ]);
+    $delivery = Delivery::create([
+        'worker_id' => $worker->id,
+        'delivery_date' => now(),
+        'status' => 'draft',
+        'created_by' => $this->user->id,
+    ]);
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->call('deleteDraft', $note->id)
+        ->assertForbidden();
+    Livewire::actingAs($this->user)->test(DeliveriesController::class)
+        ->call('deleteDraft', $delivery->id)
+        ->assertForbidden();
+
+    expect($note->fresh())->not->toBeNull()
+        ->and($delivery->fresh())->not->toBeNull();
 });
 
 it('rejects an exit when bulk stock is insufficient', function () {
@@ -182,6 +333,57 @@ it('tracks each serialized unit and prevents duplicate entry', function () {
 
     expect(fn () => app(InventoryService::class)->confirm($duplicate, $this->user->id))->toThrow(ValidationException::class);
     expect((float) InventoryMovement::where('serialized_item_id', $this->serial->id)->sum('quantity'))->toBe(1.0);
+});
+
+it('shows only serialized units with real stock when preparing a delivery', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'CREADOR ENTREGAS', 'guard_name' => 'web']);
+    $role->givePermissionTo('crear-entrega');
+    $this->user->assignRole($role);
+    $unreceived = $this->serialVariant->serializedItems()->create([
+        'serial_number' => 'SER-SIN-INGRESO',
+        'status' => 'available',
+    ]);
+    $entry = inventoryNote('entry', $this->user);
+    $item = $entry->items()->create(['product_variant_id' => $this->serialVariant->id, 'quantity' => 1]);
+    $item->serializedItems()->attach($this->serial);
+    app(InventoryService::class)->confirm($entry, $this->user->id);
+
+    Livewire::actingAs($this->user)->test(DeliveriesController::class)
+        ->call('addProduct', $this->serialVariant->id)
+        ->assertSee('Número de serie disponible')
+        ->assertSee('SER-001')
+        ->assertDontSee($unreceived->serial_number)
+        ->set('items.0.serial_ids', [$this->serial->id])
+        ->assertSet('items.0.serial_ids', [$this->serial->id]);
+});
+
+it('rejects invalid or inactive serial selections when confirming a delivery', function () {
+    $bulkEntry = inventoryNote('entry', $this->user);
+    $bulkEntry->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 2]);
+    app(InventoryService::class)->confirm($bulkEntry, $this->user->id);
+
+    $worker = Worker::create(['code' => 'TRB-VALIDA-SER', 'document' => 'VALIDA-SER', 'name' => 'Julia', 'lastname' => 'Rojas']);
+    $invalidBulkDelivery = Delivery::create(['worker_id' => $worker->id, 'delivery_date' => now(), 'status' => 'draft', 'created_by' => $this->user->id]);
+    $bulkItem = $invalidBulkDelivery->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 1]);
+    $bulkItem->serializedItems()->attach($this->serial);
+
+    expect(fn () => app(InventoryService::class)->confirmDelivery($invalidBulkDelivery, $this->user->id))
+        ->toThrow(ValidationException::class);
+
+    $serialEntry = inventoryNote('entry', $this->user);
+    $serialItem = $serialEntry->items()->create(['product_variant_id' => $this->serialVariant->id, 'quantity' => 1]);
+    $serialItem->serializedItems()->attach($this->serial);
+    app(InventoryService::class)->confirm($serialEntry, $this->user->id);
+    $this->serial->update(['status' => 'inactive']);
+
+    $inactiveSerialDelivery = Delivery::create(['worker_id' => $worker->id, 'delivery_date' => now(), 'status' => 'draft', 'created_by' => $this->user->id]);
+    $inactiveItem = $inactiveSerialDelivery->items()->create(['product_variant_id' => $this->serialVariant->id, 'quantity' => 1]);
+    $inactiveItem->serializedItems()->attach($this->serial);
+
+    expect(fn () => app(InventoryService::class)->confirmDelivery($inactiveSerialDelivery, $this->user->id))
+        ->toThrow(ValidationException::class)
+        ->and(InventoryMovement::whereNotNull('delivery_id')->count())->toBe(0);
 });
 
 it('annuls by adding inverse movements without deleting history', function () {
@@ -216,7 +418,7 @@ it('delivers stock to a worker and returns it through an audited reversal', func
     $delivery->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 2]);
 
     app(InventoryService::class)->confirmDelivery($delivery, $this->user->id);
-    expect($delivery->fresh()->number)->toBe('ENT001'.now()->format('dmy'))->and((float) $this->bulkVariant->inventoryMovements()->sum('quantity'))->toBe(3.0);
+    expect($delivery->fresh()->number)->toBe('ENT-01-'.now()->format('dmY').'-RGD')->and((float) $this->bulkVariant->inventoryMovements()->sum('quantity'))->toBe(3.0);
     app(InventoryService::class)->annulDelivery($delivery, $this->user->id, 'Entrega registrada por error');
     expect($delivery->fresh()->status)->toBe('annulled')->and((float) $this->bulkVariant->inventoryMovements()->sum('quantity'))->toBe(5.0);
 });

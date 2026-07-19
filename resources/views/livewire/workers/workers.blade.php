@@ -13,12 +13,18 @@
         <div class="card-body">
             <form wire:submit="save">
                 <div class="row g-3">
+                    <div class="col-sm-6 col-lg-3">
+                        <label class="form-label">Código de trabajador <span class="field-optional">Opcional</span></label>
+                        <input wire:model="code" maxlength="20" class="form-control text-uppercase @error('code') is-invalid @enderror" placeholder="Automático: MTTO-ELEC-01-RGD">
+                        <div class="form-text">Si queda vacío, se genera con el área primero y el cargo después. Ej.: Mantenimiento + Eléctrico → MTTO-ELEC-01-RGD.</div>
+                        @error('code')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Documento <span class="text-danger">*</span></label><input wire:model="document" maxlength="40" class="form-control @error('document') is-invalid @enderror" placeholder="Ej.: 12345678">@error('document')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Nombres <span class="text-danger">*</span></label><input wire:model="name" maxlength="100" class="form-control @error('name') is-invalid @enderror">@error('name')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Apellidos <span class="text-danger">*</span></label><input wire:model="lastname" maxlength="100" class="form-control @error('lastname') is-invalid @enderror">@error('lastname')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Fecha de ingreso</label><input wire:model="start_date" type="date" max="{{ now()->format('Y-m-d') }}" class="form-control @error('start_date') is-invalid @enderror">@error('start_date')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Área</label><input wire:model="area" maxlength="120" class="form-control @error('area') is-invalid @enderror" placeholder="Ej.: Mantenimiento">@error('area')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
-                    <div class="col-sm-6 col-lg-3"><label class="form-label">Cargo</label><input wire:model="position" maxlength="120" class="form-control @error('position') is-invalid @enderror">@error('position')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                    <div class="col-sm-6 col-lg-3"><label class="form-label">Cargo <span class="text-danger">*</span></label><input wire:model="position" maxlength="120" class="form-control @error('position') is-invalid @enderror" placeholder="Ej.: Técnico Mtto. Eléctrico">@error('position')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Teléfono</label><input wire:model="phone" maxlength="30" class="form-control @error('phone') is-invalid @enderror">@error('phone')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-sm-6 col-lg-3"><label class="form-label">Correo</label><input wire:model="email" type="email" maxlength="150" class="form-control @error('email') is-invalid @enderror">@error('email')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                     <div class="col-12"><label class="form-label">Observaciones <span class="field-optional">Opcional</span></label><textarea wire:model="notes" rows="2" maxlength="1000" class="form-control @error('notes') is-invalid @enderror" placeholder="Información adicional relevante"></textarea>@error('notes')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>

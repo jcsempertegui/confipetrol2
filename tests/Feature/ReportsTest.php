@@ -4,10 +4,12 @@ use App\Livewire\ReportsController;
 use App\Models\Category;
 use App\Models\DispatchNote;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\User;
 use App\Models\Worker;
 use App\Services\InventoryService;
 use Database\Seeders\PermissionSeeder;
+use Illuminate\Support\Carbon;
 use Livewire\Livewire;
 use Spatie\Permission\Models\Role;
 
@@ -34,6 +36,36 @@ it('shows inventory reports and low stock alerts', function () {
         ->assertSee('Stock bajo')
         ->set('stockStatus', 'low')
         ->assertSee('EPP-0001-8');
+});
+
+it('filters inventory by expiration date and highlights expired products', function () {
+    $this->travelTo(Carbon::parse('2026-07-17 10:00:00'));
+    $category = $this->variant->product->category;
+    $expiration = ProductAttribute::create([
+        'name' => 'VENCIMIENTO',
+        'code' => 'test-vencimiento',
+        'type' => 'date',
+        'scope' => 'variant',
+        'status' => true,
+    ]);
+    $category->attributes()->attach($expiration->id, ['required' => true, 'position' => 1]);
+    $this->variant->attributeValues()->create(['product_attribute_id' => $expiration->id, 'value' => '2026-08-05']);
+
+    $expiredProduct = Product::create(['category_id' => $category->id, 'code' => 'EPP-VENCIDO', 'name' => 'Producto vencido', 'tracking_type' => 'bulk']);
+    $expiredVariant = $expiredProduct->variants()->create(['sku' => 'EPP-VENCIDO-01', 'name' => 'Lote vencido']);
+    $expiredVariant->attributeValues()->create(['product_attribute_id' => $expiration->id, 'value' => '2026-07-10']);
+
+    Livewire::test(ReportsController::class)
+        ->set('expiryStatus', 'expired')
+        ->assertSee('Producto vencido')
+        ->assertSee('10/07/2026')
+        ->assertSee('Vencido')
+        ->assertDontSee('EPP-0001-8')
+        ->set('expiryStatus', '')
+        ->set('expiryFrom', '2026-08-01')
+        ->set('expiryTo', '2026-08-31')
+        ->assertSee('EPP-0001-8')
+        ->assertDontSee('Producto vencido');
 });
 
 it('filters movements by type source and quick periods', function () {

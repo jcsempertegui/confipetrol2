@@ -53,7 +53,7 @@
                         </div>
                         <div class="col-sm-6 col-lg-3">
                             <label class="form-label">Código de entrega <span class="field-optional">Opcional</span></label>
-                            <input wire:model="number" maxlength="30" class="form-control text-uppercase @error('number') is-invalid @enderror" placeholder="Se genera al confirmar">
+                            <input wire:model="number" maxlength="30" class="form-control text-uppercase @error('number') is-invalid @enderror" placeholder="Automático: ENT-01-18072026-RGD">
                             @error('number')<div class="invalid-feedback">{{ $message }}</div>@enderror
                         </div>
                         <div class="col-lg-3">
@@ -69,7 +69,14 @@
                         @if(mb_strlen(trim($productSearch)) >= 2)
                             <div class="list-group position-absolute w-100 shadow search-results">
                                 @forelse($productResults as $result)
-                                    <button type="button" wire:click="addProduct({{ $result->id }})" class="list-group-item list-group-item-action d-flex justify-content-between gap-3"><span><strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}<small class="d-block text-muted">{{ $result->sku }}</small></span><span class="badge bg-light text-dark align-self-center">Stock {{ number_format((float) ($result->stock ?? 0), 3) }}</span></button>
+                                    <button type="button" wire:click="addProduct({{ $result->id }})" class="list-group-item list-group-item-action d-flex justify-content-between gap-3">
+                                        <span><strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}<small class="d-block text-muted">{{ $result->sku }}</small></span>
+                                        @if($result->product->tracking_type === 'serialized')
+                                            <span class="badge bg-{{ $result->deliverable_serials_count > 0 ? 'primary' : 'danger' }} align-self-center">{{ $result->deliverable_serials_count }} serie(s) disponible(s)</span>
+                                        @else
+                                            <span class="badge bg-light text-dark align-self-center">Stock {{ number_format((float) ($result->stock ?? 0), 3) }}</span>
+                                        @endif
+                                    </button>
                                 @empty
                                     <div class="list-group-item text-muted">No se encontraron productos.</div>
                                 @endforelse
@@ -85,7 +92,28 @@
                                 <div class="row g-3 align-items-end">
                                     <div class="col-lg-5"><label class="form-label">Producto / variante</label><div class="form-control readonly-control"><strong>{{ $selected?->product?->name }}</strong> · {{ $selected?->name ?: $selected?->sku }} <span class="small text-muted">({{ $selected?->sku }})</span></div></div>
                                     @if($selected?->product?->tracking_type === 'serialized')
-                                        <div class="col-lg-5"><label class="form-label">Números de serie <span class="text-danger">*</span></label><select multiple size="3" wire:model="items.{{ $index }}.serial_ids" class="form-select @error('items.'.$index.'.serial_ids') is-invalid @enderror">@foreach($selected->serializedItems as $serial)<option value="{{ $serial->id }}">{{ $serial->serial_number }}</option>@endforeach</select>@error('items.'.$index.'.serial_ids')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
+                                        <div class="col-lg-6">
+                                            <label class="form-label">Número de serie disponible <span class="text-danger">*</span></label>
+                                            @if($selected->serializedItems->isNotEmpty())
+                                                <div class="border rounded p-2 bg-light-subtle @error('items.'.$index.'.serial_ids') border-danger @enderror" style="max-height: 170px; overflow-y: auto;">
+                                                    @foreach($selected->serializedItems as $serial)
+                                                        <label class="form-check d-flex align-items-center gap-2 border rounded bg-white px-3 py-2 mb-2" wire:key="delivery-serial-{{ $index }}-{{ $serial->id }}">
+                                                            <input type="checkbox" value="{{ $serial->id }}" wire:model.live="items.{{ $index }}.serial_ids" class="form-check-input mt-0">
+                                                            <span class="font-monospace fw-semibold">{{ $serial->serial_number }}</span>
+                                                            @if($serial->status !== 'available')<span class="badge bg-info ms-auto">Asignada en la entrega original</span>@endif
+                                                        </label>
+                                                    @endforeach
+                                                </div>
+                                                <div class="small text-muted mt-1">
+                                                    Seleccionadas: <strong>{{ count($row['serial_ids'] ?? []) }}</strong> · Disponibles para elegir: {{ $selected->serializedItems->where('status', 'available')->count() }}
+                                                </div>
+                                            @else
+                                                <div class="alert alert-warning py-2 mb-0"><i class="bx bx-error-circle me-1"></i>No existen series con saldo disponible. Confirma primero un remito de ingreso.</div>
+                                            @endif
+                                            @error('items.'.$index.'.serial_ids')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
+                                        </div>
+                                        <div class="col-sm-4 col-lg-2"><label class="form-label">Cantidad</label><input value="{{ count($row['serial_ids'] ?? []) }}" class="form-control" disabled></div>
+                                        <div class="col-sm-8 col-lg-3"><label class="form-label">Observación <span class="field-optional">Opcional</span></label><input wire:model="items.{{ $index }}.notes" maxlength="500" class="form-control @error('items.'.$index.'.notes') is-invalid @enderror">@error('items.'.$index.'.notes')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                                     @else
                                         <div class="col-sm-4 col-lg-2"><label class="form-label">Cantidad <span class="text-danger">*</span></label><input type="number" min="0.001" step="0.001" wire:model="items.{{ $index }}.quantity" class="form-control @error('items.'.$index.'.quantity') is-invalid @enderror">@error('items.'.$index.'.quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
                                         <div class="col-sm-6 col-lg-3"><label class="form-label">Observación <span class="field-optional">Opcional</span></label><input wire:model="items.{{ $index }}.notes" maxlength="500" class="form-control @error('items.'.$index.'.notes') is-invalid @enderror">@error('items.'.$index.'.notes')<div class="invalid-feedback">{{ $message }}</div>@enderror</div>
@@ -132,6 +160,7 @@
                     @if($delivery->status === 'draft')
                         @can('editar-entrega')<button wire:click="edit({{ $delivery->id }})" class="btn btn-sm btn-outline-primary"><i class="bx bx-edit me-1"></i>Editar</button>@endcan
                         @can('confirmar-entrega')<button wire:click="confirm({{ $delivery->id }})" wire:confirm="¿Confirmar esta entrega y descontar el inventario?" class="btn btn-sm btn-success">Confirmar</button>@endcan
+                        @can('eliminar-entrega')<button wire:click="deleteDraft({{ $delivery->id }})" wire:confirm="¿Eliminar definitivamente esta entrega en borrador? Sus datos quedarán registrados en el historial." class="btn btn-sm btn-outline-danger"><i class="bx bx-trash me-1"></i>Eliminar</button>@endcan
                     @elseif($delivery->status === 'confirmed')
                         @can('editar-entrega')<button wire:click="correct({{ $delivery->id }})" wire:confirm="Se creará una versión editable. El original seguirá vigente hasta confirmar los cambios. ¿Continuar?" class="btn btn-sm btn-outline-primary"><i class="bx bx-edit me-1"></i>Editar</button>@endcan
                         @can('anular-entrega')<button onclick="const m=prompt('Motivo de anulación (mínimo 10 caracteres):');if(m){$wire.set('annulReason',m).then(()=>$wire.annul({{ $delivery->id }}))}" class="btn btn-sm btn-outline-danger">Anular</button>@endcan

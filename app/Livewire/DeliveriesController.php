@@ -5,10 +5,10 @@ namespace App\Livewire;
 use App\Models\Delivery;
 use App\Models\ProductVariant;
 use App\Models\Worker;
+use App\Services\CodeGenerator;
 use App\Services\InventoryService;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -62,11 +62,32 @@ class DeliveriesController extends Component
         }
         $ids = collect($this->items)->pluck('variant_id')->filter();
         $selectedSerialIds = collect($this->items)->flatMap(fn ($item) => $item['serial_ids'] ?? [])->filter()->unique();
-        $variants = ProductVariant::with(['product', 'serializedItems' => fn ($q) => $q->where('status', 'available')->when($selectedSerialIds->isNotEmpty(), fn ($serials) => $serials->orWhereIn('id', $selectedSerialIds))])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
+        $serialBalance = $this->serialBalanceExpression();
+        $variants = ProductVariant::with([
+            'product',
+            'serializedItems' => function ($query) use ($selectedSerialIds, $serialBalance) {
+                $query->where(function ($options) use ($selectedSerialIds, $serialBalance) {
+                    $options->where(function ($available) use ($serialBalance) {
+                        $available->where('status', 'available')->whereRaw("{$serialBalance} = 1");
+                    });
+                    if ($selectedSerialIds->isNotEmpty()) {
+                        $options->orWhereIn('serialized_items.id', $selectedSerialIds);
+                    }
+                })->orderBy('serial_number');
+            },
+        ])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
         $productResults = collect();
         if (mb_strlen(trim($this->productSearch)) >= 2) {
             $term = '%'.trim($this->productSearch).'%';
-            $productResults = ProductVariant::with('product')->withSum('inventoryMovements as stock', 'quantity')->where('status', true)->whereHas('product', fn ($q) => $q->where('status', true))->where(fn ($q) => $q->where('sku', 'like', $term)->orWhere('name', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term))->orWhereHas('serializedItems', fn ($s) => $s->where('serial_number', 'like', $term)))->limit(15)->get();
+            $productResults = ProductVariant::with('product')
+                ->withSum('inventoryMovements as stock', 'quantity')
+                ->withCount(['serializedItems as deliverable_serials_count' => fn ($query) => $query
+                    ->where('status', 'available')
+                    ->whereRaw("{$serialBalance} = 1")])
+                ->where('status', true)
+                ->whereHas('product', fn ($q) => $q->where('status', true))
+                ->where(fn ($q) => $q->where('sku', 'like', $term)->orWhere('name', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term))->orWhereHas('serializedItems', fn ($s) => $s->where('serial_number', 'like', $term)))
+                ->limit(15)->get();
         }
 
         $selectedDetail = $this->detailId ? Delivery::with(['worker', 'items.variant.product', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
@@ -83,12 +104,21 @@ class DeliveriesController extends Component
 
     public function addProduct($id)
     {
-        $v = ProductVariant::where('status', true)->whereHas('product', fn ($q) => $q->where('status', true))->findOrFail($id);
+        $v = ProductVariant::with('product')->where('status', true)->whereHas('product', fn ($q) => $q->where('status', true))->findOrFail($id);
         if (collect($this->items)->contains('variant_id', $v->id)) {
             $this->dispatch('alert', 'Ese producto ya está agregado.', 'warning');
 
             return;
-        }$this->items[] = ['variant_id' => $v->id, 'quantity' => 1, 'serial_ids' => [], 'notes' => ''];
+        }
+        if ($v->product->tracking_type === 'serialized' && ! $v->serializedItems()
+            ->where('status', 'available')
+            ->whereRaw($this->serialBalanceExpression().' = 1')
+            ->exists()) {
+            $this->dispatch('alert', 'Este producto no tiene números de serie disponibles en almacén. Confirma primero su remito de ingreso o selecciona otro equipo.', 'warning');
+
+            return;
+        }
+        $this->items[] = ['variant_id' => $v->id, 'quantity' => 1, 'serial_ids' => [], 'notes' => ''];
         $this->productSearch = '';
     }
 
@@ -117,7 +147,7 @@ class DeliveriesController extends Component
         if ($this->deliveryId) {
             abort_unless(Delivery::whereKey($this->deliveryId)->where('status', 'draft')->exists(), 422);
         }
-        $this->number = Str::upper(trim($this->number));
+        $this->number = app(CodeGenerator::class)->normalizeSiteSuffix($this->number);
         $this->validate(['number' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('deliveries', 'number')->ignore($this->deliveryId)]]);
         $data = $this->validate(['worker_id' => 'required|exists:workers,id', 'delivery_date' => 'required|date|before_or_equal:today', 'reason' => 'nullable|string|max:180', 'notes' => 'nullable|string|max:2000', 'items' => 'required|array|min:1', 'items.*.variant_id' => 'required|integer|distinct|exists:product_variants,id', 'items.*.quantity' => 'required|numeric|min:0.001|max:999999999', 'items.*.serial_ids' => 'array', 'items.*.serial_ids.*' => 'integer|distinct|exists:serialized_items,id', 'items.*.notes' => 'nullable|string|max:500']);
         if (! Worker::whereKey($data['worker_id'])->where('status', true)->exists()) {
@@ -171,6 +201,46 @@ class DeliveriesController extends Component
     {
         abort_unless(auth()->user()->can('ver-entrega'), 403);
         $this->detailId = Delivery::findOrFail($id)->id;
+    }
+
+    public function deleteDraft(int $id): void
+    {
+        abort_unless(auth()->user()->can('eliminar-entrega'), 403);
+
+        [$number, $before] = DB::transaction(function () use ($id) {
+            $delivery = Delivery::with(['worker', 'items.variant.product', 'items.serializedItems'])
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($delivery->status !== 'draft') {
+                throw ValidationException::withMessages([
+                    'document' => 'Solo se pueden eliminar entregas que continúen en borrador.',
+                ]);
+            }
+
+            if ($delivery->movements()->exists()) {
+                throw ValidationException::withMessages([
+                    'document' => 'Esta entrega tiene movimientos de inventario y no puede eliminarse.',
+                ]);
+            }
+
+            $number = $delivery->number ?: 'BORRADOR #'.$delivery->id;
+            $before = $this->snapshot($delivery);
+            $delivery->delete();
+
+            return [$number, $before];
+        });
+
+        $this->logActivity('ENTREGAS', 'ELIMINAR_BORRADOR', 'Eliminación de la entrega en borrador '.$number, $id, $before, ['eliminado' => true]);
+
+        if ((int) $this->deliveryId === $id) {
+            $this->resetForm();
+        }
+        if ((int) $this->detailId === $id) {
+            $this->detailId = null;
+        }
+
+        $this->dispatch('alert', 'Entrega en borrador eliminada. La copia completa quedó registrada en el historial.', 'success');
     }
 
     public function correct($id)
@@ -238,8 +308,32 @@ class DeliveriesController extends Component
 
     private function snapshot(Delivery $d)
     {
-        $d->loadMissing(['worker', 'items.variant.product', 'items.serializedItems']);
+        $d->loadMissing(['worker', 'creator', 'items.variant.product', 'items.serializedItems']);
 
-        return ['número' => $d->number, 'corrige_entrega_id' => $d->corrected_from_id, 'trabajador' => $d->worker?->full_name, 'documento' => $d->worker?->document, 'fecha' => $d->delivery_date?->format('Y-m-d'), 'motivo' => $d->reason, 'estado' => $d->status, 'motivo_anulación' => $d->annul_reason, 'detalles' => $d->items->map(fn ($i) => ['producto' => $i->variant?->product?->name, 'sku' => $i->variant?->sku, 'cantidad' => (float) $i->quantity, 'series' => $i->serializedItems->pluck('serial_number')->all()])->all()];
+        return [
+            'número' => $d->number,
+            'corrige_entrega_id' => $d->corrected_from_id,
+            'trabajador' => $d->worker?->full_name,
+            'documento' => $d->worker?->document,
+            'fecha' => $d->delivery_date?->format('Y-m-d'),
+            'motivo' => $d->reason,
+            'observaciones' => $d->notes,
+            'estado' => $d->status,
+            'creado_por' => $d->creator?->login,
+            'creado_el' => $d->created_at?->format('Y-m-d H:i:s'),
+            'motivo_anulación' => $d->annul_reason,
+            'detalles' => $d->items->map(fn ($item) => [
+                'producto' => $item->variant?->product?->name,
+                'sku' => $item->variant?->sku,
+                'cantidad' => (float) $item->quantity,
+                'observaciones' => $item->notes,
+                'series' => $item->serializedItems->pluck('serial_number')->all(),
+            ])->all(),
+        ];
+    }
+
+    private function serialBalanceExpression(): string
+    {
+        return '(SELECT COALESCE(SUM(im.quantity), 0) FROM inventory_movements im WHERE im.serialized_item_id = serialized_items.id)';
     }
 }

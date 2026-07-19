@@ -4,10 +4,10 @@ namespace App\Livewire;
 
 use App\Models\DispatchNote;
 use App\Models\ProductVariant;
+use App\Services\CodeGenerator;
 use App\Services\InventoryService;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Livewire\Component;
@@ -109,7 +109,7 @@ class DispatchNotesController extends Component
                 throw ValidationException::withMessages(['type' => 'El tipo de un remito no puede cambiarse durante una corrección.']);
             }
         }
-        $this->number = Str::upper(trim($this->number));
+        $this->number = app(CodeGenerator::class)->normalizeSiteSuffix($this->number);
         $data = $this->validate([
             'number' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('dispatch_notes', 'number')->ignore($this->noteId)],
             'type' => 'required|in:entry,exit', 'document_date' => 'required|date|before_or_equal:today',
@@ -166,6 +166,46 @@ class DispatchNotesController extends Component
     {
         abort_unless(auth()->user()->can('ver-remito'), 403);
         $this->detailId = DispatchNote::findOrFail($id)->id;
+    }
+
+    public function deleteDraft(int $id): void
+    {
+        abort_unless(auth()->user()->can('eliminar-remito'), 403);
+
+        [$number, $before] = DB::transaction(function () use ($id) {
+            $note = DispatchNote::with(['items.variant.product', 'items.serializedItems'])
+                ->lockForUpdate()
+                ->findOrFail($id);
+
+            if ($note->status !== 'draft') {
+                throw ValidationException::withMessages([
+                    'document' => 'Solo se pueden eliminar remitos que continúen en borrador.',
+                ]);
+            }
+
+            if ($note->movements()->exists()) {
+                throw ValidationException::withMessages([
+                    'document' => 'Este remito tiene movimientos de inventario y no puede eliminarse.',
+                ]);
+            }
+
+            $number = $note->number ?: 'BORRADOR #'.$note->id;
+            $before = $this->snapshot($note);
+            $note->delete();
+
+            return [$number, $before];
+        });
+
+        $this->logActivity('REMITOS', 'ELIMINAR_BORRADOR', 'Eliminación del remito en borrador '.$number, $id, $before, ['eliminado' => true]);
+
+        if ((int) $this->noteId === $id) {
+            $this->resetForm();
+        }
+        if ((int) $this->detailId === $id) {
+            $this->detailId = null;
+        }
+
+        $this->dispatch('alert', 'Remito en borrador eliminado. La copia completa quedó registrada en el historial.', 'success');
     }
 
     public function correct(int $id): void
@@ -234,8 +274,27 @@ class DispatchNotesController extends Component
 
     private function snapshot(DispatchNote $note): array
     {
-        $note->loadMissing(['items.variant.product', 'items.serializedItems']);
+        $note->loadMissing(['creator', 'items.variant.product', 'items.serializedItems']);
 
-        return ['número' => $note->number, 'corrige_remito_id' => $note->corrected_from_id, 'tipo' => $note->type, 'fecha' => $note->document_date?->format('Y-m-d'), 'contraparte' => $note->counterparty, 'motivo' => $note->reason, 'estado' => $note->status, 'motivo_anulación' => $note->annul_reason, 'detalles' => $note->items->map(fn ($i) => ['producto' => $i->variant?->product?->name, 'sku' => $i->variant?->sku, 'cantidad' => (float) $i->quantity, 'series' => $i->serializedItems->pluck('serial_number')->all()])->all()];
+        return [
+            'número' => $note->number,
+            'corrige_remito_id' => $note->corrected_from_id,
+            'tipo' => $note->type,
+            'fecha' => $note->document_date?->format('Y-m-d'),
+            'contraparte' => $note->counterparty,
+            'motivo' => $note->reason,
+            'observaciones' => $note->notes,
+            'estado' => $note->status,
+            'creado_por' => $note->creator?->login,
+            'creado_el' => $note->created_at?->format('Y-m-d H:i:s'),
+            'motivo_anulación' => $note->annul_reason,
+            'detalles' => $note->items->map(fn ($item) => [
+                'producto' => $item->variant?->product?->name,
+                'sku' => $item->variant?->sku,
+                'cantidad' => (float) $item->quantity,
+                'observaciones' => $item->notes,
+                'series' => $item->serializedItems->pluck('serial_number')->all(),
+            ])->all(),
+        ];
     }
 }

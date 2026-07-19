@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\Worker;
+use App\Services\CodeGenerator;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -17,6 +18,8 @@ class WorkersController extends Component
     protected $paginationTheme = 'bootstrap';
 
     public $workerId;
+
+    public $code = '';
 
     public $document = '';
 
@@ -70,11 +73,17 @@ class WorkersController extends Component
     {
         abort_unless(auth()->user()->can($this->workerId ? 'editar-trabajador' : 'crear-trabajador'), 403);
         $this->normalizeInputs();
+        $originalCode = $this->workerId ? Worker::whereKey($this->workerId)->value('code') : null;
+        $this->code = Str::upper(trim($this->code));
+        if ($this->code !== '' && $this->code !== $originalCode) {
+            $this->code = app(CodeGenerator::class)->normalizeSiteSuffix($this->code);
+        }
         $data = $this->validate([
+            'code' => ['nullable', 'string', 'max:20', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('workers')->ignore($this->workerId)],
             'document' => ['required', 'string', 'max:40', 'regex:/^[A-Z0-9.\-]+$/', Rule::unique('workers')->ignore($this->workerId)],
             'name' => ['required', 'string', 'max:100', "regex:/^[\pL\pM '\-.]+$/u"],
             'lastname' => ['required', 'string', 'max:100', "regex:/^[\pL\pM '\-.]+$/u"],
-            'position' => 'nullable|string|max:120',
+            'position' => 'required|string|max:120',
             'area' => 'nullable|string|max:120',
             'phone' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\- ]+$/'],
             'email' => ['nullable', 'email:rfc', 'max:150', Rule::unique('workers')->ignore($this->workerId)],
@@ -88,12 +97,16 @@ class WorkersController extends Component
             'phone.regex' => 'El teléfono contiene caracteres no permitidos.',
             'start_date.before_or_equal' => 'La fecha de ingreso no puede ser futura.',
         ]);
+        $data['code'] = $data['code'] ?: null;
+        foreach (['area', 'phone', 'email', 'start_date', 'notes'] as $nullableField) {
+            $data[$nullableField] = $data[$nullableField] === '' ? null : $data[$nullableField];
+        }
 
         $before = $this->workerId ? $this->snapshot(Worker::findOrFail($this->workerId)) : null;
         $worker = DB::transaction(function () use ($data) {
             $worker = Worker::updateOrCreate(['id' => $this->workerId], $data);
             if (! $worker->code) {
-                $worker->update(['code' => 'TRB-'.str_pad((string) $worker->id, 6, '0', STR_PAD_LEFT)]);
+                $worker->update(['code' => $this->nextWorkerCode($worker->position, $worker->area)]);
             }
 
             return $worker->fresh();
@@ -109,7 +122,7 @@ class WorkersController extends Component
         abort_unless(auth()->user()->can('editar-trabajador'), 403);
         $worker = Worker::findOrFail($id);
         $this->workerId = $worker->id;
-        foreach (['document', 'name', 'lastname', 'position', 'area', 'phone', 'email', 'notes'] as $field) {
+        foreach (['code', 'document', 'name', 'lastname', 'position', 'area', 'phone', 'email', 'notes'] as $field) {
             $this->{$field} = $worker->{$field} ?? '';
         }
         $this->start_date = $worker->start_date?->format('Y-m-d') ?? '';
@@ -130,7 +143,7 @@ class WorkersController extends Component
 
     public function resetForm(): void
     {
-        $this->reset(['workerId', 'document', 'name', 'lastname', 'position', 'area', 'phone', 'email', 'start_date', 'notes']);
+        $this->reset(['workerId', 'code', 'document', 'name', 'lastname', 'position', 'area', 'phone', 'email', 'start_date', 'notes']);
         $this->status = true;
         $this->resetValidation();
     }
@@ -156,5 +169,30 @@ class WorkersController extends Component
             'fecha_ingreso' => $worker->start_date?->format('Y-m-d'),
             'observaciones' => $worker->notes, 'estado' => $worker->status,
         ];
+    }
+
+    private function nextWorkerCode(string $position, ?string $area): string
+    {
+        $codes = app(CodeGenerator::class);
+        $key = $codes->workerSequenceKey($position, $area);
+        DB::table('document_sequences')->insertOrIgnore([
+            'key' => $key,
+            'next_number' => 1,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $sequence = DB::table('document_sequences')->where('key', $key)->lockForUpdate()->first();
+        $number = (int) $sequence->next_number;
+
+        do {
+            $code = $codes->workerCode($position, $area, $number++);
+        } while (Worker::where('code', $code)->exists());
+
+        DB::table('document_sequences')->where('key', $key)->update([
+            'next_number' => $number,
+            'updated_at' => now(),
+        ]);
+
+        return $code;
     }
 }
