@@ -30,9 +30,9 @@ it('shows stock and a kardex with running balances', function () {
     $exit->items()->create(['product_variant_id' => $this->variant->id, 'quantity' => 3]);
     app(InventoryService::class)->confirm($exit, $this->user->id);
 
-    Livewire::test(InventoryController::class)->assertSee('Guantes')->assertSee('7.000')
+    Livewire::test(InventoryController::class)->assertSee('Guantes')->assertSee('7')->assertDontSee('7.000')
         ->call('viewKardex', $this->variant->id)->assertSeeHtml('aria-modal="true"')->assertSee('REM-01-'.now()->format('dmY').'-RGD')->assertSee('REM-02-'.now()->format('dmY').'-RGD')
-        ->assertSee('10.000')->assertSee('3.000')->assertSee('7.000');
+        ->assertSee('10')->assertSee('3')->assertSee('7')->assertDontSee('.000');
 });
 
 it('protects kardex independently from stock visibility', function () {

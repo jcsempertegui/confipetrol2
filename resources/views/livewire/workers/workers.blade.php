@@ -35,10 +35,12 @@
     </div>
     @endcanany
 
-    <div class="card">
-        <div class="card-header"><div class="row g-2 align-items-center">
-            <div class="col-md-8"><div class="input-group"><span class="input-group-text"><i class="bx bx-search"></i></span><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Buscar por código, documento, nombre, área o cargo"></div></div>
-            <div class="col-md-4"><select wire:model.live="statusFilter" class="form-select"><option value="active">Solo activos</option><option value="inactive">Solo inactivos</option><option value="all">Todos los trabajadores</option></select></div>
+    <div class="card module-list-card">
+        <div class="card-header filter-header">
+            <div class="filter-title"><i class="bx bx-group"></i><span>Directorio de trabajadores</span></div>
+            <div class="row g-2 flex-grow-1 justify-content-end">
+            <div class="col-12 col-lg-6"><label class="filter-label">Buscar</label><div class="input-group"><span class="input-group-text"><i class="bx bx-search"></i></span><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Código, documento, nombre, área o cargo"></div></div>
+            <div class="col-sm-6 col-lg-3"><label class="filter-label">Estado</label><select wire:model.live="statusFilter" class="form-select"><option value="active">Solo activos</option><option value="inactive">Solo inactivos</option><option value="all">Todos los trabajadores</option></select></div>
         </div></div>
         <div class="card-body p-0">
             <div class="table-responsive d-none d-lg-block">
@@ -56,11 +58,11 @@
                 </table>
             </div>
 
-            <div class="d-lg-none p-2">@forelse($workers as $worker)<div class="border rounded p-3 mb-2" wire:key="worker-card-{{ $worker->id }}">
+            <div class="d-lg-none module-data-list">@forelse($workers as $worker)<div class="module-data-card" wire:key="worker-card-{{ $worker->id }}">
                 <div class="d-flex justify-content-between gap-2"><div><strong>{{ $worker->full_name }}</strong><div class="small font-monospace text-muted">{{ $worker->code }} · {{ $worker->document }}</div></div><span class="badge align-self-start bg-{{ $worker->status ? 'success' : 'secondary' }}">{{ $worker->status ? 'Activo' : 'Inactivo' }}</span></div>
                 <div class="small mt-2"><i class="bx bx-building me-1"></i>{{ $worker->area ?: 'Sin área' }} · {{ $worker->position ?: 'Sin cargo' }}</div>
                 @if($worker->phone || $worker->email)<div class="small text-muted mt-1"><i class="bx bx-phone me-1"></i>{{ $worker->phone ?: $worker->email }}</div>@endif
-                <div class="d-flex gap-2 mt-3">@can('editar-trabajador')<button wire:click="edit({{ $worker->id }})" class="btn btn-sm btn-outline-primary flex-fill"><i class="bx bx-edit me-1"></i>Editar</button>@endcan @if($worker->status) @can('eliminar-trabajador')<button wire:click="toggleStatus({{ $worker->id }})" wire:confirm="¿Desactivar a este trabajador?" class="btn btn-sm btn-outline-danger flex-fill">Desactivar</button>@endcan @else @can('restaurar-trabajador')<button wire:click="toggleStatus({{ $worker->id }})" class="btn btn-sm btn-outline-success flex-fill">Activar</button>@endcan @endif</div>
+                <div class="module-data-actions">@can('editar-trabajador')<button wire:click="edit({{ $worker->id }})" class="btn btn-sm btn-outline-primary flex-fill"><i class="bx bx-edit me-1"></i>Editar</button>@endcan @if($worker->status) @can('eliminar-trabajador')<button wire:click="toggleStatus({{ $worker->id }})" wire:confirm="¿Desactivar a este trabajador?" class="btn btn-sm btn-outline-danger flex-fill">Desactivar</button>@endcan @else @can('restaurar-trabajador')<button wire:click="toggleStatus({{ $worker->id }})" class="btn btn-sm btn-outline-success flex-fill">Activar</button>@endcan @endif</div>
             </div>@empty<div class="text-center text-muted py-5">No se encontraron trabajadores.</div>@endforelse</div>
         </div>
         @if($workers->hasPages())<div class="card-footer">{{ $workers->links() }}</div>@endif

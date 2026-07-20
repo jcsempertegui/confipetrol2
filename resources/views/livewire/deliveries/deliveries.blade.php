@@ -74,7 +74,7 @@
                                         @if($result->product->tracking_type === 'serialized')
                                             <span class="badge bg-{{ $result->deliverable_serials_count > 0 ? 'primary' : 'danger' }} align-self-center">{{ $result->deliverable_serials_count }} serie(s) disponible(s)</span>
                                         @else
-                                            <span class="badge bg-light text-dark align-self-center">Stock {{ number_format((float) ($result->stock ?? 0), 3) }}</span>
+                                            <span class="badge bg-light text-dark align-self-center">Stock {{ \App\Support\Quantity::format($result->stock ?? 0) }}</span>
                                         @endif
                                     </button>
                                 @empty
@@ -135,14 +135,32 @@
     @endcanany
 
     @if($selectedDetail)
-        <div class="card detail-card">
-            <div class="card-header"><div><strong>Detalle de entrega {{ $selectedDetail->number ?: '#'.$selectedDetail->id }}</strong><div class="form-card-subtitle">{{ $selectedDetail->delivery_date->format('d/m/Y') }} · {{ $selectedDetail->worker->full_name }} · {{ $selectedDetail->worker->document }}</div></div><button wire:click="$set('detailId', null)" class="btn btn-sm btn-outline-secondary">Cerrar</button></div>
-            <div class="card-body">
-                @if($selectedDetail->correctedFrom)<div class="alert alert-info py-2"><i class="bx bx-history me-1"></i>Esta versión corrige la entrega <strong>{{ $selectedDetail->correctedFrom->number }}</strong>.</div>@endif
-                @if($selectedDetail->correction)<div class="alert alert-warning py-2"><i class="bx bx-history me-1"></i>Este original fue sustituido por {{ $selectedDetail->correction->number ?: 'el borrador #'.$selectedDetail->correction->id }}.</div>@endif
-                <div class="row g-3 mb-3"><div class="col-md-4"><span class="detail-label">Estado</span><span class="badge bg-{{ ['draft'=>'secondary','confirmed'=>'success','annulled'=>'danger'][$selectedDetail->status] }}">{{ ['draft'=>'Borrador','confirmed'=>'Confirmada','annulled'=>'Inactiva / anulada'][$selectedDetail->status] }}</span></div><div class="col-md-4"><span class="detail-label">Área</span>{{ $selectedDetail->worker->area ?: '—' }}</div><div class="col-md-4"><span class="detail-label">Motivo</span>{{ $selectedDetail->reason ?: '—' }}</div></div>
-                <div class="table-responsive"><table class="table"><thead><tr><th>Producto</th><th>SKU</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td>{{ $item->variant->product->name }}</td><td>{{ $item->variant->sku }}</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end">{{ number_format((float) $item->quantity, 3) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
-                @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
+        <div class="modal fade show module-modal-shell" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="delivery-detail-title" wire:click.self="$set('detailId', null)" wire:keydown.escape.window="$set('detailId', null)">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="delivery-detail-title"><i class="bx bx-package me-1 text-primary"></i>Entrega {{ $selectedDetail->number ?: '#'.$selectedDetail->id }}</h5>
+                            <div class="form-card-subtitle">{{ $selectedDetail->delivery_date->format('d/m/Y') }} · {{ $selectedDetail->worker->full_name }} · {{ $selectedDetail->worker->document }}</div>
+                        </div>
+                        <button type="button" wire:click="$set('detailId', null)" class="btn-close" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if($selectedDetail->correctedFrom)<div class="alert alert-info py-2"><i class="bx bx-history me-1"></i>Esta versión corrige la entrega <strong>{{ $selectedDetail->correctedFrom->number }}</strong>.</div>@endif
+                        @if($selectedDetail->correction)<div class="alert alert-warning py-2"><i class="bx bx-history me-1"></i>Este original fue sustituido por {{ $selectedDetail->correction->number ?: 'el borrador #'.$selectedDetail->correction->id }}.</div>@endif
+                        <div class="detail-summary-grid mb-3">
+                            <div class="detail-summary-item"><span class="detail-label">Estado</span><span class="badge bg-{{ ['draft'=>'secondary','confirmed'=>'success','annulled'=>'danger'][$selectedDetail->status] }}">{{ ['draft'=>'Borrador','confirmed'=>'Confirmada','annulled'=>'Inactiva / anulada'][$selectedDetail->status] }}</span></div>
+                            <div class="detail-summary-item"><span class="detail-label">Trabajador</span><strong>{{ $selectedDetail->worker->full_name }}</strong><div class="small text-muted">{{ $selectedDetail->worker->document }}</div></div>
+                            <div class="detail-summary-item"><span class="detail-label">Área</span><strong>{{ $selectedDetail->worker->area ?: '—' }}</strong></div>
+                            <div class="detail-summary-item"><span class="detail-label">Motivo</span><strong>{{ $selectedDetail->reason ?: '—' }}</strong></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td class="font-monospace">{{ $item->variant->sku }}</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
+                        @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" wire:click="$set('detailId', null)" class="btn btn-outline-secondary"><i class="bx bx-x me-1"></i>Cerrar</button>
+                    </div>
+                </div>
             </div>
         </div>
     @endif

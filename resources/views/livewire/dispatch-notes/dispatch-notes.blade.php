@@ -72,7 +72,7 @@
                                 @forelse($productResults as $result)
                                     <button type="button" wire:click="addProduct({{ $result->id }})" class="list-group-item list-group-item-action d-flex justify-content-between gap-3">
                                         <span><strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}<small class="d-block text-muted">{{ $result->sku }}</small></span>
-                                        <span class="badge bg-light text-dark align-self-center">Stock {{ number_format((float) ($result->stock ?? 0), 3) }}</span>
+                                        <span class="badge bg-light text-dark align-self-center">Stock {{ \App\Support\Quantity::format($result->stock ?? 0) }}</span>
                                     </button>
                                 @empty
                                     <div class="list-group-item text-muted">No se encontraron productos.</div>
@@ -141,21 +141,31 @@
     @endcanany
 
     @if($selectedDetail)
-        <div class="card detail-card">
-            <div class="card-header">
-                <div><strong>Detalle del remito {{ $selectedDetail->number ?: '#'.$selectedDetail->id }}</strong><div class="form-card-subtitle">{{ $selectedDetail->type === 'entry' ? 'Ingreso' : 'Salida' }} · {{ $selectedDetail->document_date->format('d/m/Y') }} · {{ $selectedDetail->counterparty }}</div></div>
-                <button wire:click="$set('detailId', null)" class="btn btn-sm btn-outline-secondary">Cerrar</button>
-            </div>
-            <div class="card-body">
-                @if($selectedDetail->correctedFrom)<div class="alert alert-info py-2"><i class="bx bx-history me-1"></i>Esta versión corrige al remito <strong>{{ $selectedDetail->correctedFrom->number }}</strong>.</div>@endif
-                @if($selectedDetail->correction)<div class="alert alert-warning py-2"><i class="bx bx-history me-1"></i>Este original fue sustituido por {{ $selectedDetail->correction->number ?: 'el borrador #'.$selectedDetail->correction->id }}.</div>@endif
-                <div class="row g-3 mb-3">
-                    <div class="col-md-4"><span class="detail-label">Estado</span><span class="badge bg-{{ ['draft'=>'secondary','confirmed'=>'success','annulled'=>'danger'][$selectedDetail->status] }}">{{ ['draft'=>'Borrador','confirmed'=>'Confirmado','annulled'=>'Inactivo / anulado'][$selectedDetail->status] }}</span></div>
-                    <div class="col-md-4"><span class="detail-label">Motivo</span>{{ $selectedDetail->reason ?: '—' }}</div>
-                    <div class="col-md-4"><span class="detail-label">Registrado por</span>{{ $selectedDetail->creator?->login }}</div>
+        <div class="modal fade show module-modal-shell" tabindex="-1" role="dialog" aria-modal="true" aria-labelledby="dispatch-detail-title" wire:click.self="$set('detailId', null)" wire:keydown.escape.window="$set('detailId', null)">
+            <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable modal-fullscreen-sm-down">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <div>
+                            <h5 class="modal-title" id="dispatch-detail-title"><i class="bx bx-receipt me-1 text-primary"></i>Remito {{ $selectedDetail->number ?: '#'.$selectedDetail->id }}</h5>
+                            <div class="form-card-subtitle">{{ $selectedDetail->type === 'entry' ? 'Ingreso al almacén' : 'Salida del almacén' }} · {{ $selectedDetail->document_date->format('d/m/Y') }} · {{ $selectedDetail->counterparty }}</div>
+                        </div>
+                        <button type="button" wire:click="$set('detailId', null)" class="btn-close" aria-label="Cerrar"></button>
+                    </div>
+                    <div class="modal-body">
+                        @if($selectedDetail->correctedFrom)<div class="alert alert-info py-2"><i class="bx bx-history me-1"></i>Esta versión corrige al remito <strong>{{ $selectedDetail->correctedFrom->number }}</strong>.</div>@endif
+                        @if($selectedDetail->correction)<div class="alert alert-warning py-2"><i class="bx bx-history me-1"></i>Este original fue sustituido por {{ $selectedDetail->correction->number ?: 'el borrador #'.$selectedDetail->correction->id }}.</div>@endif
+                        <div class="detail-summary-grid mb-3">
+                            <div class="detail-summary-item"><span class="detail-label">Estado</span><span class="badge bg-{{ ['draft'=>'secondary','confirmed'=>'success','annulled'=>'danger'][$selectedDetail->status] }}">{{ ['draft'=>'Borrador','confirmed'=>'Confirmado','annulled'=>'Inactivo / anulado'][$selectedDetail->status] }}</span></div>
+                            <div class="detail-summary-item"><span class="detail-label">Motivo</span><strong>{{ $selectedDetail->reason ?: '—' }}</strong></div>
+                            <div class="detail-summary-item"><span class="detail-label">Registrado por</span><strong>{{ $selectedDetail->creator?->login ?? 'Sistema' }}</strong></div>
+                        </div>
+                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td class="font-monospace">{{ $item->variant->sku }}</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
+                        @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" wire:click="$set('detailId', null)" class="btn btn-outline-secondary"><i class="bx bx-x me-1"></i>Cerrar</button>
+                    </div>
                 </div>
-                <div class="table-responsive"><table class="table"><thead><tr><th>Producto</th><th>SKU</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td>{{ $item->variant->product->name }}</td><td>{{ $item->variant->sku }}</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end">{{ number_format((float) $item->quantity, 3) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
-                @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
             </div>
         </div>
     @endif

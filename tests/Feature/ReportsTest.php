@@ -32,8 +32,16 @@ beforeEach(function () {
 it('shows inventory reports and low stock alerts', function () {
     Livewire::test(ReportsController::class)
         ->assertSee('Guantes')
-        ->assertSee('5.000')
+        ->assertSee('5')
+        ->assertDontSee('5.000')
         ->assertSee('Stock bajo')
+        ->assertSee('Más filtros')
+        ->assertDontSee('Estado de vencimiento')
+        ->set('showAdvancedFilters', true)
+        ->assertSee('Estado en el catálogo')
+        ->set('catalogStatus', 'inactive')
+        ->assertDontSee('EPP-0001-8')
+        ->set('catalogStatus', 'active')
         ->set('stockStatus', 'low')
         ->assertSee('EPP-0001-8');
 });
@@ -56,6 +64,8 @@ it('filters inventory by expiration date and highlights expired products', funct
     $expiredVariant->attributeValues()->create(['product_attribute_id' => $expiration->id, 'value' => '2026-07-10']);
 
     Livewire::test(ReportsController::class)
+        ->set('categoryFilter', $category->id)
+        ->assertSee('Estado de vencimiento')
         ->set('expiryStatus', 'expired')
         ->assertSee('Producto vencido')
         ->assertSee('10/07/2026')
@@ -66,6 +76,42 @@ it('filters inventory by expiration date and highlights expired products', funct
         ->set('expiryTo', '2026-08-31')
         ->assertSee('EPP-0001-8')
         ->assertDontSee('Producto vencido');
+});
+
+it('adapts category filters and shows available serial numbers for assets', function () {
+    $category = Category::create(['name' => 'Activos', 'code' => 'ACT', 'status' => true]);
+    $brand = ProductAttribute::create(['name' => 'Marca', 'code' => 'act-marca', 'type' => 'text', 'scope' => 'product', 'status' => true]);
+    $serialAttribute = ProductAttribute::create(['name' => 'Número de serie', 'code' => 'act-serie', 'type' => 'text', 'scope' => 'unit', 'status' => true]);
+    $category->attributes()->attach($brand->id, ['required' => true, 'position' => 1]);
+    $category->attributes()->attach($serialAttribute->id, ['required' => true, 'position' => 2]);
+
+    $toshiba = Product::create(['category_id' => $category->id, 'code' => 'ACT-001-01-RGD', 'name' => 'Laptop Toshiba', 'unit' => 'unidad', 'tracking_type' => 'serialized']);
+    $toshiba->attributeValues()->create(['product_attribute_id' => $brand->id, 'value' => 'Toshiba']);
+    $toshibaVariant = $toshiba->variants()->create(['sku' => 'ACT-001-01-RGD', 'name' => 'Unidad']);
+    $serial = $toshibaVariant->serializedItems()->create(['serial_number' => 'TOSH-RGD-0001', 'status' => 'available']);
+    $entry = DispatchNote::create(['type' => 'entry', 'document_date' => now(), 'counterparty' => 'Proveedor activos', 'status' => 'draft', 'created_by' => $this->user->id]);
+    $entryItem = $entry->items()->create(['product_variant_id' => $toshibaVariant->id, 'quantity' => 1]);
+    $entryItem->serializedItems()->attach($serial);
+    app(InventoryService::class)->confirm($entry, $this->user->id);
+
+    $dell = Product::create(['category_id' => $category->id, 'code' => 'ACT-002-01-RGD', 'name' => 'Laptop Dell', 'unit' => 'unidad', 'tracking_type' => 'serialized']);
+    $dell->attributeValues()->create(['product_attribute_id' => $brand->id, 'value' => 'Dell']);
+    $dell->variants()->create(['sku' => 'ACT-002-01-RGD', 'name' => 'Unidad']);
+
+    Livewire::test(ReportsController::class)
+        ->set('categoryFilter', $category->id)
+        ->assertSee('Filtros de Activos')
+        ->assertSee('Número de serie')
+        ->assertSee('Marca')
+        ->assertSee('TOSH-RGD-0001')
+        ->assertDontSee('Estado de vencimiento')
+        ->set('serialFilter', 'TOSH-RGD')
+        ->assertSee('Laptop Toshiba')
+        ->assertDontSee('Laptop Dell')
+        ->set('serialFilter', '')
+        ->set('attributeFilters.'.$brand->id, 'Dell')
+        ->assertSee('Laptop Dell')
+        ->assertDontSee('Laptop Toshiba');
 });
 
 it('filters movements by type source and quick periods', function () {

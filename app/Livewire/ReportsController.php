@@ -6,8 +6,10 @@ use App\Models\Category;
 use App\Models\DeliveryItem;
 use App\Models\InventoryMovement;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\ProductVariant;
 use App\Models\Worker;
+use App\Support\Quantity;
 use App\Traits\AuditLog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +34,8 @@ class ReportsController extends Component
 
     public $stockStatus = '';
 
+    public $catalogStatus = 'active';
+
     public $trackingFilter = '';
 
     public $unitFilter = '';
@@ -41,6 +45,12 @@ class ReportsController extends Component
     public $expiryTo = '';
 
     public $expiryStatus = '';
+
+    public $serialFilter = '';
+
+    public array $attributeFilters = [];
+
+    public bool $showAdvancedFilters = false;
 
     public $movementType = '';
 
@@ -61,6 +71,17 @@ class ReportsController extends Component
 
     public function render()
     {
+        $selectedCategory = $this->selectedCategory();
+        $reportAttributes = $selectedCategory?->attributes
+            ->where('status', true)
+            ->reject(fn (ProductAttribute $attribute) => $attribute->scope === 'unit' || $this->isExpirationAttribute($attribute))
+            ->values() ?? collect();
+        $hasSerialContext = (bool) ($selectedCategory
+            && ($selectedCategory->attributes->contains(fn (ProductAttribute $attribute) => $attribute->status && $attribute->scope === 'unit') || $selectedCategory->products()->where('tracking_type', 'serialized')->exists()));
+        $showSerialColumn = $this->reportType === 'stock' && $hasSerialContext;
+        $showExpiryColumn = $this->reportType === 'stock' && $selectedCategory
+            && $selectedCategory->attributes->contains(fn (ProductAttribute $attribute) => $attribute->status && $this->isExpirationAttribute($attribute));
+
         $rows = match ($this->reportType) {
             'movements' => $this->movementQuery()->latest('occurred_at')->paginate(30),
             'deliveries' => $this->deliveryQuery()->latest('id')->paginate(30),
@@ -70,10 +91,17 @@ class ReportsController extends Component
         return view('livewire.reports.reports', [
             'rows' => $rows,
             'categories' => Category::where('status', true)->orderBy('name')->get(),
-            'units' => Product::whereNotNull('unit')->distinct()->orderBy('unit')->pluck('unit'),
+            'units' => Product::when($selectedCategory, fn ($query) => $query->where('category_id', $selectedCategory->id))->whereNotNull('unit')->distinct()->orderBy('unit')->pluck('unit'),
+            'trackingTypes' => Product::when($selectedCategory, fn ($query) => $query->where('category_id', $selectedCategory->id))->whereNotNull('tracking_type')->distinct()->pluck('tracking_type'),
             'areas' => Worker::whereNotNull('area')->where('area', '!=', '')->distinct()->orderBy('area')->pluck('area'),
             'workerResults' => $this->workerResults(),
             'selectedWorker' => $this->workerFilter ? Worker::find($this->workerFilter) : null,
+            'selectedCategory' => $selectedCategory,
+            'reportAttributes' => $reportAttributes,
+            'showSerialColumn' => $showSerialColumn,
+            'hasSerialContext' => $hasSerialContext,
+            'showExpiryColumn' => $showExpiryColumn,
+            'stockColumnCount' => 8 + $reportAttributes->count() + ($showSerialColumn ? 1 : 0) + ($showExpiryColumn ? 1 : 0),
         ])->extends('layouts.theme.app');
     }
 
@@ -94,6 +122,19 @@ class ReportsController extends Component
         if ($property === 'reportType') {
             $this->searchTerm = '';
             $this->categoryFilter = '';
+            $this->attributeFilters = [];
+            $this->serialFilter = '';
+            $this->showAdvancedFilters = false;
+        }
+        if ($property === 'categoryFilter') {
+            $this->attributeFilters = [];
+            $this->serialFilter = '';
+            $this->expiryFrom = '';
+            $this->expiryTo = '';
+            $this->expiryStatus = '';
+            $this->trackingFilter = '';
+            $this->unitFilter = '';
+            $this->showAdvancedFilters = false;
         }
         $this->resetPage();
     }
@@ -115,7 +156,8 @@ class ReportsController extends Component
     public function clearFilters(): void
     {
         $type = $this->reportType;
-        $this->reset(['searchTerm', 'categoryFilter', 'stockStatus', 'trackingFilter', 'unitFilter', 'expiryFrom', 'expiryTo', 'expiryStatus', 'movementType', 'documentSource', 'areaFilter', 'workerFilter', 'workerSearch']);
+        $this->reset(['searchTerm', 'categoryFilter', 'stockStatus', 'trackingFilter', 'unitFilter', 'expiryFrom', 'expiryTo', 'expiryStatus', 'serialFilter', 'attributeFilters', 'showAdvancedFilters', 'movementType', 'documentSource', 'areaFilter', 'workerFilter', 'workerSearch']);
+        $this->catalogStatus = 'active';
         $this->deliveryStatus = 'confirmed';
         $this->reportType = $type;
         $this->setPeriod('month');
@@ -142,31 +184,65 @@ class ReportsController extends Component
         $this->validateReportDates();
         $type = $this->reportType;
         $filename = 'reporte_'.$type.'_'.now()->format('Ymd_His').'.csv';
+        $selectedCategory = $this->selectedCategory();
+        $reportAttributes = $selectedCategory?->attributes
+            ->where('status', true)
+            ->reject(fn (ProductAttribute $attribute) => $attribute->scope === 'unit' || $this->isExpirationAttribute($attribute))
+            ->values() ?? collect();
+        $hasSerialContext = (bool) ($selectedCategory
+            && ($selectedCategory->attributes->contains(fn (ProductAttribute $attribute) => $attribute->status && $attribute->scope === 'unit') || $selectedCategory->products()->where('tracking_type', 'serialized')->exists()));
+        $showSerialColumn = $type === 'stock' && $hasSerialContext;
+        $showExpiryColumn = $type === 'stock' && $selectedCategory
+            && $selectedCategory->attributes->contains(fn (ProductAttribute $attribute) => $attribute->status && $this->isExpirationAttribute($attribute));
         $this->logActivity('REPORTES', 'EXPORTAR', 'Exportación CSV del reporte '.$type, null, null, $this->activeFilters());
 
-        return response()->streamDownload(function () use ($type) {
+        return response()->streamDownload(function () use ($type, $reportAttributes, $showSerialColumn, $showExpiryColumn) {
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             if ($type === 'movements') {
                 fputcsv($out, ['Fecha', 'Movimiento', 'Producto', 'SKU', 'Unidad', 'Serie', 'Documento', 'Trabajador', 'Entrada', 'Salida', 'Usuario'], ';');
                 $this->movementQuery()->orderBy('occurred_at')->chunk(500, function ($rows) use ($out) {
                     foreach ($rows as $r) {
-                        fputcsv($out, [$r->occurred_at->format('d/m/Y H:i:s'), $this->movementLabel($r->movement_type), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), $this->safe($r->variant->product->unit), $this->safe($r->serializedItem?->serial_number), $this->safe($r->dispatchNote?->number ?? $r->delivery?->number), $this->safe($r->delivery?->worker?->full_name), $r->quantity > 0 ? (float) $r->quantity : '', $r->quantity < 0 ? abs((float) $r->quantity) : '', $this->safe($r->creator?->login)], ';');
+                        fputcsv($out, [$r->occurred_at->format('d/m/Y H:i:s'), $this->movementLabel($r->movement_type), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), $this->safe($r->variant->product->unit), $this->safe($r->serializedItem?->serial_number), $this->safe($r->dispatchNote?->number ?? $r->delivery?->number), $this->safe($r->delivery?->worker?->full_name), $r->quantity > 0 ? Quantity::format($r->quantity) : '', $r->quantity < 0 ? Quantity::format(abs((float) $r->quantity)) : '', $this->safe($r->creator?->login)], ';');
                     }
                 });
             } elseif ($type === 'deliveries') {
                 fputcsv($out, ['Fecha', 'Entrega', 'Documento trabajador', 'Trabajador', 'Área', 'Producto', 'SKU', 'Cantidad', 'Unidad', 'Series', 'Estado'], ';');
                 $this->deliveryQuery()->orderBy('id')->chunk(500, function ($rows) use ($out) {
                     foreach ($rows as $r) {
-                        fputcsv($out, [$r->delivery->delivery_date->format('d/m/Y'), $this->safe($r->delivery->number), $this->safe($r->delivery->worker->document), $this->safe($r->delivery->worker->full_name), $this->safe($r->delivery->worker->area), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), (float) $r->quantity, $this->safe($r->variant->product->unit), $this->safe($r->serializedItems->pluck('serial_number')->join(', ')), $r->delivery->status], ';');
+                        fputcsv($out, [$r->delivery->delivery_date->format('d/m/Y'), $this->safe($r->delivery->number), $this->safe($r->delivery->worker->document), $this->safe($r->delivery->worker->full_name), $this->safe($r->delivery->worker->area), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), Quantity::format($r->quantity), $this->safe($r->variant->product->unit), $this->safe($r->serializedItems->pluck('serial_number')->join(', ')), $r->delivery->status], ';');
                     }
                 });
             } else {
-                fputcsv($out, ['Categoría', 'Código', 'Producto', 'SKU', 'Variante', 'Unidad', 'Control', 'Vencimiento', 'Estado vencimiento', 'Stock actual', 'Stock mínimo', 'Estado stock'], ';');
-                $this->stockQuery()->orderBy('products.name')->chunk(500, function ($rows) use ($out) {
+                $headers = ['Categoría', 'Código', 'Producto', 'SKU', 'Variante'];
+                foreach ($reportAttributes as $attribute) {
+                    $headers[] = $attribute->name;
+                }
+                if ($showSerialColumn) {
+                    $headers[] = 'Series en almacén';
+                }
+                array_push($headers, 'Unidad', 'Control');
+                if ($showExpiryColumn) {
+                    array_push($headers, 'Vencimiento', 'Estado vencimiento');
+                }
+                array_push($headers, 'Stock actual', 'Stock mínimo', 'Estado stock');
+                fputcsv($out, $headers, ';');
+                $this->stockQuery()->orderBy('products.name')->chunk(500, function ($rows) use ($out, $reportAttributes, $showSerialColumn, $showExpiryColumn) {
                     foreach ($rows as $r) {
                         $stock = (float) ($r->stock ?? 0);
-                        fputcsv($out, [$this->safe($r->product->category->name), $this->safe($r->product->code), $this->safe($r->product->name), $this->safe($r->sku), $this->safe($r->name), $this->safe($r->product->unit), $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad', $r->expiration_date ? Carbon::parse($r->expiration_date)->format('d/m/Y') : '', $this->expiryLabel($r->expiration_date), $stock, (float) $r->minimum_stock, $this->stockLabel($stock, (float) $r->minimum_stock)], ';');
+                        $data = [$this->safe($r->product->category->name), $this->safe($r->product->code), $this->safe($r->product->name), $this->safe($r->sku), $this->safe($r->name)];
+                        foreach ($reportAttributes as $attribute) {
+                            $data[] = $this->safe($this->attributeValue($r, $attribute));
+                        }
+                        if ($showSerialColumn) {
+                            $data[] = $this->safe($this->availableSerials($r)->pluck('serial_number')->join(', '));
+                        }
+                        array_push($data, $this->safe($r->product->unit), $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad');
+                        if ($showExpiryColumn) {
+                            array_push($data, $r->expiration_date ? Carbon::parse($r->expiration_date)->format('d/m/Y') : '', $this->expiryLabel($r->expiration_date));
+                        }
+                        array_push($data, Quantity::format($stock), Quantity::format($r->minimum_stock), $this->stockLabel($stock, (float) $r->minimum_stock));
+                        fputcsv($out, $data, ';');
                     }
                 });
             }
@@ -194,13 +270,22 @@ class ReportsController extends Component
     {
         $term = '%'.trim($this->searchTerm).'%';
         $stock = '(SELECT COALESCE(SUM(im.quantity), 0) FROM inventory_movements im WHERE im.product_variant_id = product_variants.id)';
+        $serialStock = '(SELECT COALESCE(SUM(sim.quantity), 0) FROM inventory_movements sim WHERE sim.serialized_item_id = serialized_items.id)';
         $expiryDate = $this->expiryDateExpression();
         $today = now()->toDateString();
 
-        return ProductVariant::query()->with('product.category')->select('product_variants.*')->addSelect(DB::raw("{$expiryDate} AS expiration_date"))->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
+        $query = ProductVariant::query()->with([
+            'product.category',
+            'product.attributeValues',
+            'attributeValues',
+            'serializedItems' => fn ($query) => $query->where('status', '!=', 'inactive')->withSum('inventoryMovements as inventory_balance', 'quantity'),
+        ])->select('product_variants.*')->addSelect(DB::raw("{$expiryDate} AS expiration_date"))->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
             ->withSum('inventoryMovements as stock', 'quantity')
-            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('products.name', 'like', $term)->orWhere('products.code', 'like', $term)->orWhere('product_variants.sku', 'like', $term)))
+            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('products.name', 'like', $term)->orWhere('products.code', 'like', $term)->orWhere('product_variants.sku', 'like', $term)->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term)->whereRaw("{$serialStock} > 0"))))
             ->when($this->categoryFilter, fn ($q) => $q->where('products.category_id', $this->categoryFilter))
+            ->when($this->catalogStatus === 'active', fn ($q) => $q->where('products.status', true)->where('product_variants.status', true))
+            ->when($this->catalogStatus === 'inactive', fn ($q) => $q->where(fn ($status) => $status->where('products.status', false)->orWhere('product_variants.status', false)))
+            ->when($this->serialFilter, fn ($q) => $q->whereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', '%'.trim($this->serialFilter).'%')->whereRaw("{$serialStock} > 0")))
             ->when($this->trackingFilter, fn ($q) => $q->where('products.tracking_type', $this->trackingFilter))
             ->when($this->unitFilter, fn ($q) => $q->where('products.unit', $this->unitFilter))
             ->when($this->expiryFrom, fn ($q) => $q->whereRaw("{$expiryDate} >= ?", [$this->expiryFrom]))
@@ -215,36 +300,131 @@ class ReportsController extends Component
             ->when($this->stockStatus === 'out', fn ($q) => $q->whereRaw("$stock <= 0"))
             ->when($this->stockStatus === 'available', fn ($q) => $q->whereRaw("$stock > 0"))
             ->when($this->stockStatus === 'normal', fn ($q) => $q->whereRaw("$stock > product_variants.minimum_stock"));
+
+        return $this->applyVariantAttributeFilters($query);
     }
 
     private function movementQuery()
     {
         $term = '%'.trim($this->searchTerm).'%';
 
-        return InventoryMovement::with(['variant.product.category', 'serializedItem', 'dispatchNote', 'delivery.worker', 'creator'])
+        $query = InventoryMovement::with(['variant.product.category', 'serializedItem', 'dispatchNote', 'delivery.worker', 'creator'])
             ->when($this->fromDate, fn ($q) => $q->whereDate('occurred_at', '>=', $this->fromDate))->when($this->toDate, fn ($q) => $q->whereDate('occurred_at', '<=', $this->toDate))
             ->when($this->categoryFilter, fn ($q) => $q->whereHas('variant.product', fn ($p) => $p->where('category_id', $this->categoryFilter)))
             ->when($this->movementType, fn ($q) => $q->where('movement_type', $this->movementType))
             ->when($this->documentSource === 'dispatch', fn ($q) => $q->whereNotNull('dispatch_note_id'))
             ->when($this->documentSource === 'delivery', fn ($q) => $q->whereNotNull('delivery_id'))
             ->when($this->workerFilter, fn ($q) => $q->whereHas('delivery', fn ($d) => $d->where('worker_id', $this->workerFilter)))
+            ->when($this->serialFilter, fn ($q) => $q->whereHas('serializedItem', fn ($serial) => $serial->where('serial_number', 'like', '%'.trim($this->serialFilter).'%')))
             ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->whereHas('variant', fn ($v) => $v->where('sku', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term)))->orWhereHas('serializedItem', fn ($s) => $s->where('serial_number', 'like', $term))->orWhereHas('dispatchNote', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery.worker', fn ($w) => $w->where('name', 'like', $term)->orWhere('lastname', 'like', $term)->orWhere('document', 'like', $term))));
+
+        return $this->activeAttributeFilters()->isEmpty()
+            ? $query
+            : $query->whereHas('variant', fn ($variant) => $this->applyVariantAttributeFilters($variant));
     }
 
     private function deliveryQuery()
     {
         $term = '%'.trim($this->searchTerm).'%';
 
-        return DeliveryItem::with(['delivery.worker', 'variant.product.category', 'serializedItems'])
+        $query = DeliveryItem::with(['delivery.worker', 'variant.product.category', 'serializedItems'])
             ->whereHas('delivery', fn ($d) => $d->when($this->deliveryStatus, fn ($q) => $q->where('status', $this->deliveryStatus))->when($this->fromDate, fn ($q) => $q->whereDate('delivery_date', '>=', $this->fromDate))->when($this->toDate, fn ($q) => $q->whereDate('delivery_date', '<=', $this->toDate))->when($this->areaFilter, fn ($q) => $q->whereHas('worker', fn ($w) => $w->where('area', $this->areaFilter))))
             ->when($this->workerFilter, fn ($q) => $q->whereHas('delivery', fn ($d) => $d->where('worker_id', $this->workerFilter)))
             ->when($this->categoryFilter, fn ($q) => $q->whereHas('variant.product', fn ($p) => $p->where('category_id', $this->categoryFilter)))
+            ->when($this->serialFilter, fn ($q) => $q->whereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', '%'.trim($this->serialFilter).'%')))
             ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->whereHas('delivery', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery.worker', fn ($w) => $w->where('name', 'like', $term)->orWhere('lastname', 'like', $term)->orWhere('document', 'like', $term))->orWhereHas('variant', fn ($v) => $v->where('sku', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term)))));
+
+        return $this->activeAttributeFilters()->isEmpty()
+            ? $query
+            : $query->whereHas('variant', fn ($variant) => $this->applyVariantAttributeFilters($variant));
     }
 
     private function activeFilters(): array
     {
-        return collect(['tipo' => $this->reportType, 'búsqueda' => $this->searchTerm, 'categoría' => $this->categoryFilter, 'desde' => $this->fromDate, 'hasta' => $this->toDate, 'estado_stock' => $this->stockStatus, 'control' => $this->trackingFilter, 'unidad' => $this->unitFilter, 'vencimiento_desde' => $this->expiryFrom, 'vencimiento_hasta' => $this->expiryTo, 'estado_vencimiento' => $this->expiryStatus, 'movimiento' => $this->movementType, 'origen' => $this->documentSource, 'estado_entrega' => $this->deliveryStatus, 'área' => $this->areaFilter, 'trabajador_id' => $this->workerFilter])->filter(fn ($value) => filled($value))->all();
+        $filters = collect(['tipo' => $this->reportType, 'búsqueda' => $this->searchTerm, 'categoría' => $this->categoryFilter, 'serie' => $this->serialFilter, 'desde' => $this->fromDate, 'hasta' => $this->toDate, 'estado_stock' => $this->stockStatus, 'estado_catálogo' => $this->catalogStatus, 'control' => $this->trackingFilter, 'unidad' => $this->unitFilter, 'vencimiento_desde' => $this->expiryFrom, 'vencimiento_hasta' => $this->expiryTo, 'estado_vencimiento' => $this->expiryStatus, 'movimiento' => $this->movementType, 'origen' => $this->documentSource, 'estado_entrega' => $this->deliveryStatus, 'área' => $this->areaFilter, 'trabajador_id' => $this->workerFilter])->filter(fn ($value) => filled($value));
+
+        foreach ($this->activeAttributeFilters() as $filter) {
+            $filters->put('atributo_'.$filter['attribute']->code, $filter['value']);
+        }
+
+        return $filters->all();
+    }
+
+    private function selectedCategory(): ?Category
+    {
+        if (! $this->categoryFilter) {
+            return null;
+        }
+
+        return Category::with(['attributes' => fn ($query) => $query->orderBy('category_product_attribute.position')])->find($this->categoryFilter);
+    }
+
+    private function activeAttributeFilters()
+    {
+        $category = $this->selectedCategory();
+        if (! $category) {
+            return collect();
+        }
+
+        return collect($this->attributeFilters)
+            ->filter(fn ($value) => filled($value))
+            ->map(function ($value, $attributeId) use ($category) {
+                $attribute = $category->attributes->first(fn (ProductAttribute $item) => (int) $item->id === (int) $attributeId && $item->status && $item->scope !== 'unit' && ! $this->isExpirationAttribute($item));
+
+                return $attribute ? ['attribute' => $attribute, 'value' => trim((string) $value)] : null;
+            })
+            ->filter()
+            ->values();
+    }
+
+    private function applyVariantAttributeFilters($query)
+    {
+        foreach ($this->activeAttributeFilters() as $filter) {
+            $attribute = $filter['attribute'];
+            $value = $filter['value'];
+            $relation = $attribute->scope === 'product' ? 'product.attributeValues' : 'attributeValues';
+            $query->whereHas($relation, function ($attributeValue) use ($attribute, $value) {
+                $attributeValue->where('product_attribute_id', $attribute->id);
+                if ($attribute->type === 'text') {
+                    $attributeValue->where('value', 'like', '%'.$value.'%');
+                } else {
+                    $attributeValue->where('value', $value);
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    private function attributeValue(ProductVariant $variant, ProductAttribute $attribute): string
+    {
+        $values = $attribute->scope === 'product' ? $variant->product->attributeValues : $variant->attributeValues;
+        $value = $values->firstWhere('product_attribute_id', $attribute->id)?->value;
+
+        if ($attribute->type === 'boolean' && $value !== null && $value !== '') {
+            return (string) $value === '1' ? 'Sí' : 'No';
+        }
+        if ($attribute->type === 'date' && filled($value)) {
+            return Carbon::parse($value)->format('d/m/Y');
+        }
+
+        return (string) ($value ?? '');
+    }
+
+    private function availableSerials(ProductVariant $variant)
+    {
+        return $variant->serializedItems->filter(fn ($serial) => (float) ($serial->inventory_balance ?? 0) > 0)->values();
+    }
+
+    private function isExpirationAttribute(ProductAttribute $attribute): bool
+    {
+        if ($attribute->type !== 'date') {
+            return false;
+        }
+
+        $identity = mb_strtolower($attribute->code.' '.$attribute->name);
+
+        return str_contains($identity, 'venc') || str_contains($identity, 'caduc') || str_contains($identity, 'expir');
     }
 
     private function workerResults()

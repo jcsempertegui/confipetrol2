@@ -106,7 +106,7 @@
                             <div class="dashboard-list-item">
                                 <div class="dashboard-mini-icon tone-{{ $stock <= 0 ? 'danger' : 'warning' }}"><i class="bx {{ $stock <= 0 ? 'bx-x-circle' : 'bx-down-arrow-circle' }}"></i></div>
                                 <div class="dashboard-list-main"><div class="dashboard-list-title">{{ $variant->product->name }}{{ $variant->name ? ' · '.$variant->name : '' }}</div><div class="dashboard-list-subtitle">{{ $variant->sku }} · {{ $variant->product->category?->name }}</div></div>
-                                <div class="dashboard-list-value"><strong>{{ number_format($stock, 3) }} {{ $variant->product->unit }}</strong><small>Mínimo {{ number_format((float) $variant->minimum_stock, 3) }}</small></div>
+                                <div class="dashboard-list-value"><strong>{{ \App\Support\Quantity::format($stock) }} {{ $variant->product->unit }}</strong><small>Mínimo {{ \App\Support\Quantity::format($variant->minimum_stock) }}</small></div>
                             </div>
                         @empty
                             <div class="dashboard-empty"><i class="bx bx-check"></i><strong>Todo el stock está en niveles correctos</strong><span>No existen referencias agotadas ni bajo el mínimo.</span></div>
@@ -130,7 +130,7 @@
                                         <strong>{{ $movement->variant?->product?->name }} · {{ $this->movementLabel($movement->movement_type) }}</strong>
                                         <span>{{ $movement->dispatchNote?->number ?? $movement->delivery?->number ?? 'Movimiento interno' }}@if($movement->delivery?->worker) · {{ $movement->delivery->worker->full_name }}@endif @if($movement->serializedItem) · Serie {{ $movement->serializedItem->serial_number }}@endif</span>
                                     </div>
-                                    <div class="dashboard-timeline-time"><strong class="text-{{ (float) $movement->quantity >= 0 ? 'success' : 'danger' }}">{{ (float) $movement->quantity > 0 ? '+' : '' }}{{ number_format((float) $movement->quantity, 3) }}</strong><br>{{ $movement->occurred_at?->locale('es')->diffForHumans() }}</div>
+                                    <div class="dashboard-timeline-time"><strong class="text-{{ (float) $movement->quantity >= 0 ? 'success' : 'danger' }}">{{ (float) $movement->quantity > 0 ? '+' : '' }}{{ \App\Support\Quantity::format($movement->quantity) }}</strong><br>{{ $movement->occurred_at?->locale('es')->diffForHumans() }}</div>
                                 </div>
                             @empty
                                 <div class="dashboard-empty"><i class="bx bx-transfer"></i><strong>Todavía no existen movimientos</strong><span>La actividad aparecerá al confirmar remitos y entregas.</span></div>
@@ -146,7 +146,7 @@
                         <div class="expiry-banner"><i class="bx bx-calendar-exclamation"></i><div><strong>{{ $expirySummary['expired'] }} vencido(s) · {{ $expirySummary['soon'] }} por vencer</strong><span>Considera su rotación o baja oportuna.</span></div></div>
                         @forelse($expiryAlerts as $variant)
                             <div class="dashboard-list-item">
-                                <div class="dashboard-list-main"><div class="dashboard-list-title">{{ $variant->product->name }}</div><div class="dashboard-list-subtitle">{{ $variant->sku }} · Stock {{ number_format((float) $variant->stock, 3) }}</div></div>
+                                <div class="dashboard-list-main"><div class="dashboard-list-title">{{ $variant->product->name }}</div><div class="dashboard-list-subtitle">{{ $variant->sku }} · Stock {{ \App\Support\Quantity::format($variant->stock) }}</div></div>
                                 <div class="dashboard-list-value"><strong>{{ \Illuminate\Support\Carbon::parse($variant->expiration_date)->format('d/m/Y') }}</strong><span class="dashboard-status {{ $variant->days_to_expiry < 0 ? 'danger' : ($variant->days_to_expiry <= 30 ? 'warning' : 'secondary') }}">{{ $variant->days_to_expiry < 0 ? 'Vencido' : ($variant->days_to_expiry === 0 ? 'Vence hoy' : $variant->days_to_expiry.' días') }}</span></div>
                             </div>
                         @empty

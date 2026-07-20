@@ -43,53 +43,43 @@
             </div>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-6 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <span class="detail-label">Backups guardados</span>
-                        <div class="fs-4 fw-bold text-primary">{{ count($backups) }}</div>
-                    </div>
-                </div>
+        <div class="module-metrics-grid">
+            <div class="module-metric-card">
+                <span class="module-metric-icon"><i class="bx bx-data"></i></span>
+                <div><div class="module-metric-label">Backups guardados</div><div class="module-metric-value">{{ count($backups) }}</div></div>
             </div>
 
-            <div class="col-6 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <span class="detail-label">Espacio total</span>
-                        <div class="fs-5 fw-bold text-success">{{ $backupDirSize }}</div>
-                    </div>
-                </div>
+            <div class="module-metric-card tone-success">
+                <span class="module-metric-icon"><i class="bx bx-hdd"></i></span>
+                <div><div class="module-metric-label">Espacio total</div><div class="module-metric-value">{{ $backupDirSize }}</div></div>
             </div>
 
-            <div class="col-6 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <span class="detail-label">Último backup</span>
-                        <div class="fw-semibold text-info">
+            <div class="module-metric-card tone-info">
+                <span class="module-metric-icon"><i class="bx bx-time-five"></i></span>
+                <div>
+                    <div class="module-metric-label">Último backup</div>
+                    <div class="module-metric-value fs-6">
                             @if(count($backups) > 0)
                                 {{ $backups[0]['date']->format('d/m/Y H:i') }}
                             @else
                                 Sin backups
                             @endif
-                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-6 col-lg-3">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <span class="detail-label">Backup de hoy</span>
-                        @php $todayHasBackup = collect($backups)->firstWhere('is_today', true); @endphp
-                        <div class="fw-semibold {{ $todayHasBackup ? 'text-success' : 'text-warning' }}">
+            @php $todayHasBackup = collect($backups)->firstWhere('is_today', true); @endphp
+            <div class="module-metric-card {{ $todayHasBackup ? 'tone-success' : 'tone-warning' }}">
+                <span class="module-metric-icon"><i class="bx {{ $todayHasBackup ? 'bx-check-circle' : 'bx-time' }}"></i></span>
+                <div>
+                    <div class="module-metric-label">Backup de hoy</div>
+                        <div class="module-metric-value fs-6">
                             @if($todayHasBackup)
-                                <i class="bx bx-check-circle me-1"></i>Realizado
+                                Realizado
                             @else
-                                <i class="bx bx-time-five me-1"></i>Pendiente
+                                Pendiente
                             @endif
                         </div>
-                    </div>
                 </div>
             </div>
         </div>
