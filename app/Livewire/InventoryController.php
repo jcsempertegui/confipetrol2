@@ -36,22 +36,30 @@ class InventoryController extends Component
 
     public function render()
     {
-        $variants = ProductVariant::query()->with(['product.category', 'attributeValues.attribute'])
+        $variants = ProductVariant::query()->with([
+            'product.category',
+            'attributeValues.attribute',
+            'inventoryLots' => fn ($query) => $query->withSum('movements as stock', 'quantity')->orderByRaw('expiration_date IS NULL')->orderBy('expiration_date')->orderBy('lot_number'),
+        ])
             ->withSum('inventoryMovements as stock', 'quantity')
             ->withCount(['serializedItems as serialized_available_count' => fn ($q) => $q->where('status', 'available'), 'serializedItems as serialized_assigned_count' => fn ($q) => $q->where('status', 'assigned')])
             ->when($this->searchTerm, function ($q) {
                 $term = '%'.trim($this->searchTerm).'%';
                 $q->where(fn ($x) => $x->where('sku', 'like', $term)->orWhere('name', 'like', $term)
-                    ->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term)));
+                    ->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term))
+                    ->orWhereHas('inventoryLots', fn ($lot) => $lot->where('lot_number', 'like', $term)));
             })->when($this->categoryFilter, fn ($q) => $q->whereHas('product', fn ($p) => $p->where('category_id', $this->categoryFilter)))
             ->when($this->stockFilter === 'positive', fn ($q) => $q->having('stock', '>', 0))
             ->when($this->stockFilter === 'zero', fn ($q) => $q->havingRaw('COALESCE(stock, 0) = 0'))
             ->orderBy('sku')->paginate(25, ['*'], 'stockPage');
 
-        $selectedVariant = $this->selectedVariantId ? ProductVariant::with(['product.category'])->withSum('inventoryMovements as stock', 'quantity')->find($this->selectedVariantId) : null;
+        $selectedVariant = $this->selectedVariantId ? ProductVariant::with([
+            'product.category',
+            'inventoryLots' => fn ($query) => $query->withSum('movements as stock', 'quantity')->orderByRaw('expiration_date IS NULL')->orderBy('expiration_date')->orderBy('lot_number'),
+        ])->withSum('inventoryMovements as stock', 'quantity')->find($this->selectedVariantId) : null;
         $movements = null;
         if ($selectedVariant) {
-            $query = InventoryMovement::with(['dispatchNote', 'delivery.worker', 'serializedItem', 'creator'])
+            $query = InventoryMovement::with(['dispatchNote', 'delivery.worker', 'serializedItem', 'inventoryLot', 'creator'])
                 ->where('product_variant_id', $selectedVariant->id)
                 ->when($this->fromDate, fn ($q) => $q->whereDate('occurred_at', '>=', $this->fromDate))
                 ->when($this->toDate, fn ($q) => $q->whereDate('occurred_at', '<=', $this->toDate))

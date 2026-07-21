@@ -12,7 +12,7 @@ class DocumentPrintController extends Controller
 
     public function dispatchNote(DispatchNote $dispatchNote)
     {
-        $dispatchNote->load(['items.variant.product', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction']);
+        $dispatchNote->load(['items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction']);
         $this->logActivity('REMITOS', 'IMPRIMIR', 'Impresión del remito '.($dispatchNote->number ?: '#'.$dispatchNote->id), $dispatchNote->id);
 
         return view('documents.dispatch-note', compact('dispatchNote'));
@@ -20,7 +20,7 @@ class DocumentPrintController extends Controller
 
     public function delivery(Delivery $delivery)
     {
-        $delivery->load(['worker', 'items.variant.product', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction']);
+        $delivery->load(['worker', 'items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction']);
         $this->logActivity('ENTREGAS', 'IMPRIMIR', 'Impresión de la entrega '.($delivery->number ?: '#'.$delivery->id), $delivery->id);
 
         return view('documents.delivery', compact('delivery'));

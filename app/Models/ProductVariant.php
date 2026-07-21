@@ -30,6 +30,11 @@ class ProductVariant extends Model
         return $this->hasMany(InventoryMovement::class);
     }
 
+    public function inventoryLots()
+    {
+        return $this->hasMany(InventoryLot::class);
+    }
+
     public function getCurrentStockAttribute(): float
     {
         return (float) $this->inventoryMovements()->sum('quantity');

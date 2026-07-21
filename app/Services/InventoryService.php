@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Delivery;
 use App\Models\DispatchNote;
+use App\Models\InventoryLot;
 use App\Models\InventoryMovement;
 use App\Models\ProductVariant;
 use App\Models\SerializedItem;
@@ -67,25 +68,7 @@ class InventoryService
             }
 
             $note->number ??= $this->nextNumber($note->type, $note->document_date);
-            $sign = $note->type === 'entry' ? 1 : -1;
-            foreach ($items as $item) {
-                if ($item->serializedItems->isNotEmpty()) {
-                    foreach ($item->serializedItems as $serial) {
-                        InventoryMovement::create([
-                            'product_variant_id' => $item->product_variant_id, 'serialized_item_id' => $serial->id,
-                            'dispatch_note_id' => $note->id, 'movement_type' => 'dispatch_'.$note->type,
-                            'quantity' => $sign, 'occurred_at' => now(), 'created_by' => $userId,
-                        ]);
-                        $serial->update(['status' => $sign > 0 ? 'available' : 'out_of_stock']);
-                    }
-                } else {
-                    InventoryMovement::create([
-                        'product_variant_id' => $item->product_variant_id, 'dispatch_note_id' => $note->id,
-                        'movement_type' => 'dispatch_'.$note->type, 'quantity' => $sign * (float) $item->quantity,
-                        'occurred_at' => now(), 'created_by' => $userId,
-                    ]);
-                }
-            }
+            $this->recordDispatchMovements($note, $items, $userId);
             $note->fill(['status' => 'confirmed', 'confirmed_by' => $userId, 'confirmed_at' => now()])->save();
 
             return $note->fresh(['items.variant.product', 'items.serializedItems']);
@@ -117,7 +100,8 @@ class InventoryService
             }
             foreach ($movements as $movement) {
                 InventoryMovement::create([
-                    'product_variant_id' => $movement->product_variant_id, 'serialized_item_id' => $movement->serialized_item_id,
+                    'product_variant_id' => $movement->product_variant_id, 'inventory_lot_id' => $movement->inventory_lot_id,
+                    'serialized_item_id' => $movement->serialized_item_id,
                     'dispatch_note_id' => $note->id, 'reversal_of_id' => $movement->id,
                     'movement_type' => 'annulment', 'quantity' => -(float) $movement->quantity,
                     'occurred_at' => now(), 'created_by' => $userId,
@@ -181,16 +165,7 @@ class InventoryService
                     fn (string $code) => Delivery::where('number', $code)->exists()
                 );
             }
-            foreach ($items as $item) {
-                if ($item->serializedItems->isNotEmpty()) {
-                    foreach ($item->serializedItems as $serial) {
-                        InventoryMovement::create(['product_variant_id' => $item->product_variant_id, 'serialized_item_id' => $serial->id, 'delivery_id' => $delivery->id, 'movement_type' => 'delivery', 'quantity' => -1, 'occurred_at' => now(), 'created_by' => $userId]);
-                        $serial->update(['status' => 'assigned']);
-                    }
-                } else {
-                    InventoryMovement::create(['product_variant_id' => $item->product_variant_id, 'delivery_id' => $delivery->id, 'movement_type' => 'delivery', 'quantity' => -(float) $item->quantity, 'occurred_at' => now(), 'created_by' => $userId]);
-                }
-            }
+            $this->recordDeliveryMovements($delivery, $items, $userId);
             $delivery->fill(['status' => 'confirmed', 'confirmed_by' => $userId, 'confirmed_at' => now()])->save();
 
             return $delivery->fresh(['worker', 'items.variant.product', 'items.serializedItems']);
@@ -208,7 +183,7 @@ class InventoryService
                 return $this->annulCorrectedDelivery($delivery, $userId, $reason);
             }
             foreach ($delivery->movements()->lockForUpdate()->get() as $movement) {
-                InventoryMovement::create(['product_variant_id' => $movement->product_variant_id, 'serialized_item_id' => $movement->serialized_item_id, 'delivery_id' => $delivery->id, 'reversal_of_id' => $movement->id, 'movement_type' => 'delivery_annulment', 'quantity' => -(float) $movement->quantity, 'occurred_at' => now(), 'created_by' => $userId]);
+                InventoryMovement::create(['product_variant_id' => $movement->product_variant_id, 'inventory_lot_id' => $movement->inventory_lot_id, 'serialized_item_id' => $movement->serialized_item_id, 'delivery_id' => $delivery->id, 'reversal_of_id' => $movement->id, 'movement_type' => 'delivery_annulment', 'quantity' => -(float) $movement->quantity, 'occurred_at' => now(), 'created_by' => $userId]);
                 if ($movement->serialized_item_id) {
                     SerializedItem::whereKey($movement->serialized_item_id)->update(['status' => 'available']);
                 }
@@ -217,6 +192,233 @@ class InventoryService
 
             return $delivery->fresh(['worker', 'items.variant.product', 'items.serializedItems']);
         });
+    }
+
+    private function recordDispatchMovements(DispatchNote $note, $items, int $userId): void
+    {
+        foreach ($items as $item) {
+            if ($note->type === 'entry') {
+                $lot = $this->resolveEntryLot($item, $note->document_date, $userId);
+                $this->storeLotAllocations($item, [[$lot->id, (float) $item->quantity]]);
+
+                if ($item->serializedItems->isNotEmpty()) {
+                    foreach ($item->serializedItems as $serial) {
+                        InventoryMovement::create([
+                            'product_variant_id' => $item->product_variant_id,
+                            'inventory_lot_id' => $lot->id,
+                            'serialized_item_id' => $serial->id,
+                            'dispatch_note_id' => $note->id,
+                            'movement_type' => 'dispatch_entry',
+                            'quantity' => 1,
+                            'occurred_at' => now(),
+                            'created_by' => $userId,
+                        ]);
+                        $serial->update(['status' => 'available']);
+                    }
+                } else {
+                    InventoryMovement::create([
+                        'product_variant_id' => $item->product_variant_id,
+                        'inventory_lot_id' => $lot->id,
+                        'dispatch_note_id' => $note->id,
+                        'movement_type' => 'dispatch_entry',
+                        'quantity' => (float) $item->quantity,
+                        'occurred_at' => now(),
+                        'created_by' => $userId,
+                    ]);
+                }
+
+                continue;
+            }
+
+            if ($item->serializedItems->isNotEmpty()) {
+                $allocations = [];
+                foreach ($item->serializedItems as $serial) {
+                    $lotId = $this->currentLotForSerial($serial->id);
+                    $allocations[$lotId] = ($allocations[$lotId] ?? 0) + 1;
+                    InventoryMovement::create([
+                        'product_variant_id' => $item->product_variant_id,
+                        'inventory_lot_id' => $lotId,
+                        'serialized_item_id' => $serial->id,
+                        'dispatch_note_id' => $note->id,
+                        'movement_type' => 'dispatch_exit',
+                        'quantity' => -1,
+                        'occurred_at' => now(),
+                        'created_by' => $userId,
+                    ]);
+                    $serial->update(['status' => 'out_of_stock']);
+                }
+                $this->storeLotAllocations($item, collect($allocations)->map(fn ($quantity, $lotId) => [(int) $lotId, $quantity])->values()->all());
+            } else {
+                $allocations = $this->allocateAvailableLots($item->product_variant_id, (float) $item->quantity, $note->document_date, true);
+                $this->storeLotAllocations($item, $allocations);
+                foreach ($allocations as [$lotId, $quantity]) {
+                    InventoryMovement::create([
+                        'product_variant_id' => $item->product_variant_id,
+                        'inventory_lot_id' => $lotId,
+                        'dispatch_note_id' => $note->id,
+                        'movement_type' => 'dispatch_exit',
+                        'quantity' => -$quantity,
+                        'occurred_at' => now(),
+                        'created_by' => $userId,
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function recordDeliveryMovements(Delivery $delivery, $items, int $userId): void
+    {
+        foreach ($items as $item) {
+            if ($item->serializedItems->isNotEmpty()) {
+                $allocations = [];
+                foreach ($item->serializedItems as $serial) {
+                    $lotId = $this->currentLotForSerial($serial->id);
+                    $allocations[$lotId] = ($allocations[$lotId] ?? 0) + 1;
+                    InventoryMovement::create([
+                        'product_variant_id' => $item->product_variant_id,
+                        'inventory_lot_id' => $lotId,
+                        'serialized_item_id' => $serial->id,
+                        'delivery_id' => $delivery->id,
+                        'movement_type' => 'delivery',
+                        'quantity' => -1,
+                        'occurred_at' => now(),
+                        'created_by' => $userId,
+                    ]);
+                    $serial->update(['status' => 'assigned']);
+                }
+                $this->storeLotAllocations($item, collect($allocations)->map(fn ($quantity, $lotId) => [(int) $lotId, $quantity])->values()->all());
+            } else {
+                $allocations = $this->allocateAvailableLots($item->product_variant_id, (float) $item->quantity, $delivery->delivery_date, false);
+                $this->storeLotAllocations($item, $allocations);
+                foreach ($allocations as [$lotId, $quantity]) {
+                    InventoryMovement::create([
+                        'product_variant_id' => $item->product_variant_id,
+                        'inventory_lot_id' => $lotId,
+                        'delivery_id' => $delivery->id,
+                        'movement_type' => 'delivery',
+                        'quantity' => -$quantity,
+                        'occurred_at' => now(),
+                        'created_by' => $userId,
+                    ]);
+                }
+            }
+        }
+    }
+
+    private function resolveEntryLot($item, \DateTimeInterface $documentDate, int $userId, ?InventoryLot $fallback = null): InventoryLot
+    {
+        $item->loadMissing('variant.product.category.attributes');
+        $lotNumber = mb_strtoupper(trim((string) ($item->lot_number ?: $fallback?->lot_number ?: 'SIN-LOTE')));
+        $expiration = $item->expiration_date?->format('Y-m-d')
+            ?? $fallback?->expiration_date?->format('Y-m-d');
+
+        if ($item->variant->product->uses_expiration_lots && ($lotNumber === 'SIN-LOTE' || ! $expiration)) {
+            throw ValidationException::withMessages([
+                'items' => 'El producto '.$item->variant->sku.' requiere número de lote y fecha de vencimiento.',
+            ]);
+        }
+        if ($expiration && $expiration < $documentDate->format('Y-m-d')) {
+            throw ValidationException::withMessages(['items' => 'El lote '.$lotNumber.' ya estaba vencido en la fecha del remito.']);
+        }
+
+        $lot = InventoryLot::where('product_variant_id', $item->product_variant_id)
+            ->where('lot_number', $lotNumber)
+            ->lockForUpdate()
+            ->first();
+        if ($lot) {
+            $knownExpiration = $lot->expiration_date?->format('Y-m-d');
+            if ($knownExpiration && $expiration && $knownExpiration !== $expiration) {
+                throw ValidationException::withMessages([
+                    'items' => 'El lote '.$lotNumber.' ya existe con vencimiento '.$lot->expiration_date->format('d/m/Y').'.',
+                ]);
+            }
+            if (! $knownExpiration && $expiration) {
+                $lot->update(['expiration_date' => $expiration]);
+            }
+        } else {
+            $lot = InventoryLot::create([
+                'product_variant_id' => $item->product_variant_id,
+                'lot_number' => $lotNumber,
+                'expiration_date' => $expiration,
+                'received_at' => $documentDate->format('Y-m-d'),
+                'created_by' => $userId,
+            ]);
+        }
+
+        $item->update([
+            'inventory_lot_id' => $lot->id,
+            'lot_number' => $lot->lot_number,
+            'expiration_date' => $lot->expiration_date,
+        ]);
+
+        return $lot;
+    }
+
+    /** @return array<int, array{0:int,1:float}> */
+    private function allocateAvailableLots(int $variantId, float $required, \DateTimeInterface $documentDate, bool $allowExpired): array
+    {
+        $lots = InventoryLot::where('product_variant_id', $variantId)
+            ->where('status', true)
+            ->orderByRaw('expiration_date IS NULL')
+            ->orderBy('expiration_date')
+            ->orderBy('received_at')
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->get();
+        $remaining = round($required, 3);
+        $allocations = [];
+
+        foreach ($lots as $lot) {
+            if (! $allowExpired && $lot->expiration_date && $lot->expiration_date->lt($documentDate->format('Y-m-d'))) {
+                continue;
+            }
+            $balance = (float) InventoryMovement::where('inventory_lot_id', $lot->id)->sum('quantity');
+            if ($balance <= 0.0005) {
+                continue;
+            }
+            $quantity = min($balance, $remaining);
+            $allocations[] = [$lot->id, round($quantity, 3)];
+            $remaining = round($remaining - $quantity, 3);
+            if ($remaining <= 0.0005) {
+                break;
+            }
+        }
+
+        if ($remaining > 0.0005) {
+            $variant = ProductVariant::find($variantId);
+            $message = $allowExpired ? 'Stock por lote insuficiente para ' : 'Stock vigente por lote insuficiente para ';
+            throw ValidationException::withMessages(['items' => $message.($variant?->sku ?? '#'.$variantId).'.']);
+        }
+
+        return $allocations;
+    }
+
+    private function currentLotForSerial(int $serialId): int
+    {
+        $lotId = InventoryMovement::query()
+            ->select('inventory_lot_id')
+            ->where('serialized_item_id', $serialId)
+            ->whereNotNull('inventory_lot_id')
+            ->groupBy('inventory_lot_id')
+            ->havingRaw('SUM(quantity) > 0')
+            ->value('inventory_lot_id');
+
+        if (! $lotId) {
+            throw ValidationException::withMessages(['items' => 'No se pudo determinar el lote de una de las series seleccionadas.']);
+        }
+
+        return (int) $lotId;
+    }
+
+    private function storeLotAllocations($item, array $allocations): void
+    {
+        $item->lotAllocations()->delete();
+        foreach ($allocations as [$lotId, $quantity]) {
+            $item->lotAllocations()->create([
+                'inventory_lot_id' => $lotId,
+                'quantity' => $quantity,
+            ]);
+        }
     }
 
     private function confirmDispatchCorrection(DispatchNote $note, int $userId): DispatchNote
@@ -229,7 +431,7 @@ class InventoryService
         }
 
         $items = $note->items()->with(['variant.product', 'serializedItems'])->get();
-        $originalItems = $original->items()->with(['variant.product', 'serializedItems'])->get();
+        $originalItems = $original->items()->with(['variant.product', 'serializedItems', 'lotAllocations.lot'])->get();
         if ($items->isEmpty()) {
             throw ValidationException::withMessages(['items' => 'Agregue al menos un producto al remito.']);
         }
@@ -237,6 +439,17 @@ class InventoryService
         [$variants, $serials] = $this->lockCorrectionResources($originalItems, $items);
         $originalSign = $original->type === 'entry' ? 1.0 : -1.0;
         $correctedSign = $note->type === 'entry' ? 1.0 : -1.0;
+        if ($note->type === 'entry') {
+            foreach ($items as $item) {
+                $originalItem = $originalItems->firstWhere('product_variant_id', $item->product_variant_id);
+                $fallbackLot = $originalItem?->lotAllocations?->first()?->lot;
+                $lot = $this->resolveEntryLot($item, $note->document_date, $userId, $fallbackLot);
+                $this->storeLotAllocations($item, [[$lot->id, (float) $item->quantity]]);
+            }
+        } else {
+            $this->prepareCorrectedOutgoingAllocations($items, $originalItems, $note->document_date, true);
+        }
+        $items->load('lotAllocations.lot');
         $before = $this->buildContribution($originalItems, $variants, $serials, $originalSign, false);
         $after = $this->buildContribution($items, $variants, $serials, $correctedSign, true);
 
@@ -248,6 +461,8 @@ class InventoryService
             $userId,
             dispatchNoteId: $note->id,
             movementType: 'dispatch_correction',
+            lotBefore: $this->buildLotContribution($originalItems, $originalSign),
+            lotAfter: $this->buildLotContribution($items, $correctedSign),
         );
 
         $note->number ??= $this->nextNumber($note->type, $note->document_date);
@@ -276,12 +491,14 @@ class InventoryService
         }
 
         $items = $delivery->items()->with(['variant.product', 'serializedItems'])->get();
-        $originalItems = $original->items()->with(['variant.product', 'serializedItems'])->get();
+        $originalItems = $original->items()->with(['variant.product', 'serializedItems', 'lotAllocations.lot'])->get();
         if ($items->isEmpty()) {
             throw ValidationException::withMessages(['items' => 'Agregue al menos un producto.']);
         }
 
         [$variants, $serials] = $this->lockCorrectionResources($originalItems, $items);
+        $this->prepareCorrectedOutgoingAllocations($items, $originalItems, $delivery->delivery_date, false);
+        $items->load('lotAllocations.lot');
         $before = $this->buildContribution($originalItems, $variants, $serials, -1.0, false);
         $after = $this->buildContribution($items, $variants, $serials, -1.0, true);
 
@@ -294,6 +511,8 @@ class InventoryService
             deliveryId: $delivery->id,
             movementType: 'delivery_correction',
             delivery: true,
+            lotBefore: $this->buildLotContribution($originalItems, -1.0),
+            lotAfter: $this->buildLotContribution($items, -1.0),
         );
 
         if (! $delivery->number) {
@@ -322,7 +541,7 @@ class InventoryService
 
     private function annulCorrectedDispatch(DispatchNote $note, int $userId, string $reason): DispatchNote
     {
-        $items = $note->items()->with(['variant.product', 'serializedItems'])->get();
+        $items = $note->items()->with(['variant.product', 'serializedItems', 'lotAllocations.lot'])->get();
         [$variants, $serials] = $this->lockCorrectionResources(collect(), $items);
         $sign = $note->type === 'entry' ? 1.0 : -1.0;
         $current = $this->buildContribution($items, $variants, $serials, $sign, false);
@@ -335,6 +554,8 @@ class InventoryService
             $userId,
             dispatchNoteId: $note->id,
             movementType: 'annulment',
+            lotBefore: $this->buildLotContribution($items, $sign),
+            lotAfter: [],
         );
 
         $note->fill([
@@ -349,7 +570,7 @@ class InventoryService
 
     private function annulCorrectedDelivery(Delivery $delivery, int $userId, string $reason): Delivery
     {
-        $items = $delivery->items()->with(['variant.product', 'serializedItems'])->get();
+        $items = $delivery->items()->with(['variant.product', 'serializedItems', 'lotAllocations.lot'])->get();
         [$variants, $serials] = $this->lockCorrectionResources(collect(), $items);
         $current = $this->buildContribution($items, $variants, $serials, -1.0, false);
 
@@ -362,6 +583,8 @@ class InventoryService
             deliveryId: $delivery->id,
             movementType: 'delivery_annulment',
             delivery: true,
+            lotBefore: $this->buildLotContribution($items, -1.0),
+            lotAfter: [],
         );
 
         $delivery->fill([
@@ -372,6 +595,72 @@ class InventoryService
         ])->save();
 
         return $delivery->fresh(['worker', 'items.variant.product', 'items.serializedItems']);
+    }
+
+    private function prepareCorrectedOutgoingAllocations($items, $originalItems, \DateTimeInterface $documentDate, bool $allowExpired): void
+    {
+        foreach ($items as $item) {
+            $item->loadMissing('variant.product');
+            if ($item->variant->product->tracking_type === 'serialized') {
+                $grouped = [];
+                foreach ($item->serializedItems as $serial) {
+                    $lotId = InventoryMovement::where('serialized_item_id', $serial->id)
+                        ->whereNotNull('inventory_lot_id')
+                        ->latest('id')
+                        ->value('inventory_lot_id');
+                    if ($lotId) {
+                        $grouped[$lotId] = ($grouped[$lotId] ?? 0) + 1;
+                    }
+                }
+                $this->storeLotAllocations($item, collect($grouped)->map(fn ($quantity, $lotId) => [(int) $lotId, $quantity])->values()->all());
+
+                continue;
+            }
+
+            $remaining = round((float) $item->quantity, 3);
+            $allocations = [];
+            $originalItem = $originalItems->firstWhere('product_variant_id', $item->product_variant_id);
+            foreach ($originalItem?->lotAllocations?->sortBy(
+                fn ($allocation) => $allocation->lot?->expiration_date?->format('Y-m-d') ?? '9999-12-31'
+            ) ?? collect() as $allocation) {
+                if ($remaining <= 0.0005) {
+                    break;
+                }
+                $quantity = min((float) $allocation->quantity, $remaining);
+                $allocations[] = [$allocation->inventory_lot_id, round($quantity, 3)];
+                $remaining = round($remaining - $quantity, 3);
+            }
+            if ($remaining > 0.0005) {
+                $allocations = array_merge($allocations, $this->allocateAvailableLots(
+                    $item->product_variant_id,
+                    $remaining,
+                    $documentDate,
+                    $allowExpired,
+                ));
+            }
+            $this->storeLotAllocations($item, $allocations);
+        }
+    }
+
+    private function buildLotContribution($items, float $sign): array
+    {
+        $contribution = [];
+        foreach ($items as $item) {
+            $item->loadMissing(['variant.product', 'lotAllocations']);
+            if ($item->variant->product->tracking_type === 'serialized') {
+                continue;
+            }
+            foreach ($item->lotAllocations as $allocation) {
+                $variantId = (int) $item->product_variant_id;
+                $lotId = (int) $allocation->inventory_lot_id;
+                $contribution[$variantId][$lotId] = round(
+                    ($contribution[$variantId][$lotId] ?? 0.0) + ($sign * (float) $allocation->quantity),
+                    3,
+                );
+            }
+        }
+
+        return $contribution;
     }
 
     private function lockCorrectionResources($originalItems, $correctedItems): array
@@ -463,6 +752,8 @@ class InventoryService
                 $contribution['serial'][$serial->id] = [
                     'variant_id' => $variant->id,
                     'quantity' => $sign,
+                    'lot_id' => $item->inventory_lot_id ?: InventoryMovement::where('serialized_item_id', $serial->id)
+                        ->whereNotNull('inventory_lot_id')->latest('id')->value('inventory_lot_id'),
                 ];
             }
         }
@@ -480,6 +771,8 @@ class InventoryService
         ?int $deliveryId = null,
         string $movementType = 'correction',
         bool $delivery = false,
+        array $lotBefore = [],
+        array $lotAfter = [],
     ): void {
         $bulkAdjustments = [];
         $bulkIds = collect(array_keys($before['bulk']))
@@ -489,7 +782,8 @@ class InventoryService
 
         foreach ($bulkIds as $variantId) {
             $delta = round(($after['bulk'][$variantId] ?? 0.0) - ($before['bulk'][$variantId] ?? 0.0), 3);
-            if (abs($delta) < 0.0005) {
+            $lotChanged = ($lotBefore[$variantId] ?? []) !== ($lotAfter[$variantId] ?? []);
+            if (abs($delta) < 0.0005 && ! $lotChanged) {
                 continue;
             }
 
@@ -537,24 +831,50 @@ class InventoryService
                 'delta' => $delta,
                 'final' => $final,
                 'after_quantity' => (float) ($afterRow['quantity'] ?? 0.0),
+                'lot_id' => $afterRow['lot_id'] ?? $beforeRow['lot_id'] ?? null,
             ];
         }
 
         foreach ($bulkAdjustments as $adjustment) {
-            InventoryMovement::create([
-                'product_variant_id' => $adjustment['variant_id'],
-                'dispatch_note_id' => $dispatchNoteId,
-                'delivery_id' => $deliveryId,
-                'movement_type' => $movementType,
-                'quantity' => $adjustment['delta'],
-                'occurred_at' => now(),
-                'created_by' => $userId,
-            ]);
+            $variantId = $adjustment['variant_id'];
+            $lotIds = collect(array_keys($lotBefore[$variantId] ?? []))
+                ->merge(array_keys($lotAfter[$variantId] ?? []))
+                ->unique()
+                ->sort();
+            $recorded = 0.0;
+            foreach ($lotIds as $lotId) {
+                $delta = round(($lotAfter[$variantId][$lotId] ?? 0.0) - ($lotBefore[$variantId][$lotId] ?? 0.0), 3);
+                if (abs($delta) < 0.0005) {
+                    continue;
+                }
+                $currentLotStock = (float) InventoryMovement::where('inventory_lot_id', $lotId)->sum('quantity');
+                if (round($currentLotStock + $delta, 3) < -0.0005) {
+                    $lot = InventoryLot::find($lotId);
+                    throw ValidationException::withMessages([
+                        'items' => 'La corrección dejaría stock negativo en el lote '.($lot?->lot_number ?? '#'.$lotId).'.',
+                    ]);
+                }
+                InventoryMovement::create([
+                    'product_variant_id' => $variantId,
+                    'inventory_lot_id' => $lotId,
+                    'dispatch_note_id' => $dispatchNoteId,
+                    'delivery_id' => $deliveryId,
+                    'movement_type' => $movementType,
+                    'quantity' => $delta,
+                    'occurred_at' => now(),
+                    'created_by' => $userId,
+                ]);
+                $recorded = round($recorded + $delta, 3);
+            }
+            if (abs($recorded - $adjustment['delta']) > 0.0005) {
+                throw ValidationException::withMessages(['items' => 'No fue posible conciliar la corrección con sus lotes de inventario.']);
+            }
         }
 
         foreach ($serialAdjustments as $adjustment) {
             InventoryMovement::create([
                 'product_variant_id' => $adjustment['variant_id'],
+                'inventory_lot_id' => $adjustment['lot_id'],
                 'serialized_item_id' => $adjustment['serial_id'],
                 'dispatch_note_id' => $dispatchNoteId,
                 'delivery_id' => $deliveryId,

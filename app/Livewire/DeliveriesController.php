@@ -53,6 +53,8 @@ class DeliveriesController extends Component
 
     public function render()
     {
+        $effectiveDate = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $this->delivery_date) ? $this->delivery_date : now()->toDateString();
+        $usableStock = "(SELECT COALESCE(SUM(lm.quantity), 0) FROM inventory_movements lm INNER JOIN inventory_lots il ON il.id = lm.inventory_lot_id WHERE lm.product_variant_id = product_variants.id AND (il.expiration_date IS NULL OR il.expiration_date >= '".$effectiveDate."'))";
         $deliveries = Delivery::with('worker')->withCount('items')->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('number', 'like', '%'.$this->searchTerm.'%')->orWhereHas('worker', fn ($w) => $w->where('name', 'like', '%'.$this->searchTerm.'%')->orWhere('lastname', 'like', '%'.$this->searchTerm.'%')->orWhere('document', 'like', '%'.$this->searchTerm.'%'))))->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))->latest('delivery_date')->latest('id')->paginate(15);
         $selectedWorker = $this->worker_id ? Worker::find($this->worker_id) : null;
         $workerResults = collect();
@@ -65,6 +67,7 @@ class DeliveriesController extends Component
         $serialBalance = $this->serialBalanceExpression();
         $variants = ProductVariant::with([
             'product',
+            'inventoryLots' => fn ($query) => $query->withSum('movements as stock', 'quantity')->orderByRaw('expiration_date IS NULL')->orderBy('expiration_date')->orderBy('lot_number'),
             'serializedItems' => function ($query) use ($selectedSerialIds, $serialBalance) {
                 $query->where(function ($options) use ($selectedSerialIds, $serialBalance) {
                     $options->where(function ($available) use ($serialBalance) {
@@ -75,12 +78,13 @@ class DeliveriesController extends Component
                     }
                 })->orderBy('serial_number');
             },
-        ])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
+        ])->withSum('inventoryMovements as stock', 'quantity')->addSelect(DB::raw("product_variants.*, {$usableStock} AS usable_stock"))->whereIn('id', $ids)->get();
         $productResults = collect();
         if (mb_strlen(trim($this->productSearch)) >= 2) {
             $term = '%'.trim($this->productSearch).'%';
             $productResults = ProductVariant::with('product')
                 ->withSum('inventoryMovements as stock', 'quantity')
+                ->addSelect(DB::raw("product_variants.*, {$usableStock} AS usable_stock"))
                 ->withCount(['serializedItems as deliverable_serials_count' => fn ($query) => $query
                     ->where('status', 'available')
                     ->whereRaw("{$serialBalance} = 1")])
@@ -90,7 +94,7 @@ class DeliveriesController extends Component
                 ->limit(15)->get();
         }
 
-        $selectedDetail = $this->detailId ? Delivery::with(['worker', 'items.variant.product', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
+        $selectedDetail = $this->detailId ? Delivery::with(['worker', 'items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
 
         return view('livewire.deliveries.deliveries', compact('deliveries', 'selectedWorker', 'workerResults', 'variants', 'productResults', 'selectedDetail'))->extends('layouts.theme.app');
     }
@@ -308,7 +312,7 @@ class DeliveriesController extends Component
 
     private function snapshot(Delivery $d)
     {
-        $d->loadMissing(['worker', 'creator', 'items.variant.product', 'items.serializedItems']);
+        $d->loadMissing(['worker', 'creator', 'items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot']);
 
         return [
             'número' => $d->number,
@@ -326,6 +330,11 @@ class DeliveriesController extends Component
                 'producto' => $item->variant?->product?->name,
                 'sku' => $item->variant?->sku,
                 'cantidad' => (float) $item->quantity,
+                'lotes_asignados' => $item->lotAllocations->map(fn ($allocation) => [
+                    'lote' => $allocation->lot?->lot_number,
+                    'vencimiento' => $allocation->lot?->expiration_date?->format('Y-m-d'),
+                    'cantidad' => (float) $allocation->quantity,
+                ])->all(),
                 'observaciones' => $item->notes,
                 'series' => $item->serializedItems->pluck('serial_number')->all(),
             ])->all(),

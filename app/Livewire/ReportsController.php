@@ -101,7 +101,7 @@ class ReportsController extends Component
             'showSerialColumn' => $showSerialColumn,
             'hasSerialContext' => $hasSerialContext,
             'showExpiryColumn' => $showExpiryColumn,
-            'stockColumnCount' => 8 + $reportAttributes->count() + ($showSerialColumn ? 1 : 0) + ($showExpiryColumn ? 1 : 0),
+            'stockColumnCount' => 8 + $reportAttributes->count() + ($showSerialColumn ? 1 : 0) + ($showExpiryColumn ? 2 : 0),
         ])->extends('layouts.theme.app');
     }
 
@@ -200,17 +200,18 @@ class ReportsController extends Component
             $out = fopen('php://output', 'w');
             fwrite($out, "\xEF\xBB\xBF");
             if ($type === 'movements') {
-                fputcsv($out, ['Fecha', 'Movimiento', 'Producto', 'SKU', 'Unidad', 'Serie', 'Documento', 'Trabajador', 'Entrada', 'Salida', 'Usuario'], ';');
+                fputcsv($out, ['Fecha', 'Movimiento', 'Producto', 'SKU', 'Unidad', 'Lote', 'Vencimiento', 'Serie', 'Documento', 'Trabajador', 'Entrada', 'Salida', 'Usuario'], ';');
                 $this->movementQuery()->orderBy('occurred_at')->chunk(500, function ($rows) use ($out) {
                     foreach ($rows as $r) {
-                        fputcsv($out, [$r->occurred_at->format('d/m/Y H:i:s'), $this->movementLabel($r->movement_type), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), $this->safe($r->variant->product->unit), $this->safe($r->serializedItem?->serial_number), $this->safe($r->dispatchNote?->number ?? $r->delivery?->number), $this->safe($r->delivery?->worker?->full_name), $r->quantity > 0 ? Quantity::format($r->quantity) : '', $r->quantity < 0 ? Quantity::format(abs((float) $r->quantity)) : '', $this->safe($r->creator?->login)], ';');
+                        fputcsv($out, [$r->occurred_at->format('d/m/Y H:i:s'), $this->movementLabel($r->movement_type), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), $this->safe($r->variant->product->unit), $this->safe($r->inventoryLot?->lot_number), $r->inventoryLot?->expiration_date?->format('d/m/Y'), $this->safe($r->serializedItem?->serial_number), $this->safe($r->dispatchNote?->number ?? $r->delivery?->number), $this->safe($r->delivery?->worker?->full_name), $r->quantity > 0 ? Quantity::format($r->quantity) : '', $r->quantity < 0 ? Quantity::format(abs((float) $r->quantity)) : '', $this->safe($r->creator?->login)], ';');
                     }
                 });
             } elseif ($type === 'deliveries') {
-                fputcsv($out, ['Fecha', 'Entrega', 'Documento trabajador', 'Trabajador', 'Área', 'Producto', 'SKU', 'Cantidad', 'Unidad', 'Series', 'Estado'], ';');
+                fputcsv($out, ['Fecha', 'Entrega', 'Documento trabajador', 'Trabajador', 'Área', 'Producto', 'SKU', 'Lotes', 'Cantidad', 'Unidad', 'Series', 'Estado'], ';');
                 $this->deliveryQuery()->orderBy('id')->chunk(500, function ($rows) use ($out) {
                     foreach ($rows as $r) {
-                        fputcsv($out, [$r->delivery->delivery_date->format('d/m/Y'), $this->safe($r->delivery->number), $this->safe($r->delivery->worker->document), $this->safe($r->delivery->worker->full_name), $this->safe($r->delivery->worker->area), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), Quantity::format($r->quantity), $this->safe($r->variant->product->unit), $this->safe($r->serializedItems->pluck('serial_number')->join(', ')), $r->delivery->status], ';');
+                        $lots = $r->lotAllocations->map(fn ($allocation) => $allocation->lot?->lot_number.($allocation->lot?->expiration_date ? ' ('.$allocation->lot->expiration_date->format('d/m/Y').')' : ''))->filter()->join(' | ');
+                        fputcsv($out, [$r->delivery->delivery_date->format('d/m/Y'), $this->safe($r->delivery->number), $this->safe($r->delivery->worker->document), $this->safe($r->delivery->worker->full_name), $this->safe($r->delivery->worker->area), $this->safe($r->variant->product->name), $this->safe($r->variant->sku), $this->safe($lots), Quantity::format($r->quantity), $this->safe($r->variant->product->unit), $this->safe($r->serializedItems->pluck('serial_number')->join(', ')), $r->delivery->status], ';');
                     }
                 });
             } else {
@@ -223,7 +224,7 @@ class ReportsController extends Component
                 }
                 array_push($headers, 'Unidad', 'Control');
                 if ($showExpiryColumn) {
-                    array_push($headers, 'Vencimiento', 'Estado vencimiento');
+                    array_push($headers, 'Lotes con saldo', 'Próximo vencimiento', 'Estado vencimiento');
                 }
                 array_push($headers, 'Stock actual', 'Stock mínimo', 'Estado stock');
                 fputcsv($out, $headers, ';');
@@ -239,7 +240,8 @@ class ReportsController extends Component
                         }
                         array_push($data, $this->safe($r->product->unit), $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad');
                         if ($showExpiryColumn) {
-                            array_push($data, $r->expiration_date ? Carbon::parse($r->expiration_date)->format('d/m/Y') : '', $this->expiryLabel($r->expiration_date));
+                            $lots = $this->availableLots($r);
+                            array_push($data, $this->safe($lots->map(fn ($lot) => $lot->lot_number.' ('.Quantity::format($lot->stock).($lot->expiration_date ? ', '.$lot->expiration_date->format('d/m/Y') : '').')')->join(' | ')), $r->expiration_date ? Carbon::parse($r->expiration_date)->format('d/m/Y') : '', $this->expiryLabel($r->expiration_date));
                         }
                         array_push($data, Quantity::format($stock), Quantity::format($r->minimum_stock), $this->stockLabel($stock, (float) $r->minimum_stock));
                         fputcsv($out, $data, ';');
@@ -279,9 +281,10 @@ class ReportsController extends Component
             'product.attributeValues',
             'attributeValues',
             'serializedItems' => fn ($query) => $query->where('status', '!=', 'inactive')->withSum('inventoryMovements as inventory_balance', 'quantity'),
+            'inventoryLots' => fn ($query) => $query->withSum('movements as stock', 'quantity')->orderByRaw('expiration_date IS NULL')->orderBy('expiration_date')->orderBy('lot_number'),
         ])->select('product_variants.*')->addSelect(DB::raw("{$expiryDate} AS expiration_date"))->leftJoin('products', 'products.id', '=', 'product_variants.product_id')
             ->withSum('inventoryMovements as stock', 'quantity')
-            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('products.name', 'like', $term)->orWhere('products.code', 'like', $term)->orWhere('product_variants.sku', 'like', $term)->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term)->whereRaw("{$serialStock} > 0"))))
+            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->where('products.name', 'like', $term)->orWhere('products.code', 'like', $term)->orWhere('product_variants.sku', 'like', $term)->orWhereHas('inventoryLots', fn ($lot) => $lot->where('lot_number', 'like', $term))->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term)->whereRaw("{$serialStock} > 0"))))
             ->when($this->categoryFilter, fn ($q) => $q->where('products.category_id', $this->categoryFilter))
             ->when($this->catalogStatus === 'active', fn ($q) => $q->where('products.status', true)->where('product_variants.status', true))
             ->when($this->catalogStatus === 'inactive', fn ($q) => $q->where(fn ($status) => $status->where('products.status', false)->orWhere('product_variants.status', false)))
@@ -308,7 +311,7 @@ class ReportsController extends Component
     {
         $term = '%'.trim($this->searchTerm).'%';
 
-        $query = InventoryMovement::with(['variant.product.category', 'serializedItem', 'dispatchNote', 'delivery.worker', 'creator'])
+        $query = InventoryMovement::with(['variant.product.category', 'inventoryLot', 'serializedItem', 'dispatchNote', 'delivery.worker', 'creator'])
             ->when($this->fromDate, fn ($q) => $q->whereDate('occurred_at', '>=', $this->fromDate))->when($this->toDate, fn ($q) => $q->whereDate('occurred_at', '<=', $this->toDate))
             ->when($this->categoryFilter, fn ($q) => $q->whereHas('variant.product', fn ($p) => $p->where('category_id', $this->categoryFilter)))
             ->when($this->movementType, fn ($q) => $q->where('movement_type', $this->movementType))
@@ -316,7 +319,7 @@ class ReportsController extends Component
             ->when($this->documentSource === 'delivery', fn ($q) => $q->whereNotNull('delivery_id'))
             ->when($this->workerFilter, fn ($q) => $q->whereHas('delivery', fn ($d) => $d->where('worker_id', $this->workerFilter)))
             ->when($this->serialFilter, fn ($q) => $q->whereHas('serializedItem', fn ($serial) => $serial->where('serial_number', 'like', '%'.trim($this->serialFilter).'%')))
-            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->whereHas('variant', fn ($v) => $v->where('sku', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term)))->orWhereHas('serializedItem', fn ($s) => $s->where('serial_number', 'like', $term))->orWhereHas('dispatchNote', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery.worker', fn ($w) => $w->where('name', 'like', $term)->orWhere('lastname', 'like', $term)->orWhere('document', 'like', $term))));
+            ->when($this->searchTerm, fn ($q) => $q->where(fn ($x) => $x->whereHas('variant', fn ($v) => $v->where('sku', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term)))->orWhereHas('inventoryLot', fn ($lot) => $lot->where('lot_number', 'like', $term))->orWhereHas('serializedItem', fn ($s) => $s->where('serial_number', 'like', $term))->orWhereHas('dispatchNote', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery', fn ($d) => $d->where('number', 'like', $term))->orWhereHas('delivery.worker', fn ($w) => $w->where('name', 'like', $term)->orWhere('lastname', 'like', $term)->orWhere('document', 'like', $term))));
 
         return $this->activeAttributeFilters()->isEmpty()
             ? $query
@@ -327,7 +330,7 @@ class ReportsController extends Component
     {
         $term = '%'.trim($this->searchTerm).'%';
 
-        $query = DeliveryItem::with(['delivery.worker', 'variant.product.category', 'serializedItems'])
+        $query = DeliveryItem::with(['delivery.worker', 'variant.product.category', 'serializedItems', 'lotAllocations.lot'])
             ->whereHas('delivery', fn ($d) => $d->when($this->deliveryStatus, fn ($q) => $q->where('status', $this->deliveryStatus))->when($this->fromDate, fn ($q) => $q->whereDate('delivery_date', '>=', $this->fromDate))->when($this->toDate, fn ($q) => $q->whereDate('delivery_date', '<=', $this->toDate))->when($this->areaFilter, fn ($q) => $q->whereHas('worker', fn ($w) => $w->where('area', $this->areaFilter))))
             ->when($this->workerFilter, fn ($q) => $q->whereHas('delivery', fn ($d) => $d->where('worker_id', $this->workerFilter)))
             ->when($this->categoryFilter, fn ($q) => $q->whereHas('variant.product', fn ($p) => $p->where('category_id', $this->categoryFilter)))
@@ -416,6 +419,11 @@ class ReportsController extends Component
         return $variant->serializedItems->filter(fn ($serial) => (float) ($serial->inventory_balance ?? 0) > 0)->values();
     }
 
+    public function availableLots(ProductVariant $variant)
+    {
+        return $variant->inventoryLots->filter(fn ($lot) => (float) ($lot->stock ?? 0) > 0.0005)->values();
+    }
+
     private function isExpirationAttribute(ProductAttribute $attribute): bool
     {
         if ($attribute->type !== 'date') {
@@ -485,6 +493,7 @@ class ReportsController extends Component
         $expirationAttribute = "pa.type = 'date' AND (LOWER(pa.code) LIKE '%venc%' OR LOWER(pa.name) LIKE '%venc%' OR LOWER(pa.code) LIKE '%caduc%' OR LOWER(pa.name) LIKE '%caduc%' OR LOWER(pa.code) LIKE '%expir%' OR LOWER(pa.name) LIKE '%expir%')";
 
         return "COALESCE(
+            (SELECT MIN(il.expiration_date) FROM inventory_lots il WHERE il.product_variant_id = product_variants.id AND il.expiration_date IS NOT NULL AND (SELECT COALESCE(SUM(lm.quantity), 0) FROM inventory_movements lm WHERE lm.inventory_lot_id = il.id) > 0),
             (SELECT MIN(vav.value) FROM variant_attribute_values vav INNER JOIN product_attributes pa ON pa.id = vav.product_attribute_id WHERE vav.product_variant_id = product_variants.id AND {$expirationAttribute} AND vav.value <> ''),
             (SELECT MIN(pav.value) FROM product_attribute_values pav INNER JOIN product_attributes pa ON pa.id = pav.product_attribute_id WHERE pav.product_id = products.id AND {$expirationAttribute} AND pav.value <> '')
         )";

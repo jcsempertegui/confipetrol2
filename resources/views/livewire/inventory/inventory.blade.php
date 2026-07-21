@@ -30,7 +30,7 @@
         <div class="card-header filter-header">
             <div class="filter-title"><i class="bx bx-package"></i><span>Existencias</span></div>
             <div class="row g-2 flex-grow-1 justify-content-end">
-                <div class="col-12 col-lg-5"><label class="filter-label">Buscar</label><div class="input-group"><span class="input-group-text"><i class="bx bx-search"></i></span><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Producto, código, SKU o variante"></div></div>
+                <div class="col-12 col-lg-5"><label class="filter-label">Buscar</label><div class="input-group"><span class="input-group-text"><i class="bx bx-search"></i></span><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Producto, código, SKU, variante o lote"></div></div>
                 <div class="col-sm-6 col-lg-3"><label class="filter-label">Categoría</label><select wire:model.live="categoryFilter" class="form-select"><option value="">Todas las categorías</option>@foreach($categories as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select></div>
                 <div class="col-sm-6 col-lg-3"><label class="filter-label">Stock</label><select wire:model.live="stockFilter" class="form-select"><option value="">Todo el stock</option><option value="positive">Con existencia</option><option value="zero">Sin existencia</option></select></div>
             </div>
@@ -38,13 +38,26 @@
 
         <div class="table-responsive d-none d-lg-block">
             <table class="table table-hover align-middle mb-0 table-with-actions">
-                <thead><tr><th>Producto</th><th>SKU / variante</th><th>Categoría</th><th class="text-end">Stock actual</th><th>Control</th><th></th></tr></thead>
+                <thead><tr><th>Producto</th><th>SKU / variante</th><th>Categoría</th><th>Lotes con saldo</th><th class="text-end">Stock actual</th><th>Control</th><th></th></tr></thead>
                 <tbody>
                     @forelse($variants as $v)
                         <tr>
                             <td><strong>{{ $v->product->name }}</strong><div class="small text-muted">{{ $v->product->code }}</div></td>
                             <td><span class="font-monospace">{{ $v->sku }}</span><div class="small text-muted">{{ $v->name }}</div></td>
                             <td>{{ $v->product->category->name }}</td>
+                            <td>
+                                @php
+                                    $availableLots = $v->inventoryLots->filter(fn($lot) => (float) ($lot->stock ?? 0) > 0.0005);
+                                @endphp
+                                @forelse($availableLots->take(3) as $lot)
+                                    <div class="small"><strong>{{ $lot->lot_number }}</strong>@if($lot->expiration_date)<span class="text-muted"> · {{ $lot->expiration_date->format('d/m/Y') }}</span>@endif</div>
+                                @empty
+                                    <span class="text-muted">—</span>
+                                @endforelse
+                                @if($availableLots->count() > 3)
+                                    <div class="small text-primary">+ {{ $availableLots->count() - 3 }} lote(s)</div>
+                                @endif
+                            </td>
                             <td class="text-end"><span class="fs-6 fw-bold text-{{ (float) ($v->stock ?? 0) > 0 ? 'success' : 'danger' }}">{{ \App\Support\Quantity::format($v->stock ?? 0) }}</span></td>
                             <td>
                                 @if($v->product->tracking_type === 'serialized')
@@ -57,7 +70,7 @@
                             <td class="text-end"><button wire:click="viewKardex({{ $v->id }})" class="btn btn-sm btn-outline-primary"><i class="bx bx-history me-1"></i>Kardex</button></td>
                         </tr>
                     @empty
-                        <tr><td colspan="6" class="text-center text-muted py-5">No se encontraron productos.</td></tr>
+                        <tr><td colspan="7" class="text-center text-muted py-5">No se encontraron productos.</td></tr>
                     @endforelse
                 </tbody>
             </table>
@@ -68,6 +81,17 @@
                 <div class="module-data-card">
                     <div class="d-flex justify-content-between gap-2"><div><strong>{{ $v->product->name }}</strong><div class="small font-monospace text-muted">{{ $v->sku }} · {{ $v->name }}</div></div><span class="fw-bold text-{{ (float) ($v->stock ?? 0) > 0 ? 'success' : 'danger' }}">{{ \App\Support\Quantity::format($v->stock ?? 0) }}</span></div>
                     <div class="small text-muted mt-1">{{ $v->product->category->name }} · {{ $v->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad' }}</div>
+                    @php
+                        $availableLots = $v->inventoryLots->filter(fn($lot) => (float) ($lot->stock ?? 0) > 0.0005);
+                    @endphp
+                    @if($availableLots->isNotEmpty())
+                        <div class="small mt-2">
+                            <i class="bx bx-layer me-1"></i>{{ $availableLots->count() }} lote(s) con saldo
+                            @if($availableLots->first()->expiration_date)
+                                · próximo vencimiento {{ $availableLots->first()->expiration_date->format('d/m/Y') }}
+                            @endif
+                        </div>
+                    @endif
                     <div class="module-data-actions"><button wire:click="viewKardex({{ $v->id }})" class="btn btn-sm btn-outline-primary w-100"><i class="bx bx-history me-1"></i>Ver Kardex</button></div>
                 </div>
             @empty
@@ -91,6 +115,22 @@
                     </div>
 
                     <div class="modal-body p-0">
+                        @php
+                            $availableLots = $selectedVariant->inventoryLots->filter(fn($lot) => (float) ($lot->stock ?? 0) > 0.0005);
+                        @endphp
+                        @if($availableLots->isNotEmpty())
+                            <div class="p-3 border-bottom">
+                                <div class="small fw-semibold text-uppercase text-muted mb-2">Existencia por lote</div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    @foreach($availableLots as $lot)
+                                        <div class="border rounded px-3 py-2 bg-light">
+                                            <strong>{{ $lot->lot_number }}</strong>
+                                            <div class="small">Saldo {{ \App\Support\Quantity::format($lot->stock) }}@if($lot->expiration_date) · vence {{ $lot->expiration_date->format('d/m/Y') }}@endif</div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                         <div class="p-3 border-bottom bg-light">
                             <div class="row g-2">
                                 <div class="col-6 col-md-3"><label class="filter-label">Desde</label><input type="date" wire:model.live="fromDate" class="form-control"></div>
@@ -101,7 +141,7 @@
 
                         <div class="table-responsive">
                             <table class="table table-hover align-middle mb-0">
-                                <thead class="sticky-top bg-white"><tr><th>Fecha y hora</th><th>Movimiento</th><th>Documento / destino</th><th>Serie</th><th>Usuario</th><th class="text-end">Entrada</th><th class="text-end">Salida</th><th class="text-end">Saldo</th></tr></thead>
+                                <thead class="sticky-top bg-white"><tr><th>Fecha y hora</th><th>Movimiento</th><th>Documento / destino</th><th>Lote / vencimiento</th><th>Serie</th><th>Usuario</th><th class="text-end">Entrada</th><th class="text-end">Salida</th><th class="text-end">Saldo</th></tr></thead>
                                 <tbody>
                                     @forelse($movements as $m)
                                         @php
@@ -113,6 +153,7 @@
                                             <td class="text-nowrap">{{ $m->occurred_at->format('d/m/Y H:i:s') }}</td>
                                             <td>{{ $label }}</td>
                                             <td><strong>{{ $reference }}</strong>@if($destination)<div class="small text-muted">{{ $destination }}</div>@endif</td>
+                                            <td><strong>{{ $m->inventoryLot?->lot_number ?? '—' }}</strong>@if($m->inventoryLot?->expiration_date)<div class="small text-muted">{{ $m->inventoryLot->expiration_date->format('d/m/Y') }}</div>@endif</td>
                                             <td class="font-monospace small">{{ $m->serializedItem?->serial_number ?? '—' }}</td>
                                             <td>{{ $m->creator?->login ?? 'Sistema' }}</td>
                                             <td class="text-end text-success">{{ (float) $m->quantity > 0 ? \App\Support\Quantity::format($m->quantity) : '' }}</td>
@@ -120,7 +161,7 @@
                                             <td class="text-end fw-bold">{{ \App\Support\Quantity::format($m->balance_after) }}</td>
                                         </tr>
                                     @empty
-                                        <tr><td colspan="8" class="text-center text-muted py-5">No hay movimientos en el periodo seleccionado.</td></tr>
+                                        <tr><td colspan="9" class="text-center text-muted py-5">No hay movimientos en el periodo seleccionado.</td></tr>
                                     @endforelse
                                 </tbody>
                             </table>
