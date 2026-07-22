@@ -123,6 +123,12 @@ class BackupsController extends Component
             return;
         }
 
+        if (Str::length($this->sqlFile->getClientOriginalName()) > 255) {
+            $this->addError('sqlFile', 'El nombre del archivo es demasiado largo.');
+
+            return;
+        }
+
         $this->isRestoring = true;
 
         try {
@@ -174,13 +180,44 @@ class BackupsController extends Component
         if (! is_file($path) || filesize($path) < 100) {
             throw new \RuntimeException('El archivo de respaldo está vacío o dañado.');
         }
-        $handle = fopen($path, 'r');
-        $sample = $handle ? fread($handle, min(filesize($path), 1048576)) : false;
-        if (is_resource($handle)) {
-            fclose($handle);
+        $handle = fopen($path, 'rb');
+        if (! is_resource($handle)) {
+            throw new \RuntimeException('No se pudo leer el archivo de respaldo.');
         }
-        if ($sample === false || preg_match('/\b(DROP|CREATE)\s+DATABASE\b|\bUSE\s+[`\w-]+\s*;/i', $sample)) {
-            throw new \RuntimeException('El respaldo contiene instrucciones de base de datos no permitidas.');
+
+        $forbiddenPatterns = [
+            '/\b(?:CREATE|ALTER|DROP)\s+DATABASE\b/i',
+            '/\bUSE\s+(?:`[^`]+`|[A-Z0-9_$-]+)\s*;/i',
+            '/\b(?:CREATE|ALTER|DROP|RENAME)\s+USER\b/i',
+            '/\b(?:GRANT|REVOKE)\b/i',
+            '/\bSET\s+PASSWORD\b/i',
+            '/\bINTO\s+(?:OUTFILE|DUMPFILE)\b/i',
+            '/\bLOAD\s+(?:DATA|XML)\b/i',
+            '/\b(?:INSTALL|UNINSTALL)\s+(?:PLUGIN|SONAME)\b/i',
+            '/\bSHUTDOWN\b|\bRESET\s+MASTER\b/i',
+            '/\bCHANGE\s+(?:MASTER|REPLICATION)\b|\b(?:START|STOP)\s+REPLICA\b/i',
+            '/^\s*(?:SOURCE|SYSTEM|\\!)(?:\s|$)/mi',
+            '/(?<![A-Z0-9_`])`?(?:'.preg_quote(DB::connection()->getDatabaseName(), '/').'|mysql|information_schema|performance_schema|sys)`?\s*\./i',
+        ];
+
+        $tail = '';
+        try {
+            while (! feof($handle)) {
+                $chunk = fread($handle, 1048576);
+                if ($chunk === false) {
+                    throw new \RuntimeException('No se pudo leer por completo el archivo de respaldo.');
+                }
+
+                $content = $tail.$chunk;
+                foreach ($forbiddenPatterns as $pattern) {
+                    if (preg_match($pattern, $content) === 1) {
+                        throw new \RuntimeException('El respaldo contiene instrucciones SQL no permitidas.');
+                    }
+                }
+                $tail = substr($content, -4096);
+            }
+        } finally {
+            fclose($handle);
         }
     }
 
@@ -345,6 +382,7 @@ class BackupsController extends Component
 
     public function download(string $filename)
     {
+        abort_unless(auth()->user()?->can('ver-backup'), 403);
         $filename = basename($filename);
 
         if (! str_ends_with($filename, '.sql')) {

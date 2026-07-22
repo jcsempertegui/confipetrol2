@@ -5,8 +5,10 @@ namespace App\Livewire;
 use App\Models\Category;
 use App\Models\ProductAttribute;
 use App\Traits\AuditLog;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 
 class CategoriesController extends Component
@@ -52,10 +54,12 @@ class CategoriesController extends Component
     public function saveCategory(): void
     {
         abort_unless(auth()->user()->can($this->categoryId ? 'editar-categoria' : 'crear-categoria'), 403);
+        $this->name = preg_replace('/\s+/u', ' ', trim($this->name));
         $this->code = Str::upper(trim($this->code));
+        $this->description = trim($this->description);
         $data = $this->validate([
-            'name' => 'required|string|max:150',
-            'code' => ['nullable', 'string', 'max:50', Rule::unique('categories')->ignore($this->categoryId)],
+            'name' => ['required', 'string', 'max:150'],
+            'code' => ['nullable', 'string', 'max:50', 'regex:/^[A-Z0-9][A-Z0-9._-]*$/', Rule::unique('categories')->ignore($this->categoryId)],
             'description' => 'nullable|string|max:1000', 'status' => 'boolean',
         ]);
         $this->code = $this->code ?: $this->makeCategoryCode();
@@ -84,6 +88,11 @@ class CategoriesController extends Component
     {
         abort_unless(auth()->user()->can('eliminar-categoria'), 403);
         $category = Category::findOrFail($id);
+        if ($category->status && $category->products()->where('status', true)->exists()) {
+            throw ValidationException::withMessages([
+                'category' => 'No se puede desactivar una categoría que todavía contiene productos activos.',
+            ]);
+        }
         $before = ['status' => (bool) $category->status];
         $category->update(['status' => ! $category->status]);
         $this->logActivity('CATEGORIAS', $category->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado de la categoría '.$category->name, $category->id, $before, ['status' => (bool) $category->status]);
@@ -94,10 +103,12 @@ class CategoriesController extends Component
         abort_unless(auth()->user()->can('gestionar-atributos'), 403);
         abort_unless($this->selectedCategoryId, 422, 'Seleccione una categoría.');
         $category = Category::findOrFail($this->selectedCategoryId);
+        $this->attributeName = preg_replace('/\s+/u', ' ', trim($this->attributeName));
         $this->attributeCode = Str::lower(trim($this->attributeCode ?: $category->code.'-'.Str::slug($this->attributeName)));
+        $this->attributeOptions = trim($this->attributeOptions);
         $data = $this->validate([
             'attributeName' => 'required|string|max:150',
-            'attributeCode' => ['required', 'string', 'max:50', Rule::unique('product_attributes', 'code')->ignore($this->attributeId)],
+            'attributeCode' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9][a-z0-9._-]*$/', Rule::unique('product_attributes', 'code')->ignore($this->attributeId)],
             'attributeType' => 'required|in:text,number,select,boolean,date',
             'attributeScope' => 'required|in:product,variant,unit',
             'attributeOptions' => 'nullable|string|max:2000', 'attributeStatus' => 'boolean',
@@ -116,7 +127,19 @@ class CategoriesController extends Component
             }
             $data['attributeType'] = 'text';
         }
-        $options = $this->attributeType === 'select' ? collect(explode(',', $this->attributeOptions))->map(fn ($v) => trim($v))->filter()->values()->all() : null;
+        $options = $this->attributeType === 'select'
+            ? collect(explode(',', $this->attributeOptions))->map(fn ($v) => trim($v))->filter()->unique()->values()->all()
+            : null;
+        if ($this->attributeType === 'select' && empty($options)) {
+            $this->addError('attributeOptions', 'Agregue al menos una opción para el atributo de lista.');
+
+            return;
+        }
+        if (collect($options ?? [])->contains(fn ($option) => mb_strlen($option) > 100)) {
+            $this->addError('attributeOptions', 'Cada opción puede contener como máximo 100 caracteres.');
+
+            return;
+        }
         if ($this->attributeId) {
             $current = ProductAttribute::findOrFail($this->attributeId);
             $isUsed = $current->productValues()->exists() || $current->variantValues()->exists() || ($current->scope === 'unit' && $current->categories()->whereHas('products.variants.serializedItems')->exists());
@@ -135,15 +158,19 @@ class CategoriesController extends Component
             }
         }
         $before = $this->attributeId ? $this->attributeSnapshot(ProductAttribute::findOrFail($this->attributeId), $category) : null;
-        $attribute = ProductAttribute::updateOrCreate(['id' => $this->attributeId], [
-            'name' => $data['attributeName'], 'code' => $data['attributeCode'], 'type' => $data['attributeType'],
-            'scope' => $data['attributeScope'], 'options' => $options, 'status' => $data['attributeStatus'],
-        ]);
-        $category->attributes()->syncWithoutDetaching([$attribute->id => [
-            'required' => (bool) $this->attributeRequired,
-            'position' => $category->attributes()->count(),
-        ]]);
-        $category->attributes()->updateExistingPivot($attribute->id, ['required' => (bool) $this->attributeRequired]);
+        $attribute = DB::transaction(function () use ($data, $options, $category) {
+            $attribute = ProductAttribute::updateOrCreate(['id' => $this->attributeId], [
+                'name' => $data['attributeName'], 'code' => $data['attributeCode'], 'type' => $data['attributeType'],
+                'scope' => $data['attributeScope'], 'options' => $options, 'status' => $data['attributeStatus'],
+            ]);
+            $category->attributes()->syncWithoutDetaching([$attribute->id => [
+                'required' => (bool) $this->attributeRequired,
+                'position' => $category->attributes()->count(),
+            ]]);
+            $category->attributes()->updateExistingPivot($attribute->id, ['required' => (bool) $this->attributeRequired]);
+
+            return $attribute;
+        });
         $this->logActivity('CATEGORIAS', $this->attributeId ? 'EDITAR' : 'CREAR', 'Atributo '.$attribute->name.' de la categoría '.$category->name, $attribute->id, $before, $this->attributeSnapshot($attribute->fresh(), $category));
         $this->resetAttribute();
         $this->dispatch('alert', 'Atributo guardado correctamente.', 'success');

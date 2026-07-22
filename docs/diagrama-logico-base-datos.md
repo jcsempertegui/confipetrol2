@@ -10,10 +10,8 @@ Este documento representa las entidades del negocio y sus relaciones. Omite cach
 flowchart LR
     CAT[Categorías y atributos] --> PROD[Productos y variantes]
     PROD --> SER[Unidades seriadas]
-    PROD --> LOT[Lotes y vencimientos]
 
     REM[Remitos de ingreso y salida] --> KAR[Kardex]
-    LOT --> KAR
     SER --> KAR
 
     TRA[Trabajadores] --> ENT[Entregas]
@@ -30,7 +28,7 @@ flowchart LR
     PROD --> AUD
 ```
 
-El stock no es un dato editable: se obtiene sumando los movimientos del Kardex por variante, lote o número de serie.
+El stock no es un dato editable: se obtiene sumando los movimientos del Kardex por variante o número de serie.
 
 ## 1. Catálogo de productos
 
@@ -121,7 +119,7 @@ erDiagram
 
 Una variante es la unidad lógica que participa en el inventario. Un producto sin tallas también tiene una variante única interna. Cuando el producto es seriado, cada equipo físico se representa mediante una unidad seriada.
 
-## 2. Operación, lotes e inventario
+## 2. Operación e inventario
 
 ```mermaid
 erDiagram
@@ -136,13 +134,7 @@ erDiagram
     DETALLE_ENTREGA ||--o{ SERIE_ENTREGA : selecciona
     UNIDAD_SERIADA ||--o{ SERIE_ENTREGA : participa
 
-    VARIANTE ||--o{ LOTE : organiza
-    LOTE ||--o{ ASIGNACION_LOTE : distribuye
-    DETALLE_REMITO o|--o{ ASIGNACION_LOTE : utiliza
-    DETALLE_ENTREGA o|--o{ ASIGNACION_LOTE : utiliza
-
     VARIANTE ||--o{ MOVIMIENTO_INVENTARIO : afecta
-    LOTE o|--o{ MOVIMIENTO_INVENTARIO : identifica
     UNIDAD_SERIADA o|--o{ MOVIMIENTO_INVENTARIO : identifica
     REMITO o|--o{ MOVIMIENTO_INVENTARIO : origina
     ENTREGA o|--o{ MOVIMIENTO_INVENTARIO : origina
@@ -166,8 +158,6 @@ erDiagram
         id_remito remito
         id_variante variante
         cantidad cantidad
-        lote lote_ingresado
-        vencimiento fecha_vencimiento
     }
 
     TRABAJADOR {
@@ -196,27 +186,9 @@ erDiagram
         cantidad cantidad
     }
 
-    LOTE {
-        id identificador
-        id_variante variante
-        numero_lote lote
-        fecha_vencimiento vencimiento
-        fecha_recepcion recepcion
-        estado activo_inactivo
-    }
-
-    ASIGNACION_LOTE {
-        id identificador
-        id_lote lote
-        id_detalle_remito remito_opcional
-        id_detalle_entrega entrega_opcional
-        cantidad cantidad_asignada
-    }
-
     MOVIMIENTO_INVENTARIO {
         id identificador
         id_variante variante
-        id_lote lote_opcional
         id_unidad_seriada serie_opcional
         id_remito remito_opcional
         id_entrega entrega_opcional
@@ -241,8 +213,6 @@ erDiagram
 
 - Un remito representa un ingreso o una salida del almacén.
 - Una entrega representa la asignación de productos a un trabajador.
-- Una asignación de lote pertenece a un detalle de remito o a un detalle de entrega, pero nunca a ambos.
-- Los productos con vencimiento se entregan mediante FEFO: primero sale el lote vigente que vence antes.
 - Una anulación no elimina movimientos; crea movimientos inversos relacionados con los originales.
 - Una corrección conserva el documento original y registra una nueva versión.
 - Una unidad seriada solamente puede tener saldo cero o uno.
@@ -324,8 +294,6 @@ La identidad textual del actor permanece en auditoría aunque posteriormente se 
 | Trabajador | `workers` |
 | Entrega y detalle | `deliveries`, `delivery_items` |
 | Series de entrega | `delivery_serialized_items` |
-| Lote | `inventory_lots` |
-| Asignación de lote | `inventory_lot_allocations` |
 | Movimiento / Kardex | `inventory_movements` |
 | Usuario | `users` |
 | Rol y permiso | `roles`, `permissions` |

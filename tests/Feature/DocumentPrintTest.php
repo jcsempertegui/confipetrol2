@@ -23,7 +23,16 @@ beforeEach(function () {
 });
 
 it('prints and audits a dispatch note', function () {
-    $note = DispatchNote::create(['number' => 'ING001160726', 'type' => 'entry', 'document_date' => now(), 'counterparty' => 'Proveedor', 'status' => 'confirmed', 'created_by' => $this->user->id]);
+    $note = DispatchNote::create([
+        'number' => 'ING001160726',
+        'type' => 'entry',
+        'document_date' => now(),
+        'counterparty' => 'Proveedor',
+        'status' => 'confirmed',
+        'created_by' => $this->user->id,
+        'confirmed_by' => $this->user->id,
+        'confirmed_at' => now(),
+    ]);
     $note->items()->create(['product_variant_id' => $this->variant->id, 'quantity' => 2]);
 
     $this->get(route('dispatch-notes.print', $note))->assertOk()->assertSee('ING001160726')->assertSee('Guante');
@@ -32,7 +41,15 @@ it('prints and audits a dispatch note', function () {
 
 it('prints and audits a worker delivery', function () {
     $worker = Worker::create(['document' => 'CI-9090', 'name' => 'Ana', 'lastname' => 'Pérez', 'status' => true]);
-    $delivery = Delivery::create(['number' => 'ENT001160726', 'worker_id' => $worker->id, 'delivery_date' => now(), 'status' => 'confirmed', 'created_by' => $this->user->id]);
+    $delivery = Delivery::create([
+        'number' => 'ENT001160726',
+        'worker_id' => $worker->id,
+        'delivery_date' => now(),
+        'status' => 'confirmed',
+        'created_by' => $this->user->id,
+        'confirmed_by' => $this->user->id,
+        'confirmed_at' => now(),
+    ]);
     $delivery->items()->create(['product_variant_id' => $this->variant->id, 'quantity' => 1]);
 
     $this->get(route('deliveries.print', $delivery))->assertOk()->assertSee('ENT001160726')->assertSee('Ana Pérez');

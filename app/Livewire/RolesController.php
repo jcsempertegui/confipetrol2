@@ -5,6 +5,8 @@ namespace App\Livewire;
 use App\Models\User;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Permission;
@@ -88,9 +90,11 @@ class RolesController extends Component
     public function Create()
     {
         abort_unless(auth()->user()->can('crear-rol'), 403);
+        $this->name = Str::upper(trim((string) $this->name));
         $rules = [
-            'name' => 'required|unique:roles|min:2',
-            'permisosSelected' => 'required|array',
+            'name' => ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\pN _.-]+$/u", Rule::unique('roles', 'name')],
+            'permisosSelected' => ['required', 'array', 'min:1'],
+            'permisosSelected.*' => ['required', 'string', 'distinct', Rule::exists('permissions', 'name')],
         ];
         $message = [
             'name.required' => 'Nombre de el rol es requerido',
@@ -102,8 +106,12 @@ class RolesController extends Component
 
         $this->validate($rules, $message);
 
-        $role = Role::create(['name' => $this->name]);
-        $role->syncPermissions($this->permisosSelected);
+        $role = DB::transaction(function () {
+            $role = Role::create(['name' => $this->name]);
+            $role->syncPermissions(array_values(array_unique($this->permisosSelected)));
+
+            return $role->fresh('permissions');
+        });
 
         $this->logActivity(
             'ROLES', 'CREAR',
@@ -136,9 +144,11 @@ class RolesController extends Component
     public function Update()
     {
         abort_unless(auth()->user()->can('editar-rol'), 403);
+        $this->name = Str::upper(trim((string) $this->name));
         $rules = [
-            'name' => "required|unique:roles,name,{$this->selected_id}|min:2",
-            'permisosSelected' => 'required|array',
+            'name' => ['required', 'string', 'min:2', 'max:100', "regex:/^[\pL\pN _.-]+$/u", Rule::unique('roles', 'name')->ignore($this->selected_id)],
+            'permisosSelected' => ['required', 'array', 'min:1'],
+            'permisosSelected.*' => ['required', 'string', 'distinct', Rule::exists('permissions', 'name')],
         ];
 
         $message = [
@@ -154,9 +164,12 @@ class RolesController extends Component
         $role = Role::find($this->selected_id);
         abort_if($role?->name === 'SUPER ADMIN', 403);
         $before = ['nombre' => $role->name, 'permisos' => $role->permissions->pluck('name')->sort()->values()->all()];
-        $role->name = $this->name;
-        $role->save();
-        $role->syncPermissions($this->permisosSelected);
+        DB::transaction(function () use ($role) {
+            $role->name = $this->name;
+            $role->save();
+            $role->syncPermissions(array_values(array_unique($this->permisosSelected)));
+        });
+        $role->refresh()->load('permissions');
 
         $this->logActivity(
             'ROLES', 'EDITAR',

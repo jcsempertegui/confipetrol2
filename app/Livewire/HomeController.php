@@ -274,7 +274,6 @@ class HomeController extends Component
         $expirationAttribute = "pa.type = 'date' AND (LOWER(pa.code) LIKE '%venc%' OR LOWER(pa.name) LIKE '%venc%' OR LOWER(pa.code) LIKE '%caduc%' OR LOWER(pa.name) LIKE '%caduc%' OR LOWER(pa.code) LIKE '%expir%' OR LOWER(pa.name) LIKE '%expir%')";
 
         return "COALESCE(
-            (SELECT MIN(il.expiration_date) FROM inventory_lots il WHERE il.product_variant_id = product_variants.id AND il.expiration_date IS NOT NULL AND (SELECT COALESCE(SUM(lm.quantity), 0) FROM inventory_movements lm WHERE lm.inventory_lot_id = il.id) > 0),
             (SELECT MIN(vav.value) FROM variant_attribute_values vav INNER JOIN product_attributes pa ON pa.id = vav.product_attribute_id WHERE vav.product_variant_id = product_variants.id AND {$expirationAttribute} AND vav.value <> ''),
             (SELECT MIN(pav.value) FROM product_attribute_values pav INNER JOIN product_attributes pa ON pa.id = pav.product_attribute_id WHERE pav.product_id = products.id AND {$expirationAttribute} AND pav.value <> '')
         )";

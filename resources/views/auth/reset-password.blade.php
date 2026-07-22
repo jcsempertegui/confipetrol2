@@ -50,7 +50,7 @@
                             <!-- Nueva contraseña -->
                             <div class="mb-3">
                                 <label class="form-label">Nueva contraseña</label>
-                                <input type="password" name="password" class="form-control"
+                                <input type="password" name="password" minlength="12" class="form-control"
                                     placeholder="Ingresa nueva contraseña" required autocomplete="new-password">
                                 @error('password')
                                 <small class="text-danger">{{ $message }}</small>
@@ -60,7 +60,7 @@
                             <!-- Confirmar contraseña -->
                             <div class="mb-3">
                                 <label class="form-label">Confirmar contraseña</label>
-                                <input type="password" name="password_confirmation" class="form-control"
+                                <input type="password" name="password_confirmation" minlength="12" class="form-control"
                                     placeholder="Confirma la contraseña" required autocomplete="new-password">
                                 @error('password_confirmation')
                                 <small class="text-danger">{{ $message }}</small>

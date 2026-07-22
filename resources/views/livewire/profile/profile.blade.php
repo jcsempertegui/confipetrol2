@@ -95,6 +95,7 @@
                                 id="new-password"
                                 name="password"
                                 type="password"
+                                minlength="12"
                                 autocomplete="new-password"
                                 class="form-control @error('password', 'updatePassword') is-invalid @enderror"
                                 required
@@ -108,6 +109,7 @@
                                 id="new-password-confirmation"
                                 name="password_confirmation"
                                 type="password"
+                                minlength="12"
                                 autocomplete="new-password"
                                 class="form-control"
                                 required

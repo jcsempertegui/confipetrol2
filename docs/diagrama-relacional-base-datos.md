@@ -2,7 +2,7 @@
 
 Sistema de almacén Confipetrol — esquema MySQL actualizado al 20/07/2026.
 
-El modelo contiene 35 tablas. Para mantenerlo legible se divide en cuatro diagramas: catálogo, operación e inventario, seguridad y tablas técnicas. Los campos `created_at` y `updated_at` se omiten en algunos bloques cuando no intervienen en una relación.
+El modelo contiene 33 tablas. Para mantenerlo legible se divide en cuatro diagramas: catálogo, operación e inventario, seguridad y tablas técnicas. Los campos `created_at` y `updated_at` se omiten en algunos bloques cuando no intervienen en una relación.
 
 ## Convenciones
 
@@ -112,16 +112,15 @@ erDiagram
 - Una categoría configura sus atributos mediante `category_product_attribute`.
 - Un atributo puede aplicarse al producto, a su variante o a una unidad serializada según `scope`.
 - Un producto tiene una o varias variantes. La variante es la unidad que participa en remitos, entregas y Kardex.
-- El atributo de catálogo **Vencimiento** permanece en estas tablas; el vencimiento operativo de cada recepción se registra en `inventory_lots`.
+- El vencimiento puede mantenerse como atributo configurable del catálogo y utilizarse en filtros y alertas, sin crear una estructura adicional de inventario.
 
-## 2. Operación, lotes, entregas e inventario
+## 2. Operación, entregas e inventario
 
 ```mermaid
 erDiagram
     workers ||--o{ deliveries : recibe
     users ||--o{ dispatch_notes : registra
     users ||--o{ deliveries : registra
-    users ||--o{ inventory_lots : crea
     users ||--o{ inventory_movements : registra
 
     dispatch_notes o|--o| dispatch_notes : corrige
@@ -129,7 +128,6 @@ erDiagram
 
     dispatch_notes ||--|{ dispatch_note_items : contiene
     product_variants ||--o{ dispatch_note_items : referencia
-    inventory_lots o|--o{ dispatch_note_items : lote_ingresado
 
     deliveries ||--|{ delivery_items : contiene
     product_variants ||--o{ delivery_items : referencia
@@ -139,13 +137,7 @@ erDiagram
     delivery_items ||--o{ delivery_serialized_items : selecciona
     serialized_items ||--o{ delivery_serialized_items : participa
 
-    product_variants ||--o{ inventory_lots : divide_stock
-    inventory_lots ||--o{ inventory_lot_allocations : asigna
-    dispatch_note_items o|--o{ inventory_lot_allocations : distribuye
-    delivery_items o|--o{ inventory_lot_allocations : distribuye
-
     product_variants ||--o{ inventory_movements : afecta
-    inventory_lots o|--o{ inventory_movements : identifica
     serialized_items o|--o{ inventory_movements : identifica
     dispatch_notes o|--o{ inventory_movements : origina
     deliveries o|--o{ inventory_movements : origina
@@ -193,10 +185,7 @@ erDiagram
         bigint id PK
         bigint dispatch_note_id FK
         bigint product_variant_id FK
-        bigint inventory_lot_id FK "nullable"
         decimal quantity
-        varchar lot_number nullable
-        date expiration_date nullable
         varchar notes nullable
     }
 
@@ -235,29 +224,9 @@ erDiagram
         bigint serialized_item_id PK,FK
     }
 
-    inventory_lots {
-        bigint id PK
-        bigint product_variant_id FK,UK
-        varchar lot_number UK "único dentro de la variante"
-        date expiration_date nullable
-        date received_at nullable
-        boolean is_legacy
-        boolean status
-        bigint created_by FK "nullable"
-    }
-
-    inventory_lot_allocations {
-        bigint id PK
-        bigint inventory_lot_id FK
-        bigint dispatch_note_item_id FK "nullable"
-        bigint delivery_item_id FK "nullable"
-        decimal quantity
-    }
-
     inventory_movements {
         bigint id PK
         bigint product_variant_id FK
-        bigint inventory_lot_id FK "nullable"
         bigint serialized_item_id FK "nullable"
         bigint dispatch_note_id FK "nullable"
         bigint delivery_id FK "nullable"
@@ -284,12 +253,9 @@ erDiagram
 
 ### Reglas de integridad operacional
 
-- `inventory_lot_allocations` vincula una asignación con un detalle de remito **o** con un detalle de entrega; ambos campos no deben usarse simultáneamente.
 - Las entradas crean saldo positivo; las salidas y entregas crean saldo negativo.
 - Las anulaciones y correcciones generan nuevos movimientos. No eliminan el movimiento original.
 - `reversal_of_id` identifica exactamente qué movimiento fue revertido.
-- FEFO se aplica usando `inventory_lots.expiration_date`: primero sale el lote vigente que vence antes.
-- Un lote vencido no puede asignarse a una entrega, pero puede retirarse mediante un remito de salida.
 - `corrected_from_id` conserva la relación entre un documento original y su versión corregida.
 
 ## 3. Usuarios, roles, permisos y auditoría
@@ -467,9 +433,8 @@ Los respaldos no tienen una tabla relacional. Se almacenan como archivos SQL en 
 flowchart LR
     C[Categoría] --> P[Producto]
     P --> V[Variante / SKU]
-    V --> L[Lote y vencimiento]
-    R[Remito de ingreso] --> L
-    L --> M[Movimientos de inventario]
+    R[Remito de ingreso] --> M[Movimientos de inventario]
+    V --> M
     E[Entrega a trabajador] --> M
     S[Remito de salida] --> M
     M --> K[Stock y Kardex]

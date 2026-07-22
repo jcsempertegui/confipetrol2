@@ -4,6 +4,7 @@ namespace App\Livewire;
 
 use App\Models\User;
 use App\Traits\AuditLog;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Livewire\Component;
 
@@ -27,10 +28,15 @@ class ProfileController extends Component
     public function save(): void
     {
         $user = User::findOrFail(auth()->id());
+        $this->name = trim($this->name);
+        $this->lastname = trim($this->lastname);
+        $this->email = Str::lower(trim($this->email));
+        $this->phone = trim($this->phone);
         $data = $this->validate([
-            'name' => 'required|string|max:150', 'lastname' => 'nullable|string|max:150',
+            'name' => ['required', 'string', 'max:150', "regex:/^[\pL\pM '\-.]+$/u"],
+            'lastname' => ['nullable', 'string', 'max:150', "regex:/^[\pL\pM '\-.]+$/u"],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],
-            'phone' => 'nullable|string|max:30',
+            'phone' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\- ]+$/'],
         ]);
         $before = $user->only(['name', 'lastname', 'email', 'phone']);
         $user->update($data);

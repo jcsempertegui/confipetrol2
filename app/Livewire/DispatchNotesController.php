@@ -61,14 +61,21 @@ class DispatchNotesController extends Component
             ->when($this->typeFilter, fn ($q) => $q->where('type', $this->typeFilter))->when($this->statusFilter, fn ($q) => $q->where('status', $this->statusFilter))
             ->latest('document_date')->latest('id')->paginate(15);
         $ids = collect($this->items)->pluck('variant_id')->filter();
-        $variants = ProductVariant::with(['product.category.attributes', 'serializedItems' => fn ($q) => $q->where('status', '!=', 'inactive')])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
+        $variants = ProductVariant::with([
+            'product.attributeValues.attribute',
+            'attributeValues.attribute',
+            'serializedItems' => fn ($q) => $q->where('status', '!=', 'inactive'),
+        ])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
         $productResults = collect();
-        if (mb_strlen(trim($this->productSearch)) >= 2) {
-            $term = '%'.trim($this->productSearch).'%';
-            $productResults = ProductVariant::with('product.category.attributes')->withSum('inventoryMovements as stock', 'quantity')->where('status', true)->whereHas('product', fn ($q) => $q->where('status', true))
-                ->where(fn ($q) => $q->where('sku', 'like', $term)->orWhere('name', 'like', $term)->orWhereHas('product', fn ($p) => $p->where('name', 'like', $term)->orWhere('code', 'like', $term))->orWhereHas('serializedItems', fn ($s) => $s->where('serial_number', 'like', $term)))->limit(15)->get();
+        if (mb_strlen(trim($this->productSearch)) >= 1) {
+            $productResults = ProductVariant::with(['product.attributeValues.attribute', 'attributeValues.attribute'])
+                ->withSum('inventoryMovements as stock', 'quantity')
+                ->where('status', true)
+                ->whereHas('product', fn ($q) => $q->where('status', true));
+            $this->applyProductSearch($productResults, $this->productSearch);
+            $productResults = $productResults->orderBy('sku')->limit(15)->get();
         }
-        $selectedDetail = $this->detailId ? DispatchNote::with(['items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
+        $selectedDetail = $this->detailId ? DispatchNote::with(['items.variant.product.attributeValues.attribute', 'items.variant.attributeValues.attribute', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
 
         return view('livewire.dispatch-notes.dispatch-notes', compact('dispatchNotes', 'variants', 'productResults', 'selectedDetail'))->extends('layouts.theme.app');
     }
@@ -87,18 +94,7 @@ class DispatchNotesController extends Component
             $this->dispatch('alert', 'Ese producto ya está agregado.', 'warning');
 
             return;
-        }
-        $variant->loadMissing('product.category.attributes');
-        $this->items[] = [
-            'variant_id' => $variant->id,
-            'quantity' => 1,
-            'serial_ids' => [],
-            'lot_number' => '',
-            'expiration_date' => $this->type === 'entry' && $variant->product->uses_expiration_lots
-                ? ($variant->product->catalog_expiration_date ?? '')
-                : '',
-            'notes' => '',
-        ];
+        } $this->items[] = ['variant_id' => $variant->id, 'quantity' => 1, 'serial_ids' => [], 'notes' => ''];
         $this->productSearch = '';
     }
 
@@ -120,38 +116,30 @@ class DispatchNotesController extends Component
                 throw ValidationException::withMessages(['type' => 'El tipo de un remito no puede cambiarse durante una corrección.']);
             }
         }
+        $this->counterparty = preg_replace('/\s+/u', ' ', trim($this->counterparty));
+        $this->reason = preg_replace('/\s+/u', ' ', trim($this->reason));
+        $this->notes = trim($this->notes);
+        foreach ($this->items as &$item) {
+            $item['notes'] = trim((string) ($item['notes'] ?? ''));
+        }
+        unset($item);
         $this->number = app(CodeGenerator::class)->normalizeSiteSuffix($this->number);
         $data = $this->validate([
             'number' => ['nullable', 'string', 'max:30', 'regex:/^[A-Z0-9][A-Z0-9._\/-]*$/', Rule::unique('dispatch_notes', 'number')->ignore($this->noteId)],
-            'type' => 'required|in:entry,exit', 'document_date' => 'required|date|before_or_equal:today',
+            'type' => 'required|in:entry,exit', 'document_date' => 'required|date_format:Y-m-d|before_or_equal:today',
             'counterparty' => 'required|string|max:180', 'reason' => 'nullable|string|max:180', 'notes' => 'nullable|string|max:2000',
             'items' => 'required|array|min:1', 'items.*.variant_id' => 'required|integer|distinct|exists:product_variants,id',
             'items.*.quantity' => 'required|numeric|min:0.001|max:999999999',
-            'items.*.lot_number' => 'nullable|string|max:100', 'items.*.expiration_date' => 'nullable|date',
             'items.*.notes' => 'nullable|string|max:500', 'items.*.serial_ids' => 'array', 'items.*.serial_ids.*' => 'integer|distinct|exists:serialized_items,id',
         ]);
-
-        foreach ($data['items'] as $index => &$row) {
-            $variant = ProductVariant::with('product.category.attributes')->findOrFail($row['variant_id']);
-            $row['lot_number'] = mb_strtoupper(trim((string) ($row['lot_number'] ?? '')));
-            $row['expiration_date'] = filled($row['expiration_date'] ?? null) ? $row['expiration_date'] : null;
-            if ($data['type'] === 'entry' && $variant->product->uses_expiration_lots) {
-                if ($row['lot_number'] === '') {
-                    throw ValidationException::withMessages(["items.{$index}.lot_number" => 'El número de lote es obligatorio para '.$variant->sku.'.']);
-                }
-                if (! $row['expiration_date']) {
-                    throw ValidationException::withMessages(["items.{$index}.expiration_date" => 'La fecha de vencimiento del lote es obligatoria para '.$variant->sku.'.']);
-                }
-                if ($row['expiration_date'] < $data['document_date']) {
-                    throw ValidationException::withMessages(["items.{$index}.expiration_date" => 'No se puede ingresar un lote que ya estaba vencido en la fecha del remito.']);
-                }
-            }
-            if ($data['type'] !== 'entry') {
-                $row['lot_number'] = '';
-                $row['expiration_date'] = null;
+        foreach ($data['items'] as $index => $row) {
+            $variant = ProductVariant::with('product')->findOrFail($row['variant_id']);
+            if (! $variant->status || ! $variant->product->status) {
+                throw ValidationException::withMessages([
+                    "items.{$index}.variant_id" => 'El producto '.$variant->sku.' está inactivo y no puede utilizarse.',
+                ]);
             }
         }
-        unset($row);
         $before = $this->noteId ? $this->snapshot(DispatchNote::with('items.serializedItems')->findOrFail($this->noteId)) : null;
         $note = DB::transaction(function () use ($data) {
             $attributes = collect($data)->only(['number', 'type', 'document_date', 'counterparty', 'reason', 'notes'])->all() + ['status' => 'draft'];
@@ -170,13 +158,7 @@ class DispatchNotesController extends Component
                 } elseif ($serialIds->isNotEmpty()) {
                     throw ValidationException::withMessages(['items' => 'El producto '.$variant->sku.' no utiliza números de serie.']);
                 }
-                $item = $note->items()->create([
-                    'product_variant_id' => $row['variant_id'],
-                    'quantity' => $row['quantity'],
-                    'lot_number' => $row['lot_number'] ?: null,
-                    'expiration_date' => $row['expiration_date'] ?: null,
-                    'notes' => $row['notes'] ?: null,
-                ]);
+                $item = $note->items()->create(['product_variant_id' => $row['variant_id'], 'quantity' => $row['quantity'], 'notes' => $row['notes'] ?: null]);
                 $item->serializedItems()->sync($serialIds);
             }
 
@@ -197,14 +179,7 @@ class DispatchNotesController extends Component
         foreach (['number', 'type', 'counterparty', 'reason', 'notes'] as $field) {
             $this->{$field} = $note->{$field} ?? '';
         } $this->document_date = $note->document_date->format('Y-m-d');
-        $this->items = $note->items->map(fn ($i) => [
-            'variant_id' => $i->product_variant_id,
-            'quantity' => (float) $i->quantity,
-            'serial_ids' => $i->serializedItems->pluck('id')->all(),
-            'lot_number' => $i->lot_number ?? '',
-            'expiration_date' => $i->expiration_date?->format('Y-m-d') ?? '',
-            'notes' => $i->notes ?? '',
-        ])->all();
+        $this->items = $note->items->map(fn ($i) => ['variant_id' => $i->product_variant_id, 'quantity' => (float) $i->quantity, 'serial_ids' => $i->serializedItems->pluck('id')->all(), 'notes' => $i->notes ?? ''])->all();
         $this->detailId = null;
         $this->dispatch('document-form-opened', target: 'dispatch-note-form');
     }
@@ -272,13 +247,7 @@ class DispatchNotesController extends Component
         $copy = DB::transaction(function () use ($original) {
             $draft = DispatchNote::create(['corrected_from_id' => $original->id, 'type' => $original->type, 'document_date' => $original->document_date, 'counterparty' => $original->counterparty, 'reason' => $original->reason, 'notes' => trim(($original->notes ? $original->notes."\n" : '').'Corrección del remito '.$original->number), 'status' => 'draft', 'created_by' => auth()->id()]);
             foreach ($original->items as $item) {
-                $newItem = $draft->items()->create([
-                    'product_variant_id' => $item->product_variant_id,
-                    'quantity' => $item->quantity,
-                    'lot_number' => $item->lot_number,
-                    'expiration_date' => $item->expiration_date,
-                    'notes' => $item->notes,
-                ]);
+                $newItem = $draft->items()->create(['product_variant_id' => $item->product_variant_id, 'quantity' => $item->quantity, 'notes' => $item->notes]);
                 $newItem->serializedItems()->sync($item->serializedItems->pluck('id'));
             }
 
@@ -325,9 +294,43 @@ class DispatchNotesController extends Component
         $this->resetValidation();
     }
 
+    private function applyProductSearch($query, string $search): void
+    {
+        $tokens = collect(preg_split('/\s+/u', trim($search)) ?: [])
+            ->filter()
+            ->take(5);
+
+        foreach ($tokens as $token) {
+            $exactAttribute = mb_strlen($token) === 1;
+            $term = '%'.$token.'%';
+            $matchAttribute = function ($values) use ($token, $term, $exactAttribute) {
+                $values->where('value', $exactAttribute ? '=' : 'like', $exactAttribute ? $token : $term);
+                if (! $exactAttribute) {
+                    $values->orWhereHas('attribute', fn ($attribute) => $attribute
+                        ->where('name', 'like', $term)
+                        ->orWhere('code', 'like', $term));
+                }
+            };
+
+            $query->where(function ($options) use ($term, $exactAttribute, $matchAttribute) {
+                if (! $exactAttribute) {
+                    $options->where('sku', 'like', $term)
+                        ->orWhere('name', 'like', $term)
+                        ->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term));
+                }
+                $options->orWhereHas('attributeValues', $matchAttribute)
+                    ->orWhereHas('product', fn ($product) => $product
+                        ->when(! $exactAttribute, fn ($fields) => $fields
+                            ->where('name', 'like', $term)
+                            ->orWhere('code', 'like', $term))
+                        ->orWhereHas('attributeValues', $matchAttribute));
+            });
+        }
+    }
+
     private function snapshot(DispatchNote $note): array
     {
-        $note->loadMissing(['creator', 'items.variant.product', 'items.serializedItems', 'items.lotAllocations.lot']);
+        $note->loadMissing(['creator', 'items.variant.product', 'items.serializedItems']);
 
         return [
             'número' => $note->number,
@@ -345,13 +348,6 @@ class DispatchNotesController extends Component
                 'producto' => $item->variant?->product?->name,
                 'sku' => $item->variant?->sku,
                 'cantidad' => (float) $item->quantity,
-                'lote' => $item->lot_number,
-                'vencimiento' => $item->expiration_date?->format('Y-m-d'),
-                'lotes_asignados' => $item->lotAllocations->map(fn ($allocation) => [
-                    'lote' => $allocation->lot?->lot_number,
-                    'vencimiento' => $allocation->lot?->expiration_date?->format('Y-m-d'),
-                    'cantidad' => (float) $allocation->quantity,
-                ])->all(),
                 'observaciones' => $item->notes,
                 'series' => $item->serializedItems->pluck('serial_number')->all(),
             ])->all(),

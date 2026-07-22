@@ -77,8 +77,8 @@ class LogsController extends Component
     public function filterLogs(): void
     {
         $this->validate([
-            'fromDate' => 'required|date',
-            'toDate' => 'required|date|after_or_equal:fromDate',
+            'fromDate' => 'required|date_format:Y-m-d',
+            'toDate' => 'required|date_format:Y-m-d|after_or_equal:fromDate',
         ], [
             'fromDate.required' => 'Selecciona la fecha inicial.',
             'toDate.required' => 'Selecciona la fecha final.',

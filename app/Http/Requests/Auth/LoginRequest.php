@@ -30,9 +30,16 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'login' => ['required', 'string'],
-            'password' => ['required', 'string'],
+            'login' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
+            'password' => ['required', 'string', 'max:255'],
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'login' => trim((string) $this->input('login')),
+        ]);
     }
 
     /**
@@ -53,7 +60,7 @@ class LoginRequest extends FormRequest
                     'user_id' => User::where('login', $this->input('login'))->value('id'),
                     'actor_login' => $this->input('login'), 'modulo' => 'ACCESO', 'accion' => 'INTENTO_FALLIDO',
                     'descripcion' => 'Intento de inicio de sesión con credenciales incorrectas', 'ip' => $this->ip(),
-                    'valores_nuevos' => ['navegador' => $this->userAgent()],
+                    'valores_nuevos' => ['navegador' => Str::limit((string) $this->userAgent(), 500, '')],
                 ]);
             } catch (\Throwable $exception) {
                 file_put_contents(storage_path('logs/audit-fallback.log'), json_encode([

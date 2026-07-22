@@ -87,7 +87,7 @@ class WorkersController extends Component
             'area' => 'nullable|string|max:120',
             'phone' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\- ]+$/'],
             'email' => ['nullable', 'email:rfc', 'max:150', Rule::unique('workers')->ignore($this->workerId)],
-            'start_date' => 'nullable|date|before_or_equal:today',
+            'start_date' => 'nullable|date_format:Y-m-d|before_or_equal:today',
             'notes' => 'nullable|string|max:1000',
             'status' => 'boolean',
         ], [

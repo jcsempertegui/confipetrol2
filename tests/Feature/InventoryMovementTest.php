@@ -8,6 +8,7 @@ use App\Models\DispatchNote;
 use App\Models\InventoryMovement;
 use App\Models\Log;
 use App\Models\Product;
+use App\Models\ProductAttribute;
 use App\Models\User;
 use App\Models\Worker;
 use App\Services\InventoryService;
@@ -30,6 +31,37 @@ function inventoryNote(string $type, User $user): DispatchNote
 {
     return DispatchNote::create(['type' => $type, 'document_date' => now(), 'counterparty' => 'Proveedor de prueba', 'status' => 'draft', 'created_by' => $user->id]);
 }
+
+it('finds and identifies products by their variant attributes in a dispatch note', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'BUSCADOR REMITOS', 'guard_name' => 'web']);
+    $role->givePermissionTo('crear-remito');
+    $this->user->assignRole($role);
+
+    $size = ProductAttribute::create([
+        'name' => 'Talla',
+        'code' => 'epp-talla-buscador',
+        'type' => 'select',
+        'scope' => 'variant',
+        'options' => ['S', 'M', 'L'],
+    ]);
+    $this->bulkProduct->category->attributes()->attach($size, ['required' => true]);
+    $shirt = Product::create([
+        'category_id' => $this->bulkProduct->category_id,
+        'code' => 'EPP-CAMISA-RGD',
+        'name' => 'Camisa de trabajo',
+        'tracking_type' => 'bulk',
+    ]);
+    $large = $shirt->variants()->create(['sku' => 'EPP-CAMISA-03-RGD']);
+    $large->attributeValues()->create(['product_attribute_id' => $size->id, 'value' => 'L']);
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->set('productSearch', 'Camisa L')
+        ->assertSee('Camisa de trabajo')
+        ->assertSee('Talla: L')
+        ->call('addProduct', $large->id)
+        ->assertSee('Talla: L');
+});
 
 it('confirms entries and exits with an immutable inventory ledger', function () {
     $entry = inventoryNote('entry', $this->user);

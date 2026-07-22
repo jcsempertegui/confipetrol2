@@ -60,7 +60,7 @@ it('filters inventory by expiration date and highlights expired products', funct
     $this->variant->attributeValues()->create(['product_attribute_id' => $expiration->id, 'value' => '2026-08-05']);
 
     $expiredProduct = Product::create(['category_id' => $category->id, 'code' => 'EPP-VENCIDO', 'name' => 'Producto vencido', 'tracking_type' => 'bulk']);
-    $expiredVariant = $expiredProduct->variants()->create(['sku' => 'EPP-VENCIDO-01', 'name' => 'Lote vencido']);
+    $expiredVariant = $expiredProduct->variants()->create(['sku' => 'EPP-VENCIDO-01', 'name' => 'Producto vencido']);
     $expiredVariant->attributeValues()->create(['product_attribute_id' => $expiration->id, 'value' => '2026-07-10']);
 
     Livewire::test(ReportsController::class)

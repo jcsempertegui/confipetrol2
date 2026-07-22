@@ -6,7 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 
 class InventoryMovement extends Model
 {
-    protected $fillable = ['product_variant_id', 'inventory_lot_id', 'serialized_item_id', 'dispatch_note_id', 'delivery_id', 'reversal_of_id', 'movement_type', 'quantity', 'occurred_at', 'created_by'];
+    protected static function booted(): void
+    {
+        static::updating(fn () => throw new \LogicException('Los movimientos del Kardex son inmutables.'));
+        static::deleting(fn () => throw new \LogicException('Los movimientos del Kardex no pueden eliminarse.'));
+    }
+
+    protected $fillable = ['product_variant_id', 'serialized_item_id', 'dispatch_note_id', 'delivery_id', 'reversal_of_id', 'movement_type', 'quantity', 'occurred_at', 'created_by'];
 
     protected $casts = ['quantity' => 'decimal:3', 'occurred_at' => 'datetime'];
 
@@ -18,11 +24,6 @@ class InventoryMovement extends Model
     public function serializedItem()
     {
         return $this->belongsTo(SerializedItem::class);
-    }
-
-    public function inventoryLot()
-    {
-        return $this->belongsTo(InventoryLot::class);
     }
 
     public function dispatchNote()

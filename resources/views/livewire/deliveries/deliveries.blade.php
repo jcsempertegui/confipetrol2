@@ -74,7 +74,7 @@
                                         @if($result->product->tracking_type === 'serialized')
                                             <span class="badge bg-{{ $result->deliverable_serials_count > 0 ? 'primary' : 'danger' }} align-self-center">{{ $result->deliverable_serials_count }} serie(s) disponible(s)</span>
                                         @else
-                                            <span class="badge bg-light text-dark align-self-center">Stock vigente {{ \App\Support\Quantity::format($result->usable_stock ?? 0) }}</span>
+                                            <span class="badge bg-light text-dark align-self-center">Stock {{ \App\Support\Quantity::format($result->stock ?? 0) }}</span>
                                         @endif
                                     </button>
                                 @empty
@@ -87,24 +87,10 @@
 
                     <div class="document-items">
                         @foreach($items as $index => $row)
-                            @php
-                                $selected = $variants->firstWhere('id', (int) ($row['variant_id'] ?? 0));
-                                $usableLots = $selected?->inventoryLots?->filter(fn($lot) => (float) ($lot->stock ?? 0) > 0.0005 && (!$lot->expiration_date || $lot->expiration_date->format('Y-m-d') >= $delivery_date)) ?? collect();
-                            @endphp
+                            @php($selected = $variants->firstWhere('id', (int) ($row['variant_id'] ?? 0)))
                             <div class="document-item" wire:key="delivery-item-{{ $index }}">
                                 <div class="row g-3 align-items-end">
-                                    <div class="col-lg-5">
-                                        <label class="form-label">Producto / variante</label>
-                                        <div class="form-control readonly-control"><strong>{{ $selected?->product?->name }}</strong> · {{ $selected?->name ?: $selected?->sku }} <span class="small text-muted">({{ $selected?->sku }})</span></div>
-                                        @if($selected?->product?->tracking_type !== 'serialized' && $usableLots->isNotEmpty())
-                                            <div class="small text-muted mt-1">
-                                                <i class="bx bx-sort-up me-1"></i>FEFO automático: primero {{ $usableLots->first()->lot_number }}
-                                                @if($usableLots->first()->expiration_date)
-                                                    (vence {{ $usableLots->first()->expiration_date->format('d/m/Y') }})
-                                                @endif
-                                            </div>
-                                        @endif
-                                    </div>
+                                    <div class="col-lg-5"><label class="form-label">Producto / variante</label><div class="form-control readonly-control"><strong>{{ $selected?->product?->name }}</strong> · {{ $selected?->name ?: $selected?->sku }} <span class="small text-muted">({{ $selected?->sku }})</span></div></div>
                                     @if($selected?->product?->tracking_type === 'serialized')
                                         <div class="col-lg-6">
                                             <label class="form-label">Número de serie disponible <span class="text-danger">*</span></label>
@@ -168,7 +154,7 @@
                             <div class="detail-summary-item"><span class="detail-label">Área</span><strong>{{ $selectedDetail->worker->area ?: '—' }}</strong></div>
                             <div class="detail-summary-item"><span class="detail-label">Motivo</span><strong>{{ $selectedDetail->reason ?: '—' }}</strong></div>
                         </div>
-                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU</th><th>Lotes entregados</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td class="font-monospace">{{ $item->variant->sku }}</td><td>@forelse($item->lotAllocations as $allocation)<div><strong>{{ $allocation->lot?->lot_number }}</strong>@if($allocation->lot?->expiration_date)<span class="small text-muted"> · vence {{ $allocation->lot->expiration_date->format('d/m/Y') }}</span>@endif <span class="badge bg-light text-dark border">{{ \App\Support\Quantity::format($allocation->quantity) }}</span></div>@empty<span class="text-muted">—</span>@endforelse</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
+                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td class="font-monospace">{{ $item->variant->sku }}</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
                         @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
                     </div>
                     <div class="modal-footer">

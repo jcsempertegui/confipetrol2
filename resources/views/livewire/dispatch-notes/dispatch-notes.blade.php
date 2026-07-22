@@ -62,19 +62,20 @@
                     </div>
 
                     <div class="form-section-title mt-4">Productos <span class="text-danger">*</span></div>
-                    @if($type === 'entry')
-                        <div class="alert alert-light border py-2 small"><i class="bx bx-calendar-check me-1 text-primary"></i>Los medicamentos y demás productos con vencimiento se registran por lote. La fecha configurada anteriormente en el producto se conserva y se propone como valor inicial.</div>
-                    @endif
                     <div class="position-relative">
                         <div class="input-group">
                             <span class="input-group-text"><i class="bx bx-search"></i></span>
-                            <input wire:model.live.debounce.250ms="productSearch" class="form-control" placeholder="Buscar por producto, código, SKU, variante o número de serie">
+                            <input wire:model.live.debounce.250ms="productSearch" class="form-control" placeholder="Buscar producto y atributo, ej.: Camisa L">
                         </div>
-                        @if(mb_strlen(trim($productSearch)) >= 2)
+                        @if(mb_strlen(trim($productSearch)) >= 1)
                             <div class="list-group position-absolute w-100 shadow search-results">
                                 @forelse($productResults as $result)
                                     <button type="button" wire:click="addProduct({{ $result->id }})" class="list-group-item list-group-item-action d-flex justify-content-between gap-3">
-                                        <span><strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}<small class="d-block text-muted">{{ $result->sku }}</small></span>
+                                        <span>
+                                            <strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}
+                                            <small class="d-block text-muted">{{ $result->sku }}</small>
+                                            @if($result->attribute_summary)<small class="d-block text-primary mt-1"><i class="bx bx-purchase-tag-alt me-1"></i>{{ $result->attribute_summary }}</small>@endif
+                                        </span>
                                         <span class="badge bg-light text-dark align-self-center">Stock {{ \App\Support\Quantity::format($result->stock ?? 0) }}</span>
                                     </button>
                                 @empty
@@ -90,11 +91,12 @@
                             @php($selected = $variants->firstWhere('id', (int) ($row['variant_id'] ?? 0)))
                             <div class="document-item" wire:key="note-item-{{ $index }}">
                                 <div class="row g-3 align-items-end">
-                                    <div class="{{ $type === 'entry' && $selected?->product?->uses_expiration_lots ? 'col-lg-4' : 'col-lg-5' }}">
+                                    <div class="col-lg-5">
                                         <label class="form-label">Producto / variante</label>
                                         <div class="form-control readonly-control">
                                             <strong>{{ $selected?->product?->name }}</strong> · {{ $selected?->name ?: $selected?->sku }}
                                             <span class="small text-muted">({{ $selected?->sku }})</span>
+                                            @if($selected?->attribute_summary)<span class="d-block small text-primary mt-1"><i class="bx bx-purchase-tag-alt me-1"></i>{{ $selected->attribute_summary }}</span>@endif
                                         </div>
                                     </div>
                                     @if($selected?->product?->tracking_type === 'serialized')
@@ -110,23 +112,11 @@
                                             <input value="{{ count($row['serial_ids'] ?? []) }}" disabled class="form-control">
                                         </div>
                                     @else
-                                        <div class="col-8 {{ $type === 'entry' && $selected?->product?->uses_expiration_lots ? 'col-lg-2' : 'col-lg-5' }}">
+                                        <div class="col-8 col-lg-5">
                                             <label class="form-label">Cantidad <span class="text-danger">*</span></label>
                                             <input type="number" min="0.001" step="0.001" wire:model="items.{{ $index }}.quantity" class="form-control @error('items.'.$index.'.quantity') is-invalid @enderror">
                                             @error('items.'.$index.'.quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
                                         </div>
-                                        @if($type === 'entry' && $selected?->product?->uses_expiration_lots)
-                                            <div class="col-sm-6 col-lg-3">
-                                                <label class="form-label">Número de lote <span class="text-danger">*</span></label>
-                                                <input wire:model="items.{{ $index }}.lot_number" maxlength="100" class="form-control text-uppercase @error('items.'.$index.'.lot_number') is-invalid @enderror" placeholder="Ej.: MED-2407-A">
-                                                @error('items.'.$index.'.lot_number')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                            </div>
-                                            <div class="col-sm-6 col-lg-2">
-                                                <label class="form-label">Vencimiento <span class="text-danger">*</span></label>
-                                                <input type="date" min="{{ $document_date ?: now()->format('Y-m-d') }}" wire:model="items.{{ $index }}.expiration_date" class="form-control @error('items.'.$index.'.expiration_date') is-invalid @enderror">
-                                                @error('items.'.$index.'.expiration_date')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                            </div>
-                                        @endif
                                     @endif
                                     <div class="col-4 col-lg-1">
                                         <button type="button" wire:click="removeItem({{ $index }})" class="btn btn-outline-danger w-100" title="Quitar producto"><i class="bx bx-trash"></i></button>
@@ -174,7 +164,7 @@
                             <div class="detail-summary-item"><span class="detail-label">Motivo</span><strong>{{ $selectedDetail->reason ?: '—' }}</strong></div>
                             <div class="detail-summary-item"><span class="detail-label">Registrado por</span><strong>{{ $selectedDetail->creator?->login ?? 'Sistema' }}</strong></div>
                         </div>
-                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU</th><th>Lote / vencimiento</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td class="font-monospace">{{ $item->variant->sku }}</td><td>@forelse($item->lotAllocations as $allocation)<div><strong>{{ $allocation->lot?->lot_number }}</strong>@if($allocation->lot?->expiration_date)<span class="small text-muted"> · {{ $allocation->lot->expiration_date->format('d/m/Y') }}</span>@endif <span class="badge bg-light text-dark border">{{ \App\Support\Quantity::format($allocation->quantity) }}</span></div>@empty<span class="text-muted">—</span>@endforelse</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
+                        <div class="table-responsive"><table class="table table-hover"><thead><tr><th>Producto</th><th>SKU / atributos</th><th>Series</th><th class="text-end">Cantidad</th></tr></thead><tbody>@foreach($selectedDetail->items as $item)<tr><td><strong>{{ $item->variant->product->name }}</strong></td><td><span class="font-monospace">{{ $item->variant->sku }}</span>@if($item->variant->attribute_summary)<div class="small text-primary mt-1">{{ $item->variant->attribute_summary }}</div>@endif</td><td>{{ $item->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td><td class="text-end fw-semibold">{{ \App\Support\Quantity::format($item->quantity) }} {{ $item->variant->product->unit }}</td></tr>@endforeach</tbody></table></div>
                         @if($selectedDetail->annul_reason)<div class="alert alert-danger mt-3 mb-0"><strong>Motivo de inactivación/anulación:</strong> {{ $selectedDetail->annul_reason }}</div>@endif
                     </div>
                     <div class="modal-footer">

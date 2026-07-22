@@ -5,7 +5,10 @@ namespace App\Livewire;
 use App\Models\User;
 use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Rules\Password;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 use Spatie\Permission\Models\Role;
@@ -52,7 +55,9 @@ class UsersController extends Component
                 ->orWhere('lastname', 'like', $term)->orWhere('email', 'like', $term)->orWhere('document', 'like', $term));
         })->latest('id')->paginate($this->perPage);
 
-        $roles = Role::when(! auth()->user()->hasRole('SUPER ADMIN'), fn ($query) => $query->where('name', '!=', 'SUPER ADMIN'))->orderBy('name')->get();
+        $roles = Role::where('status', true)
+            ->when(! auth()->user()->hasRole('SUPER ADMIN'), fn ($query) => $query->where('name', '!=', 'SUPER ADMIN'))
+            ->orderBy('name')->get();
 
         return view('livewire.users.users', ['users' => $users, 'roles' => $roles])
             ->extends('layouts.theme.app');
@@ -89,26 +94,46 @@ class UsersController extends Component
     {
         abort_unless(auth()->user()->can($this->isEditMode ? 'editar-usuario' : 'crear-usuario'), 403);
         $id = $this->user_id;
+        $this->login = Str::lower(trim($this->login));
+        $this->name = preg_replace('/\s+/u', ' ', trim($this->name));
+        $this->lastname = preg_replace('/\s+/u', ' ', trim($this->lastname));
+        $this->document = Str::upper(trim($this->document));
+        $this->email = Str::lower(trim($this->email));
+        $this->phone = trim($this->phone);
         abort_if($this->role === 'SUPER ADMIN' && ! auth()->user()->hasRole('SUPER ADMIN'), 403);
+        $passwordRules = [$this->isEditMode ? 'nullable' : 'required', 'string', 'max:255', 'confirmed', Password::defaults()];
         $this->validate([
-            'login' => ['required', 'string', 'max:100', Rule::unique('users')->ignore($id)],
-            'name' => ['required', 'string', 'max:150'], 'lastname' => ['nullable', 'string', 'max:150'],
-            'document' => ['required', 'string', 'max:50', Rule::unique('users')->ignore($id)],
+            'login' => ['required', 'string', 'max:100', 'regex:/^[a-z0-9._-]+$/', Rule::unique('users')->ignore($id)],
+            'name' => ['required', 'string', 'max:150', "regex:/^[\pL\pM '\-.]+$/u"],
+            'lastname' => ['nullable', 'string', 'max:150', "regex:/^[\pL\pM '\-.]+$/u"],
+            'document' => ['required', 'string', 'max:50', 'regex:/^[A-Z0-9.\-]+$/', Rule::unique('users')->ignore($id)],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($id)],
-            'phone' => ['nullable', 'string', 'max:30'], 'role' => ['required', Rule::exists('roles', 'name')],
-            'status' => ['required', 'boolean'], 'password' => [$this->isEditMode ? 'nullable' : 'required', 'confirmed', 'min:8'],
+            'phone' => ['nullable', 'string', 'max:30', 'regex:/^[0-9+()\- ]+$/'],
+            'role' => ['required', Rule::exists('roles', 'name')->where('status', true)],
+            'status' => ['required', 'boolean'], 'password' => $passwordRules,
         ]);
         $user = $this->isEditMode ? User::findOrFail($id) : new User;
-        $before = $user->exists ? array_merge($user->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $user->roles->pluck('name')->all()]) : null;
-        $user->fill(['login' => $this->login, 'name' => $this->name, 'lastname' => $this->lastname ?: null,
-            'document' => $this->document, 'email' => $this->email, 'phone' => $this->phone ?: null, 'status' => $this->status]);
-        if ($this->password !== '') {
-            $user->password = $this->password;
+
+        if ($user->exists && $user->id === auth()->id() && ! $this->status) {
+            throw ValidationException::withMessages(['status' => 'No puede desactivar su propia cuenta.']);
         }
-        $user->save();
-        $user->syncRoles([$this->role]);
-        $after = array_merge($user->fresh()->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $user->fresh()->roles->pluck('name')->all()]);
-        $this->logActivity('USUARIOS', $this->isEditMode ? 'EDITAR' : 'CREAR', 'Usuario '.$user->login, $user->id, $before, $after);
+        if ($user->exists && $user->hasRole('SUPER ADMIN') && ($this->role !== 'SUPER ADMIN' || ! $this->status)) {
+            throw ValidationException::withMessages(['role' => 'La cuenta SUPER ADMIN no puede desactivarse ni perder su rol principal.']);
+        }
+
+        $before = $user->exists ? array_merge($user->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $user->roles->pluck('name')->all()]) : null;
+        DB::transaction(function () use ($user, $before) {
+            $user->fill(['login' => $this->login, 'name' => $this->name, 'lastname' => $this->lastname ?: null,
+                'document' => $this->document, 'email' => $this->email, 'phone' => $this->phone ?: null, 'status' => $this->status]);
+            if ($this->password !== '') {
+                $user->password = $this->password;
+            }
+            $user->save();
+            $user->syncRoles([$this->role]);
+            $freshUser = $user->fresh('roles');
+            $after = array_merge($freshUser->only(['login', 'name', 'lastname', 'document', 'email', 'phone', 'status']), ['rol' => $freshUser->roles->pluck('name')->all()]);
+            $this->logActivity('USUARIOS', $this->isEditMode ? 'EDITAR' : 'CREAR', 'Usuario '.$user->login, $user->id, $before, $after);
+        });
         $this->dispatch('hide-user-modal');
         $this->dispatch('alert', 'Usuario guardado correctamente.', 'success');
         $this->resetForm();

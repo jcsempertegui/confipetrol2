@@ -24,9 +24,4 @@ class DeliveryItem extends Model
     {
         return $this->belongsToMany(SerializedItem::class, 'delivery_serialized_items');
     }
-
-    public function lotAllocations()
-    {
-        return $this->hasMany(InventoryLotAllocation::class);
-    }
 }

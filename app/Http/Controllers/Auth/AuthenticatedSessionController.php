@@ -9,6 +9,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
@@ -56,7 +57,10 @@ class AuthenticatedSessionController extends Controller
             'accion' => 'INICIO_SESION',
             'descripcion' => 'Inicio de sesión: '.$user->login,
             'ip' => $request->ip(),
-            'valores_nuevos' => ['navegador' => $request->header('User-Agent'), 'sesión' => $currentSessionId],
+            'valores_nuevos' => [
+                'navegador' => Str::limit((string) $request->userAgent(), 500, ''),
+                'huella_sesión' => hash('sha256', $currentSessionId),
+            ],
         ]);
 
         if ($message) {

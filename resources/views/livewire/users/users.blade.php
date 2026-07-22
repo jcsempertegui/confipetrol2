@@ -188,7 +188,7 @@
                                         <span class="text-danger">*</span>
                                     @endif
                                 </label>
-                                <input id="user-password" wire:model="password" type="password" minlength="8" autocomplete="new-password" class="form-control @error('password') is-invalid @enderror">
+                                <input id="user-password" wire:model="password" type="password" minlength="12" autocomplete="new-password" class="form-control @error('password') is-invalid @enderror">
                                 @error('password')<div class="invalid-feedback">{{ $message }}</div>@enderror
                             </div>
 
@@ -201,7 +201,7 @@
                                         <span class="text-danger">*</span>
                                     @endif
                                 </label>
-                                <input id="user-password-confirmation" wire:model="password_confirmation" type="password" minlength="8" autocomplete="new-password" class="form-control">
+                                <input id="user-password-confirmation" wire:model="password_confirmation" type="password" minlength="12" autocomplete="new-password" class="form-control">
                             </div>
                         </div>
                     </div>

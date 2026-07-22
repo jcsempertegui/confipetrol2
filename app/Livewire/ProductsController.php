@@ -10,6 +10,7 @@ use App\Traits\AuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -91,6 +92,9 @@ class ProductsController extends Component
     public function save(): void
     {
         abort_unless(auth()->user()->can($this->productId ? 'editar-producto' : 'crear-producto'), 403);
+        $this->name = preg_replace('/\s+/u', ' ', trim($this->name));
+        $this->description = trim($this->description);
+        $this->unit = preg_replace('/\s+/u', ' ', trim($this->unit));
         $this->code = Str::upper(trim($this->code));
         if (! $this->productId && filled($this->code)) {
             $this->code = app(CodeGenerator::class)->normalizeSiteSuffix($this->code);
@@ -194,7 +198,7 @@ class ProductsController extends Component
                 $product->attributeValues()->updateOrCreate(['product_attribute_id' => $attribute->id], ['value' => $this->productValues[$attribute->id] ?? null]);
             }
             $kept = [];
-            foreach ($this->variants as $row) {
+            foreach ($this->variants as $index => $row) {
                 $variant = filled($row['id'] ?? null)
                     ? $product->variants()->whereKey($row['id'])->first()
                     : $product->variants()->where('sku', $row['sku'])->first();
@@ -206,14 +210,45 @@ class ProductsController extends Component
                 }
                 if ($product->tracking_type === 'serialized') {
                     $serials = $this->parseSerials($row['serials'] ?? '');
+                    $removedSerial = $variant->serializedItems()
+                        ->whereNotIn('serial_number', $serials)
+                        ->whereHas('inventoryMovements')
+                        ->first();
+                    if ($removedSerial) {
+                        throw ValidationException::withMessages([
+                            "variants.{$index}.serials" => 'La serie '.$removedSerial->serial_number.' tiene historial y no puede retirarse del producto.',
+                        ]);
+                    }
                     $variant->serializedItems()->whereNotIn('serial_number', $serials)->update(['status' => 'inactive']);
                     foreach ($serials as $serial) {
-                        $item = SerializedItem::where('serial_number', $serial)->first() ?? new SerializedItem;
-                        $item->fill(['product_variant_id' => $variant->id, 'serial_number' => $serial, 'status' => 'available'])->save();
+                        $item = SerializedItem::where('serial_number', $serial)->first();
+                        if ($item && $item->product_variant_id !== $variant->id) {
+                            throw ValidationException::withMessages([
+                                "variants.{$index}.serials" => 'La serie '.$serial.' ya pertenece a otra variante y no puede trasladarse.',
+                            ]);
+                        }
+                        if (! $item) {
+                            $item = new SerializedItem([
+                                'product_variant_id' => $variant->id,
+                                'serial_number' => $serial,
+                                'status' => 'available',
+                            ]);
+                        } elseif ($item->status === 'inactive' && ! $item->inventoryMovements()->exists()) {
+                            $item->status = 'available';
+                        }
+                        $item->save();
                     }
                 }
             }
-            $product->variants()->whereNotIn('id', $kept)->update(['status' => false]);
+            $removedVariants = $product->variants()->whereNotIn('id', $kept)->withSum('inventoryMovements as stock', 'quantity')->get();
+            $blockedVariant = $removedVariants->first(fn ($variant) => abs((float) $variant->stock) > 0.0005
+                || $variant->serializedItems()->where('status', 'assigned')->exists());
+            if ($blockedVariant) {
+                throw ValidationException::withMessages([
+                    'variants' => 'La variante '.$blockedVariant->sku.' conserva stock o equipos asignados y no puede desactivarse.',
+                ]);
+            }
+            $product->variants()->whereIn('id', $removedVariants->pluck('id'))->update(['status' => false]);
             $this->logActivity('PRODUCTOS', $this->productId ? 'EDITAR' : 'CREAR', 'Producto '.$product->name, $product->id, $before, $this->productSnapshot($product));
         });
         $this->resetForm();
@@ -236,6 +271,16 @@ class ProductsController extends Component
     {
         abort_unless(auth()->user()->can('eliminar-producto'), 403);
         $p = Product::findOrFail($id);
+        if ($p->status) {
+            $hasStock = $p->variants()->withSum('inventoryMovements as stock', 'quantity')->get()
+                ->contains(fn ($variant) => abs((float) $variant->stock) > 0.0005);
+            $hasAssignedUnits = $p->variants()->whereHas('serializedItems', fn ($query) => $query->where('status', 'assigned'))->exists();
+            if ($hasStock || $hasAssignedUnits) {
+                throw ValidationException::withMessages([
+                    'product' => 'No se puede desactivar un producto que conserva stock o equipos asignados.',
+                ]);
+            }
+        }
         $before = ['status' => (bool) $p->status];
         $p->update(['status' => ! $p->status]);
         $this->logActivity('PRODUCTOS', $p->status ? 'RESTAURAR' : 'ELIMINAR', 'Cambio de estado del producto '.$p->name, $p->id, $before, ['status' => (bool) $p->status]);
@@ -288,12 +333,21 @@ class ProductsController extends Component
 
     private function validateAttributeValue($attribute, mixed $value, string $field): void
     {
+        $stringValue = is_scalar($value) ? trim((string) $value) : '';
+        $strictDate = static function (string $date): bool {
+            $parsed = \DateTimeImmutable::createFromFormat('!Y-m-d', $date);
+            $errors = \DateTimeImmutable::getLastErrors();
+
+            return $parsed !== false
+                && $parsed->format('Y-m-d') === $date
+                && ($errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0));
+        };
         $valid = match ($attribute->type) {
-            'number' => is_numeric($value),
-            'date' => strtotime((string) $value) !== false,
-            'select' => in_array((string) $value, array_map('strval', $attribute->options ?? []), true),
+            'number' => preg_match('/^-?\d{1,15}(?:\.\d{1,6})?$/', $stringValue) === 1,
+            'date' => $strictDate($stringValue),
+            'select' => in_array($stringValue, array_map('strval', $attribute->options ?? []), true),
             'boolean' => in_array($value, [0, 1, '0', '1', true, false], true),
-            default => is_scalar($value) && mb_strlen((string) $value) <= 2000,
+            default => is_scalar($value) && mb_strlen($stringValue) <= 2000,
         };
         if (! $valid) {
             $this->addError($field, 'El valor no corresponde al tipo configurado para '.$attribute->name.'.');

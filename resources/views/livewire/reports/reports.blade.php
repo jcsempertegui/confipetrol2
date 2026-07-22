@@ -34,7 +34,7 @@ body.dark-mode .report-advanced-panel{border-color:#49515a;background:#23272c}
         </div>
 
         <div class="row g-2">
-            <div class="col-lg-5"><label class="filter-label">Búsqueda general</label><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Producto, código, SKU, lote, serie, documento o trabajador"></div>
+            <div class="col-lg-5"><label class="filter-label">Búsqueda general</label><input wire:model.live.debounce.350ms="searchTerm" class="form-control" placeholder="Producto, código, SKU, serie, documento o trabajador"></div>
             <div class="col-lg-3"><label class="filter-label">Categoría</label><select wire:model.live="categoryFilter" class="form-select"><option value="">Todas las categorías</option>@foreach($categories as $c)<option value="{{ $c->id }}">{{ $c->name }}</option>@endforeach</select></div>
 
             @if($reportType === 'stock')
@@ -144,7 +144,7 @@ body.dark-mode .report-advanced-panel{border-color:#49515a;background:#23272c}
                 @foreach($reportAttributes as $attribute)<th>{{ $attribute->name }}</th>@endforeach
                 @if($showSerialColumn)<th>Series en almacén</th>@endif
                 <th>Unidad</th><th>Control</th>
-                @if($showExpiryColumn)<th>Lotes con saldo</th><th>Próximo vencimiento</th>@endif
+                @if($showExpiryColumn)<th>Vencimiento</th>@endif
                 <th class="text-end">Stock</th><th class="text-end">Mínimo</th><th>Estado</th>
             </tr>
         </thead>
@@ -155,7 +155,6 @@ body.dark-mode .report-advanced-panel{border-color:#49515a;background:#23272c}
                     $label = $this->stockLabel($stock, (float) $r->minimum_stock);
                     $expiryLabel = $this->expiryLabel($r->expiration_date);
                     $availableSerials = $r->serializedItems->filter(fn ($serial) => (float) ($serial->inventory_balance ?? 0) > 0);
-                    $availableLots = $this->availableLots($r);
                 @endphp
                 <tr>
                     <td>{{ $r->product->category->name }}</td>
@@ -187,7 +186,6 @@ body.dark-mode .report-advanced-panel{border-color:#49515a;background:#23272c}
                     <td>{{ $r->product->unit }}</td>
                     <td><span class="badge bg-light text-dark border">{{ $r->product->tracking_type === 'serialized' ? 'Por serie' : 'Por cantidad' }}</span></td>
                     @if($showExpiryColumn)
-                        <td>@forelse($availableLots as $lot)<div class="mb-1"><strong>{{ $lot->lot_number }}</strong> <span class="badge bg-light text-dark border">{{ \App\Support\Quantity::format($lot->stock) }}</span>@if($lot->expiration_date)<div class="small text-muted">Vence {{ $lot->expiration_date->format('d/m/Y') }}</div>@endif</div>@empty<span class="text-muted">—</span>@endforelse</td>
                         <td class="text-nowrap">@if($r->expiration_date)<strong>{{ \Illuminate\Support\Carbon::parse($r->expiration_date)->format('d/m/Y') }}</strong><div><span class="badge bg-{{ $this->expiryBadge($r->expiration_date) }}">{{ $expiryLabel }}</span></div>@else<span class="text-muted">—</span>@endif</td>
                     @endif
                     <td class="text-end fw-bold">{{ \App\Support\Quantity::format($stock) }}</td>
@@ -199,11 +197,11 @@ body.dark-mode .report-advanced-panel{border-color:#49515a;background:#23272c}
             @endforelse
         </tbody>
     @elseif($reportType === 'movements')
-        <thead><tr><th>Fecha</th><th>Movimiento</th><th>Producto / SKU</th><th>Lote / vencimiento</th><th>Serie</th><th>Documento / trabajador</th><th class="text-end">Entrada</th><th class="text-end">Salida</th><th>Usuario</th></tr></thead>
-        <tbody>@forelse($rows as $r)<tr><td class="text-nowrap">{{ $r->occurred_at->format('d/m/Y H:i:s') }}</td><td>{{ $this->movementLabel($r->movement_type) }}</td><td><strong>{{ $r->variant->product->name }}</strong><div class="small text-muted">{{ $r->variant->sku }} · {{ $r->variant->product->unit }}</div></td><td><strong>{{ $r->inventoryLot?->lot_number ?? '—' }}</strong>@if($r->inventoryLot?->expiration_date)<div class="small text-muted">{{ $r->inventoryLot->expiration_date->format('d/m/Y') }}</div>@endif</td><td>{{ $r->serializedItem?->serial_number ?? '—' }}</td><td>{{ $r->dispatchNote?->number ?? $r->delivery?->number ?? '—' }}<div class="small text-muted">{{ $r->delivery?->worker?->full_name }}</div></td><td class="text-end text-success">{{ $r->quantity > 0 ? \App\Support\Quantity::format($r->quantity) : '' }}</td><td class="text-end text-danger">{{ $r->quantity < 0 ? \App\Support\Quantity::format(abs((float) $r->quantity)) : '' }}</td><td>{{ $r->creator?->login }}</td></tr>@empty<tr><td colspan="9" class="text-center py-5 text-muted">No existen movimientos que coincidan con los filtros.</td></tr>@endforelse</tbody>
+        <thead><tr><th>Fecha</th><th>Movimiento</th><th>Producto / SKU</th><th>Serie</th><th>Documento / trabajador</th><th class="text-end">Entrada</th><th class="text-end">Salida</th><th>Usuario</th></tr></thead>
+        <tbody>@forelse($rows as $r)<tr><td class="text-nowrap">{{ $r->occurred_at->format('d/m/Y H:i:s') }}</td><td>{{ $this->movementLabel($r->movement_type) }}</td><td><strong>{{ $r->variant->product->name }}</strong><div class="small text-muted">{{ $r->variant->sku }} · {{ $r->variant->product->unit }}</div></td><td>{{ $r->serializedItem?->serial_number ?? '—' }}</td><td>{{ $r->dispatchNote?->number ?? $r->delivery?->number ?? '—' }}<div class="small text-muted">{{ $r->delivery?->worker?->full_name }}</div></td><td class="text-end text-success">{{ $r->quantity > 0 ? \App\Support\Quantity::format($r->quantity) : '' }}</td><td class="text-end text-danger">{{ $r->quantity < 0 ? \App\Support\Quantity::format(abs((float) $r->quantity)) : '' }}</td><td>{{ $r->creator?->login }}</td></tr>@empty<tr><td colspan="8" class="text-center py-5 text-muted">No existen movimientos que coincidan con los filtros.</td></tr>@endforelse</tbody>
     @else
-        <thead><tr><th>Fecha</th><th>Entrega / estado</th><th>Trabajador</th><th>Área</th><th>Producto / SKU</th><th>Lotes entregados</th><th class="text-end">Cantidad</th><th>Series asignadas</th></tr></thead>
-        <tbody>@forelse($rows as $r)<tr><td>{{ $r->delivery->delivery_date->format('d/m/Y') }}</td><td>{{ $r->delivery->number ?: 'BORRADOR #'.$r->delivery->id }}<div class="small text-muted">{{ ['draft'=>'Borrador','confirmed'=>'Confirmada','annulled'=>'Anulada'][$r->delivery->status] }}</div></td><td><strong>{{ $r->delivery->worker->full_name }}</strong><div class="small text-muted">{{ $r->delivery->worker->document }}</div></td><td>{{ $r->delivery->worker->area }}</td><td><strong>{{ $r->variant->product->name }}</strong><div class="small text-muted">{{ $r->variant->sku }} · {{ $r->variant->product->unit }}</div></td><td>@forelse($r->lotAllocations as $allocation)<div><strong>{{ $allocation->lot?->lot_number }}</strong>@if($allocation->lot?->expiration_date)<span class="small text-muted"> · {{ $allocation->lot->expiration_date->format('d/m/Y') }}</span>@endif</div>@empty<span class="text-muted">—</span>@endforelse</td><td class="text-end">{{ \App\Support\Quantity::format($r->quantity) }}</td><td>{{ $r->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td></tr>@empty<tr><td colspan="8" class="text-center py-5 text-muted">No existen entregas que coincidan con los filtros.</td></tr>@endforelse</tbody>
+        <thead><tr><th>Fecha</th><th>Entrega / estado</th><th>Trabajador</th><th>Área</th><th>Producto / SKU</th><th class="text-end">Cantidad</th><th>Series asignadas</th></tr></thead>
+        <tbody>@forelse($rows as $r)<tr><td>{{ $r->delivery->delivery_date->format('d/m/Y') }}</td><td>{{ $r->delivery->number ?: 'BORRADOR #'.$r->delivery->id }}<div class="small text-muted">{{ ['draft'=>'Borrador','confirmed'=>'Confirmada','annulled'=>'Anulada'][$r->delivery->status] }}</div></td><td><strong>{{ $r->delivery->worker->full_name }}</strong><div class="small text-muted">{{ $r->delivery->worker->document }}</div></td><td>{{ $r->delivery->worker->area }}</td><td><strong>{{ $r->variant->product->name }}</strong><div class="small text-muted">{{ $r->variant->sku }} · {{ $r->variant->product->unit }}</div></td><td class="text-end">{{ \App\Support\Quantity::format($r->quantity) }}</td><td>{{ $r->serializedItems->pluck('serial_number')->join(', ') ?: '—' }}</td></tr>@empty<tr><td colspan="7" class="text-center py-5 text-muted">No existen entregas que coincidan con los filtros.</td></tr>@endforelse</tbody>
     @endif
     </table></div>
     @if($rows->hasPages())<div class="card-footer no-print">{{ $rows->links() }}</div>@endif
