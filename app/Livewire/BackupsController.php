@@ -2,6 +2,7 @@
 
 namespace App\Livewire;
 
+use App\Services\BackupCryptoService;
 use App\Traits\AuditLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Artisan;
@@ -35,11 +36,10 @@ class BackupsController extends Component
                 $this->logActivity('BACKUPS', 'CREAR', 'Creación de respaldo de base de datos', null, null, $latest ? ['archivo' => $latest['filename'], 'tamaño' => $latest['size']] : null);
                 $this->dispatch('backupSuccess', 'Backup creado correctamente.');
             } else {
-                $output = Artisan::output();
-                $this->dispatch('backupError', 'Error al crear el backup. '.$output);
+                $this->dispatch('backupError', 'No se pudo crear el respaldo. Revise el registro técnico del sistema.');
             }
         } catch (\Throwable $e) {
-            $this->dispatch('backupError', 'Error inesperado: '.$e->getMessage());
+            $this->dispatchBackupFailure('crear el respaldo', $e);
         }
 
         $this->isCreating = false;
@@ -55,7 +55,7 @@ class BackupsController extends Component
         abort_unless(auth()->user()->can('eliminar-backup'), 403);
         $filename = basename($filename);
 
-        if (! str_ends_with($filename, '.sql')) {
+        if (! $this->isSupportedBackupName($filename)) {
             return;
         }
 
@@ -94,13 +94,13 @@ class BackupsController extends Component
 
         try {
             $this->verifyBackupChecksum($path);
-            $this->prepareRestore($filename);
-            $this->executeRestoreFile($path);
+            $rollbackPath = $this->prepareRestore($filename);
+            $this->executeRestoreFile($path, $rollbackPath);
             $this->writeRestoreAudit('COMPLETADA', $filename);
             $this->logActivity('BACKUPS', 'RESTAURAR', 'Restauración de base de datos', null, ['base_de_datos' => DB::connection()->getDatabaseName()], ['archivo_restaurado' => $filename]);
             $this->dispatch('backupSuccess', 'Base de datos restaurada desde: '.$filename);
         } catch (\Throwable $e) {
-            $this->dispatch('backupError', 'Error al restaurar: '.$e->getMessage());
+            $this->dispatchBackupFailure('restaurar la base de datos', $e);
         }
 
         $this->isRestoring = false;
@@ -117,8 +117,8 @@ class BackupsController extends Component
             ]
         );
 
-        if (strtolower($this->sqlFile->getClientOriginalExtension()) !== 'sql') {
-            $this->addError('sqlFile', 'Solo se permiten archivos .sql');
+        if (! in_array(strtolower($this->sqlFile->getClientOriginalExtension()), ['sql', 'cfpbak'], true)) {
+            $this->addError('sqlFile', 'Solo se permiten respaldos .cfpbak o archivos SQL heredados.');
 
             return;
         }
@@ -133,29 +133,42 @@ class BackupsController extends Component
 
         try {
             $originalName = $this->sqlFile->getClientOriginalName();
-            $this->prepareRestore($originalName);
-            $this->executeRestoreFile($this->sqlFile->getRealPath());
+            $rollbackPath = $this->prepareRestore($originalName);
+            $this->executeRestoreFile($this->sqlFile->getRealPath(), $rollbackPath);
             $this->writeRestoreAudit('COMPLETADA', $originalName);
             $this->logActivity('BACKUPS', 'RESTAURAR', 'Restauración desde archivo subido', null, ['base_de_datos' => DB::connection()->getDatabaseName()], ['archivo_restaurado' => $originalName]);
             $this->sqlFile = null;
             $this->dispatch('backupSuccess', 'Base de datos restaurada desde archivo subido.');
         } catch (\Throwable $e) {
-            $this->dispatch('backupError', 'Error al restaurar: '.$e->getMessage());
+            $this->dispatchBackupFailure('restaurar el archivo subido', $e);
         }
 
         $this->isRestoring = false;
     }
 
-    private function executeRestoreFile(string $path): void
+    private function executeRestoreFile(string $path, string $rollbackPath): void
     {
         set_time_limit(300);
         ini_set('memory_limit', '256M');
-        $this->validateRestoreFile($path);
+        [$plainPath, $removePlainPath] = $this->plainRestorePath($path);
+
+        try {
+            $this->executePlainRestoreFile($plainPath, $rollbackPath);
+        } finally {
+            if ($removePlainPath) {
+                @unlink($plainPath);
+            }
+        }
+    }
+
+    private function executePlainRestoreFile(string $plainPath, string $rollbackPath): void
+    {
+        $this->validateRestoreFile($plainPath);
         $database = DB::connection()->getDatabaseName();
         $temporaryDatabase = substr(preg_replace('/[^a-zA-Z0-9_]/', '_', $database), 0, 40).'_validate_'.Str::lower(Str::random(8));
         DB::statement("CREATE DATABASE `{$temporaryDatabase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
         try {
-            $this->runMysqlRestore($path, $temporaryDatabase);
+            $this->runMysqlRestore($plainPath, $temporaryDatabase);
             $requiredTables = DB::table('information_schema.tables')->where('table_schema', $temporaryDatabase)
                 ->whereIn('table_name', ['users', 'migrations', 'roles', 'permissions'])->pluck('table_name');
             if ($requiredTables->count() !== 4) {
@@ -166,13 +179,60 @@ class BackupsController extends Component
         }
 
         Artisan::call('down', ['--render' => 'errors.maintenance']);
+        $leaveInMaintenance = false;
         try {
-            $this->runMysqlRestore($path, $database);
-            DB::purge('mysql');
-            DB::reconnect('mysql');
+            try {
+                $this->runMysqlRestore($plainPath, $database);
+                DB::purge();
+                DB::reconnect();
+            } catch (\Throwable $restoreException) {
+                try {
+                    $this->restoreSafetyCopy($rollbackPath, $database);
+                } catch (\Throwable $rollbackException) {
+                    $leaveInMaintenance = true;
+                    throw new \RuntimeException(
+                        'La restauración y la recuperación automática fallaron. El sistema permanecerá en mantenimiento.',
+                        0,
+                        $rollbackException
+                    );
+                }
+
+                throw new \RuntimeException(
+                    'La restauración fue cancelada y la base original se recuperó automáticamente.',
+                    0,
+                    $restoreException
+                );
+            }
         } finally {
-            Artisan::call('up');
+            if (! $leaveInMaintenance) {
+                Artisan::call('up');
+            }
         }
+    }
+
+    private function restoreSafetyCopy(string $rollbackPath, string $database): void
+    {
+        $this->verifyBackupChecksum($rollbackPath);
+        [$plainRollback, $removePlainRollback] = $this->plainRestorePath($rollbackPath);
+        try {
+            $this->validateRestoreFile($plainRollback);
+            $this->runMysqlRestore($plainRollback, $database);
+            DB::purge();
+            DB::reconnect();
+        } finally {
+            if ($removePlainRollback) {
+                @unlink($plainRollback);
+            }
+        }
+    }
+
+    private function plainRestorePath(string $path): array
+    {
+        if (! app(BackupCryptoService::class)->isEncrypted($path)) {
+            return [$path, false];
+        }
+
+        return [app(BackupCryptoService::class)->decryptToTemporary($path), true];
     }
 
     private function validateRestoreFile(string $path): void
@@ -236,7 +296,7 @@ class BackupsController extends Component
     private function runMysqlRestore(string $path, string $database): void
     {
         $mysql = $this->findMysqlClient();
-        $config = config('database.connections.mysql');
+        $config = config('database.connections.'.config('database.default'));
         $args = [$mysql, '--host='.$config['host'], '--port='.$config['port'], '--user='.$config['username']];
         $args[] = '--default-character-set=utf8mb4';
         $args[] = $database;
@@ -282,12 +342,23 @@ class BackupsController extends Component
         abort_unless(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'), 403);
     }
 
-    private function prepareRestore(string $source): void
+    private function prepareRestore(string $source): string
     {
         $this->writeRestoreAudit('INICIADA', $source);
         if (Artisan::call('backup:database', ['--type' => 'pre_restauracion']) !== 0) {
             throw new \RuntimeException('No se pudo crear el respaldo de seguridad previo. La restauración fue cancelada.');
         }
+
+        $files = array_merge(
+            glob(storage_path('app/backups/backup_pre_restauracion_*.cfpbak')) ?: [],
+            glob(storage_path('app/backups/backup_pre_restauracion_*.sql')) ?: []
+        );
+        usort($files, fn (string $a, string $b) => filemtime($b) <=> filemtime($a));
+        if (! isset($files[0])) {
+            throw new \RuntimeException('No se encontró el respaldo de seguridad previo.');
+        }
+
+        return $files[0];
     }
 
     private function writeRestoreAudit(string $status, string $source): void
@@ -308,7 +379,10 @@ class BackupsController extends Component
             return [];
         }
 
-        $files = glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql') ?: [];
+        $files = array_merge(
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.cfpbak') ?: [],
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql') ?: []
+        );
 
         $backups = [];
         foreach ($files as $file) {
@@ -374,7 +448,10 @@ class BackupsController extends Component
             return '0 B';
         }
 
-        $files = glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql') ?: [];
+        $files = array_merge(
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.cfpbak') ?: [],
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql') ?: []
+        );
         $total = array_sum(array_map('filesize', $files));
 
         return $this->formatSize($total);
@@ -382,10 +459,10 @@ class BackupsController extends Component
 
     public function download(string $filename)
     {
-        abort_unless(auth()->user()?->can('ver-backup'), 403);
+        abort_unless(auth()->user()?->hasRole('SUPER ADMIN') && auth()->user()?->can('descargar-backup'), 403);
         $filename = basename($filename);
 
-        if (! str_ends_with($filename, '.sql')) {
+        if (! $this->isSupportedBackupName($filename)) {
             abort(404);
         }
 
@@ -400,5 +477,19 @@ class BackupsController extends Component
         ]);
 
         return response()->download($path);
+    }
+
+    private function isSupportedBackupName(string $filename): bool
+    {
+        $lower = strtolower($filename);
+
+        return str_ends_with($lower, '.cfpbak') || str_ends_with($lower, '.sql');
+    }
+
+    private function dispatchBackupFailure(string $operation, \Throwable $exception): void
+    {
+        $reference = Str::upper(Str::random(10));
+        report(new \RuntimeException('Fallo al '.$operation.' [referencia '.$reference.']', 0, $exception));
+        $this->dispatch('backupError', 'No se pudo '.$operation.'. Referencia técnica: '.$reference.'.');
     }
 }

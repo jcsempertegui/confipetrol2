@@ -2,6 +2,8 @@
 
 namespace App\Console\Commands;
 
+use App\Models\Log as AuditLog;
+use App\Services\BackupCryptoService;
 use Carbon\Carbon;
 use Illuminate\Console\Command;
 
@@ -11,9 +13,9 @@ class DatabaseBackupCommand extends Command
 
     protected $description = 'Crea un backup completo de la base de datos MySQL';
 
-    public function handle(): int
+    public function handle(BackupCryptoService $crypto): int
     {
-        $config = config('database.connections.mysql');
+        $config = config('database.connections.'.config('database.default'));
         $host = $config['host'];
         $port = $config['port'];
         $database = trim($config['database']);
@@ -25,6 +27,11 @@ class DatabaseBackupCommand extends Command
         if (! is_dir($backupDir)) {
             mkdir($backupDir, 0755, true);
         }
+        foreach (glob($backupDir.DIRECTORY_SEPARATOR.'.backup_*.sql.tmp') ?: [] as $temporaryFile) {
+            if (filemtime($temporaryFile) < now()->subHour()->getTimestamp()) {
+                @unlink($temporaryFile);
+            }
+        }
 
         $type = (string) $this->option('type');
         if (! in_array($type, ['manual', 'automatico', 'pre_restauracion'], true)) {
@@ -33,8 +40,10 @@ class DatabaseBackupCommand extends Command
             return 1;
         }
 
-        $filename = 'backup_'.$type.'_'.Carbon::now(config('app.timezone'))->format('Y-m-d_H-i-s').'.sql';
-        $filepath = $backupDir.DIRECTORY_SEPARATOR.$filename;
+        $baseName = 'backup_'.$type.'_'.Carbon::now(config('app.timezone'))->format('Y-m-d_H-i-s');
+        $filename = $baseName.'.cfpbak';
+        $filepath = $backupDir.DIRECTORY_SEPARATOR.'.'.$baseName.'.sql.tmp';
+        $encryptedPath = $backupDir.DIRECTORY_SEPARATOR.$filename;
 
         $mysqldump = $this->findMysqldump();
 
@@ -87,11 +96,24 @@ class DatabaseBackupCommand extends Command
             return 1;
         }
 
-        file_put_contents($filepath.'.sha256', hash_file('sha256', $filepath)."  {$filename}\n", LOCK_EX);
+        try {
+            $crypto->encryptFile($filepath, $encryptedPath);
+        } catch (\Throwable $exception) {
+            @unlink($filepath);
+            @unlink($encryptedPath);
+            $this->error('No se pudo proteger el respaldo: '.$exception->getMessage());
+
+            return 1;
+        }
+
+        file_put_contents($encryptedPath.'.sha256', hash_file('sha256', $encryptedPath)."  {$filename}\n", LOCK_EX);
 
         $this->cleanOldBackups($backupDir);
 
-        $size = $this->formatSize(filesize($filepath));
+        $size = $this->formatSize(filesize($encryptedPath));
+        if ($type === 'automatico') {
+            $this->writeAutomaticBackupAudit($filename, filesize($encryptedPath));
+        }
         $this->info("Backup creado exitosamente: {$filename} ({$size})");
 
         return 0;
@@ -133,7 +155,10 @@ class DatabaseBackupCommand extends Command
 
     private function cleanOldBackups(string $backupDir): void
     {
-        $files = glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql');
+        $files = array_merge(
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.cfpbak') ?: [],
+            glob($backupDir.DIRECTORY_SEPARATOR.'backup_*.sql') ?: []
+        );
 
         if (! $files || count($files) <= 30) {
             return;
@@ -162,5 +187,31 @@ class DatabaseBackupCommand extends Command
         }
 
         return $bytes.' B';
+    }
+
+    private function writeAutomaticBackupAudit(string $filename, int $bytes): void
+    {
+        try {
+            AuditLog::create([
+                'actor_login' => 'Sistema',
+                'modulo' => 'BACKUPS',
+                'accion' => 'CREAR_AUTOMATICO',
+                'descripcion' => 'Creación programada de respaldo cifrado',
+                'valores_nuevos' => [
+                    'archivo' => $filename,
+                    'tamaño_bytes' => $bytes,
+                    'sha256' => hash_file('sha256', storage_path('app/backups/'.$filename)),
+                ],
+            ]);
+        } catch (\Throwable $exception) {
+            file_put_contents(storage_path('logs/audit-fallback.log'), json_encode([
+                'timestamp' => now()->toIso8601String(),
+                'actor_login' => 'Sistema',
+                'module' => 'BACKUPS',
+                'action' => 'CREAR_AUTOMATICO',
+                'after' => ['archivo' => $filename, 'tamaño_bytes' => $bytes],
+                'database_error' => $exception->getMessage(),
+            ], JSON_UNESCAPED_UNICODE).PHP_EOL, FILE_APPEND | LOCK_EX);
+        }
     }
 }

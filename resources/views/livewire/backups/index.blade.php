@@ -137,6 +137,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end text-nowrap">
+                                        @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('descargar-backup'))
                                         <a
                                             href="{{ route('backup.download', ['filename' => $backup['filename']]) }}"
                                             class="btn btn-outline-primary btn-sm"
@@ -145,6 +146,7 @@
                                         >
                                             <i class="bx bx-download"></i>
                                         </a>
+                                        @endif
 
                                         @if(auth()->user()->hasRole('SUPER ADMIN') && auth()->user()->can('restaurar-backup'))
                                             <button
@@ -217,12 +219,12 @@
                             <i class="bx bx-error me-1"></i>Esta acción reemplazará <strong>toda</strong> la base de datos actual. Es irreversible.
                         </div>
 
-                        <label for="backup-sql-file" class="form-label">Archivo SQL <span class="text-danger">*</span></label>
+                        <label for="backup-sql-file" class="form-label">Archivo de respaldo <span class="text-danger">*</span></label>
                         <input
                             id="backup-sql-file"
                             type="file"
                             wire:model="sqlFile"
-                            accept=".sql"
+                            accept=".cfpbak,.sql"
                             class="form-control @error('sqlFile') is-invalid @enderror"
                         >
                         @error('sqlFile')<div class="invalid-feedback">{{ $message }}</div>@enderror

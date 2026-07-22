@@ -30,9 +30,23 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('inventory_movements', function (Blueprint $table) { $table->dropIndex('inventory_movement_type_date_idx'); $table->dropIndex('inventory_delivery_date_idx'); $table->dropIndex('inventory_dispatch_date_idx'); });
-        Schema::table('deliveries', function (Blueprint $table) { $table->dropIndex('deliveries_worker_date_idx'); $table->dropIndex('deliveries_status_date_idx'); });
-        Schema::table('dispatch_notes', function (Blueprint $table) { $table->dropIndex('dispatch_status_date_idx'); $table->dropIndex('dispatch_type_date_idx'); });
-        Schema::table('logs', function (Blueprint $table) { $table->dropIndex('logs_module_date_idx'); $table->dropIndex('logs_action_date_idx'); $table->dropIndex('logs_user_date_idx'); });
+        Schema::table('inventory_movements', function (Blueprint $table) {
+            $table->dropIndex('inventory_movement_type_date_idx');
+            $table->dropIndex('inventory_delivery_date_idx');
+            $table->dropIndex('inventory_dispatch_date_idx');
+        });
+        Schema::table('deliveries', function (Blueprint $table) {
+            $table->dropIndex('deliveries_worker_date_idx');
+            $table->dropIndex('deliveries_status_date_idx');
+        });
+        Schema::table('dispatch_notes', function (Blueprint $table) {
+            $table->dropIndex('dispatch_status_date_idx');
+            $table->dropIndex('dispatch_type_date_idx');
+        });
+        Schema::table('logs', function (Blueprint $table) {
+            $table->dropIndex('logs_module_date_idx');
+            $table->dropIndex('logs_action_date_idx');
+            $table->dropIndex('logs_user_date_idx');
+        });
     }
 };

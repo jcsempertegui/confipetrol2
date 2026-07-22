@@ -1,19 +1,19 @@
 <?php
 
+use App\Http\Controllers\DocumentPrintController;
 use App\Livewire\BackupsController;
 use App\Livewire\CategoriesController;
+use App\Livewire\DeliveriesController;
+use App\Livewire\DispatchNotesController;
 use App\Livewire\HomeController;
+use App\Livewire\InventoryController;
 use App\Livewire\LogsController;
 use App\Livewire\ProductsController;
 use App\Livewire\ProfileController;
+use App\Livewire\ReportsController;
 use App\Livewire\RolesController;
 use App\Livewire\UsersController;
 use App\Livewire\WorkersController;
-use App\Livewire\DispatchNotesController;
-use App\Livewire\DeliveriesController;
-use App\Livewire\InventoryController;
-use App\Livewire\ReportsController;
-use App\Http\Controllers\DocumentPrintController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/login');

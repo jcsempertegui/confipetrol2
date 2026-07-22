@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Auth\LoginRequest;
-use App\Models\Log;
+use App\Traits\AuditLog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -14,6 +14,8 @@ use Illuminate\View\View;
 
 class AuthenticatedSessionController extends Controller
 {
+    use AuditLog;
+
     public function create(): View
     {
         return view('auth.login');
@@ -50,18 +52,17 @@ class AuthenticatedSessionController extends Controller
         }
         // --- FIN LOGICA ---
 
-        Log::create([
-            'user_id' => $user->id,
-            'actor_login' => $user->login,
-            'modulo' => 'ACCESO',
-            'accion' => 'INICIO_SESION',
-            'descripcion' => 'Inicio de sesión: '.$user->login,
-            'ip' => $request->ip(),
-            'valores_nuevos' => [
+        $this->logActivity(
+            'ACCESO',
+            'INICIO_SESION',
+            'Inicio de sesión: '.$user->login,
+            $user->id,
+            null,
+            [
                 'navegador' => Str::limit((string) $request->userAgent(), 500, ''),
                 'huella_sesión' => hash('sha256', $currentSessionId),
-            ],
-        ]);
+            ]
+        );
 
         if ($message) {
             return redirect()->route('home')->with('warning', $message);
@@ -73,14 +74,12 @@ class AuthenticatedSessionController extends Controller
     public function destroy(Request $request): RedirectResponse
     {
         if (Auth::user()) {
-            Log::create([
-                'user_id' => Auth::user()->id,
-                'actor_login' => Auth::user()->login,
-                'modulo' => 'ACCESO',
-                'accion' => 'CIERRE_SESION',
-                'descripcion' => 'Cierre de sesión: '.Auth::user()->login,
-                'ip' => $request->ip(),
-            ]);
+            $this->logActivity(
+                'ACCESO',
+                'CIERRE_SESION',
+                'Cierre de sesión: '.Auth::user()->login,
+                Auth::id()
+            );
         }
 
         Auth::guard('web')->logout();

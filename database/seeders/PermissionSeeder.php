@@ -16,7 +16,7 @@ class PermissionSeeder extends Seeder
             'Usuarios' => ['ver-usuario', 'crear-usuario', 'editar-usuario', 'eliminar-usuario', 'restaurar-usuario'],
             'Roles' => ['ver-rol', 'crear-rol', 'editar-rol', 'eliminar-rol', 'restaurar-rol'],
             'Logs' => ['ver-log', 'exportar-log'],
-            'Backups' => ['ver-backup', 'crear-backup', 'restaurar-backup', 'eliminar-backup'],
+            'Backups' => ['ver-backup', 'crear-backup', 'descargar-backup', 'restaurar-backup', 'eliminar-backup'],
             'Categorías' => ['ver-categoria', 'crear-categoria', 'editar-categoria', 'eliminar-categoria', 'gestionar-atributos'],
             'Productos' => ['ver-producto', 'crear-producto', 'editar-producto', 'eliminar-producto'],
             'Trabajadores' => ['ver-trabajador', 'crear-trabajador', 'editar-trabajador', 'eliminar-trabajador', 'restaurar-trabajador'],

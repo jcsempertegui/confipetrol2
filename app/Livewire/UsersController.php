@@ -141,9 +141,10 @@ class UsersController extends Component
 
     public function toggleStatus(int $id): void
     {
-        abort_unless(auth()->user()->can('eliminar-usuario'), 403);
-        abort_if($id === auth()->id(), 422, 'No puede desactivar su propia cuenta.');
         $user = User::findOrFail($id);
+        $permission = $user->status ? 'eliminar-usuario' : 'restaurar-usuario';
+        abort_unless(auth()->user()->can($permission), 403);
+        abort_if($id === auth()->id(), 422, 'No puede desactivar su propia cuenta.');
         abort_if($user->hasRole('SUPER ADMIN'), 403, 'La cuenta SUPER ADMIN no puede desactivarse.');
         $before = ['status' => (bool) $user->status];
         $user->update(['status' => $user->status ? 0 : 1]);

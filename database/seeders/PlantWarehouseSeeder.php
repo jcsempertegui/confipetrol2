@@ -1075,7 +1075,7 @@ class PlantWarehouseSeeder extends Seeder
 
     private function withExclusiveLock(callable $callback): void
     {
-        if (DB::getDriverName() !== 'mysql') {
+        if (! in_array(DB::getDriverName(), ['mysql', 'mariadb'], true)) {
             $callback();
 
             return;

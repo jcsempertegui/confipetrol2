@@ -1,0 +1,8 @@
+{
+    "preset": "laravel",
+    "exclude": [
+        "public/assets",
+        "vendor",
+        "node_modules"
+    ]
+}

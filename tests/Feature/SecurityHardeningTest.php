@@ -11,6 +11,7 @@ use App\Models\Product;
 use App\Models\ProductAttribute;
 use App\Models\SerializedItem;
 use App\Models\User;
+use App\Services\BackupCryptoService;
 use App\Services\InventoryService;
 use Database\Seeders\PermissionSeeder;
 use Illuminate\Database\QueryException;
@@ -25,7 +26,70 @@ it('adds defensive browser headers to every web response', function () {
         ->assertHeader('X-Content-Type-Options', 'nosniff')
         ->assertHeader('X-Frame-Options', 'SAMEORIGIN')
         ->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin')
-        ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+        ->assertHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+        ->assertHeader('Content-Security-Policy');
+});
+
+it('encrypts, authenticates and decrypts database backups', function () {
+    $temporaryRoot = tempnam(sys_get_temp_dir(), 'confipetrol-backup-');
+    @unlink($temporaryRoot);
+    $plain = $temporaryRoot.'.sql';
+    $encrypted = $temporaryRoot.'.cfpbak';
+    $contents = str_repeat("INSERT INTO prueba VALUES (1);\n", 50000);
+    file_put_contents($plain, $contents);
+
+    try {
+        app(BackupCryptoService::class)->encryptFile($plain, $encrypted);
+        expect(file_exists($plain))->toBeFalse()
+            ->and(file_get_contents($encrypted, false, null, 0, 8))->toBe("CFPBK01\0");
+
+        $decrypted = app(BackupCryptoService::class)->decryptToTemporary($encrypted);
+        expect(hash_file('sha256', $decrypted))->toBe(hash('sha256', $contents));
+        @unlink($decrypted);
+
+        $handle = fopen($encrypted, 'r+b');
+        fseek($handle, 50);
+        fwrite($handle, chr(ord(fread($handle, 1)) ^ 1));
+        fclose($handle);
+
+        expect(fn () => app(BackupCryptoService::class)->verify($encrypted))
+            ->toThrow(RuntimeException::class, 'autenticidad');
+    } finally {
+        @unlink($plain);
+        @unlink($encrypted);
+    }
+});
+
+it('separates user deactivation and restoration permissions', function () {
+    $this->seed(PermissionSeeder::class);
+    $target = User::factory()->create(['status' => false]);
+    $restorer = User::factory()->create();
+    $role = Role::create(['name' => 'RESTAURADOR DE USUARIOS', 'guard_name' => 'web']);
+    $role->givePermissionTo('restaurar-usuario');
+    $restorer->assignRole($role);
+
+    Livewire::actingAs($restorer)->test(UsersController::class)
+        ->call('toggleStatus', $target->id)
+        ->assertHasNoErrors();
+
+    expect($target->fresh()->status)->toBeTrue();
+
+    Livewire::actingAs($restorer)->test(UsersController::class)
+        ->call('toggleStatus', $target->id)
+        ->assertForbidden();
+});
+
+it('restricts database backup downloads to an authorized super admin', function () {
+    $this->seed(PermissionSeeder::class);
+    $operator = User::factory()->create();
+    $role = Role::create(['name' => 'OPERADOR DE RESPALDOS', 'guard_name' => 'web']);
+    $role->syncPermissions(['ver-backup', 'descargar-backup']);
+    $operator->assignRole($role);
+
+    $this->actingAs($operator)
+        ->withSession(['auth.password_confirmed_at' => time()])
+        ->get('/backup/download/backup_fake.cfpbak')
+        ->assertForbidden();
 });
 
 it('makes inventory movements and audit records immutable in the model and database', function () {

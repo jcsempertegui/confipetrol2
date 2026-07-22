@@ -76,7 +76,7 @@
                                         </button>
                                     @endcan
 
-                                    @can('eliminar-usuario')
+                                    @if(($user->status && auth()->user()->can('eliminar-usuario')) || (! $user->status && auth()->user()->can('restaurar-usuario')))
                                         <button
                                             type="button"
                                             wire:click="toggleStatus({{ $user->id }})"
@@ -88,7 +88,7 @@
                                         >
                                             <i class="bx bx-power-off"></i>
                                         </button>
-                                    @endcan
+                                    @endif
                                 </td>
                             </tr>
                         @empty
