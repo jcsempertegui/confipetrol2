@@ -76,7 +76,7 @@
                                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 border-top pt-3">
                                     <div>
                                         <div class="form-section-title mb-1">{{ $variantAttributes->isNotEmpty() ? 'Variantes del producto' : 'Identificación y control' }}</div>
-                                        <div class="small text-muted">{{ $variantAttributes->isNotEmpty() ? 'Registra una fila por talla o presentación.' : ($unitAttribute ? 'Cada activo se controla mediante su identificador único.' : 'Configura el nivel mínimo de existencia.') }}</div>
+                                        <div class="small text-muted">{{ $variantAttributes->isNotEmpty() ? 'Registra una fila por talla o presentación. Una misma combinación no puede repetirse.' : ($unitAttribute ? 'Cada activo se controla mediante su identificador único.' : 'Configura el nivel mínimo de existencia.') }}</div>
                                     </div>
                                     @if($variantAttributes->isNotEmpty())
                                         <button type="button" wire:click="addVariant" class="btn btn-sm btn-outline-primary"><i class="bx bx-plus me-1"></i>Agregar variante</button>
@@ -110,7 +110,7 @@
                                                 @foreach($variantAttributes as $attribute)
                                                     <div class="col-md-3">
                                                         <label class="form-label">{{ $attribute->name }} @if($attribute->pivot->required)<span class="text-danger">*</span>@else<span class="field-optional">Opcional</span>@endif</label>
-                                                        @include('livewire.products.attribute-input', ['model' => 'variants.'.$index.'.values.'.$attribute->id, 'attribute' => $attribute])
+                                                        @include('livewire.products.attribute-input', ['model' => 'variants.'.$index.'.values.'.$attribute->id, 'attribute' => $attribute, 'variantIndex' => $index])
                                                         @error('variants.'.$index.'.values.'.$attribute->id)<div class="invalid-feedback d-block">{{ $message }}</div>@enderror
                                                     </div>
                                                 @endforeach

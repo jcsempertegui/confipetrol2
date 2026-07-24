@@ -3,6 +3,7 @@
 namespace App\Livewire;
 
 use App\Models\DispatchNote;
+use App\Models\Product;
 use App\Models\ProductVariant;
 use App\Services\CodeGenerator;
 use App\Services\InventoryService;
@@ -68,16 +69,30 @@ class DispatchNotesController extends Component
         ])->withSum('inventoryMovements as stock', 'quantity')->whereIn('id', $ids)->get();
         $productResults = collect();
         if (mb_strlen(trim($this->productSearch)) >= 1) {
-            $productResults = ProductVariant::with(['product.attributeValues.attribute', 'attributeValues.attribute'])
-                ->withSum('inventoryMovements as stock', 'quantity')
+            $productResults = Product::with([
+                'attributeValues.attribute',
+                'variants' => fn ($query) => $query
+                    ->where('status', true)
+                    ->with(['attributeValues.attribute'])
+                    ->withSum('inventoryMovements as stock', 'quantity')
+                    ->orderBy('sku'),
+            ])
                 ->where('status', true)
-                ->whereHas('product', fn ($q) => $q->where('status', true));
+                ->whereHas('variants', fn ($query) => $query->where('status', true));
             $this->applyProductSearch($productResults, $this->productSearch);
-            $productResults = $productResults->orderBy('sku')->limit(15)->get();
+            $productResults = $productResults->orderBy('name')->limit(12)->get();
         }
+        $itemGroups = collect($this->items)
+            ->map(function (array $row, int $index) use ($variants): ?array {
+                $variant = $variants->firstWhere('id', (int) ($row['variant_id'] ?? 0));
+
+                return $variant ? compact('row', 'index', 'variant') : null;
+            })
+            ->filter()
+            ->groupBy(fn (array $item) => $item['variant']->product_id);
         $selectedDetail = $this->detailId ? DispatchNote::with(['items.variant.product.attributeValues.attribute', 'items.variant.attributeValues.attribute', 'items.serializedItems', 'creator', 'confirmer', 'annuller', 'correctedFrom', 'correction'])->find($this->detailId) : null;
 
-        return view('livewire.dispatch-notes.dispatch-notes', compact('dispatchNotes', 'variants', 'productResults', 'selectedDetail'))->extends('layouts.theme.app');
+        return view('livewire.dispatch-notes.dispatch-notes', compact('dispatchNotes', 'variants', 'productResults', 'itemGroups', 'selectedDetail'))->extends('layouts.theme.app');
     }
 
     public function updated($property): void
@@ -98,10 +113,53 @@ class DispatchNotesController extends Component
         $this->productSearch = '';
     }
 
+    public function addProductGroup(int $productId): void
+    {
+        $product = Product::query()
+            ->where('status', true)
+            ->with(['variants' => fn ($query) => $query->where('status', true)->orderBy('sku')])
+            ->findOrFail($productId);
+        $existingIds = collect($this->items)->pluck('variant_id')->map(fn ($id) => (int) $id);
+        $added = 0;
+
+        foreach ($product->variants as $variant) {
+            if ($existingIds->contains($variant->id)) {
+                continue;
+            }
+
+            $serialized = $product->tracking_type === 'serialized';
+            $this->items[] = [
+                'variant_id' => $variant->id,
+                'quantity' => $serialized ? 1 : 0,
+                'serial_ids' => [],
+                'notes' => '',
+            ];
+            $added++;
+        }
+
+        $this->productSearch = '';
+        $this->dispatch(
+            'alert',
+            $added > 0
+                ? "Se agregaron {$added} presentaciones de {$product->name}. Ingresa cantidad solo en las recibidas."
+                : 'Todas las presentaciones de ese producto ya están agregadas.',
+            $added > 0 ? 'success' : 'warning'
+        );
+    }
+
     public function removeItem(int $index): void
     {
         unset($this->items[$index]);
         $this->items = array_values($this->items);
+    }
+
+    public function removeProduct(int $productId): void
+    {
+        $variantIds = ProductVariant::query()->where('product_id', $productId)->pluck('id');
+        $this->items = collect($this->items)
+            ->reject(fn (array $item) => $variantIds->contains((int) ($item['variant_id'] ?? 0)))
+            ->values()
+            ->all();
     }
 
     public function save(): void
@@ -129,7 +187,7 @@ class DispatchNotesController extends Component
             'type' => 'required|in:entry,exit', 'document_date' => 'required|date_format:Y-m-d|before_or_equal:today',
             'counterparty' => 'required|string|max:180', 'reason' => 'nullable|string|max:180', 'notes' => 'nullable|string|max:2000',
             'items' => 'required|array|min:1', 'items.*.variant_id' => 'required|integer|distinct|exists:product_variants,id',
-            'items.*.quantity' => 'required|numeric|min:0.001|max:999999999',
+            'items.*.quantity' => 'required|numeric|min:0|max:999999999',
             'items.*.notes' => 'nullable|string|max:500', 'items.*.serial_ids' => 'array', 'items.*.serial_ids.*' => 'integer|distinct|exists:serialized_items,id',
         ]);
         foreach ($data['items'] as $index => $row) {
@@ -139,6 +197,19 @@ class DispatchNotesController extends Component
                     "items.{$index}.variant_id" => 'El producto '.$variant->sku.' está inactivo y no puede utilizarse.',
                 ]);
             }
+        }
+        $data['items'] = collect($data['items'])
+            ->filter(function (array $row): bool {
+                $variant = ProductVariant::with('product')->findOrFail($row['variant_id']);
+
+                return $variant->product->tracking_type === 'serialized' || (float) $row['quantity'] > 0;
+            })
+            ->values()
+            ->all();
+        if ($data['items'] === []) {
+            throw ValidationException::withMessages([
+                'items' => 'Ingresa una cantidad mayor a cero en al menos una presentación.',
+            ]);
         }
         $before = $this->noteId ? $this->snapshot(DispatchNote::with('items.serializedItems')->findOrFail($this->noteId)) : null;
         $note = DB::transaction(function () use ($data) {
@@ -314,16 +385,20 @@ class DispatchNotesController extends Component
 
             $query->where(function ($options) use ($term, $exactAttribute, $matchAttribute) {
                 if (! $exactAttribute) {
-                    $options->where('sku', 'like', $term)
-                        ->orWhere('name', 'like', $term)
-                        ->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term));
+                    $options->where('name', 'like', $term)
+                        ->orWhere('code', 'like', $term);
                 }
                 $options->orWhereHas('attributeValues', $matchAttribute)
-                    ->orWhereHas('product', fn ($product) => $product
-                        ->when(! $exactAttribute, fn ($fields) => $fields
-                            ->where('name', 'like', $term)
-                            ->orWhere('code', 'like', $term))
-                        ->orWhereHas('attributeValues', $matchAttribute));
+                    ->orWhereHas('variants', function ($variants) use ($term, $exactAttribute, $matchAttribute) {
+                        $variants->where(function ($variant) use ($term, $exactAttribute, $matchAttribute) {
+                            if (! $exactAttribute) {
+                                $variant->where('sku', 'like', $term)
+                                    ->orWhere('name', 'like', $term)
+                                    ->orWhereHas('serializedItems', fn ($serial) => $serial->where('serial_number', 'like', $term));
+                            }
+                            $variant->orWhereHas('attributeValues', $matchAttribute);
+                        });
+                    });
             });
         }
     }

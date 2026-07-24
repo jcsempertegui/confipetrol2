@@ -70,13 +70,23 @@
                         @if(mb_strlen(trim($productSearch)) >= 1)
                             <div class="list-group position-absolute w-100 shadow search-results">
                                 @forelse($productResults as $result)
-                                    <button type="button" wire:click="addProduct({{ $result->id }})" class="list-group-item list-group-item-action d-flex justify-content-between gap-3">
-                                        <span>
-                                            <strong>{{ $result->product->name }}</strong> · {{ $result->name ?: $result->sku }}
-                                            <small class="d-block text-muted">{{ $result->sku }}</small>
-                                            @if($result->attribute_summary)<small class="d-block text-primary mt-1"><i class="bx bx-purchase-tag-alt me-1"></i>{{ $result->attribute_summary }}</small>@endif
+                                    <button type="button" wire:click="addProductGroup({{ $result->id }})" class="list-group-item list-group-item-action product-search-result">
+                                        <span class="product-search-main">
+                                            <span>
+                                                <strong>{{ $result->name }}</strong>
+                                                <small class="d-block text-muted font-monospace">{{ $result->code }}</small>
+                                            </span>
+                                            <span class="badge bg-primary-subtle text-primary">{{ $result->variants->count() }} {{ $result->variants->count() === 1 ? 'presentación' : 'presentaciones' }}</span>
                                         </span>
-                                        <span class="badge bg-light text-dark align-self-center">Stock {{ \App\Support\Quantity::format($result->stock ?? 0) }}</span>
+                                        <span class="product-variant-preview">
+                                            @foreach($result->variants->take(8) as $variant)
+                                                @php($variantSummary = $variant->attributeValues->filter(fn($value) => filled($value->value) && $value->attribute)->map(fn($value) => $value->attribute->name.': '.$value->value)->join(' · '))
+                                                <span class="variant-preview-chip">{{ $variant->name ?: ($variantSummary ?: $variant->sku) }}</span>
+                                            @endforeach
+                                            @if($result->variants->count() > 8)
+                                                <span class="variant-preview-chip">+{{ $result->variants->count() - 8 }} más</span>
+                                            @endif
+                                        </span>
                                     </button>
                                 @empty
                                     <div class="list-group-item text-muted">No se encontraron productos.</div>
@@ -87,43 +97,62 @@
                     @error('items')<div class="text-danger small mt-1">{{ $message }}</div>@enderror
 
                     <div class="document-items">
-                        @foreach($items as $index => $row)
-                            @php($selected = $variants->firstWhere('id', (int) ($row['variant_id'] ?? 0)))
-                            <div class="document-item" wire:key="note-item-{{ $index }}">
-                                <div class="row g-3 align-items-end">
-                                    <div class="col-lg-5">
-                                        <label class="form-label">Producto / variante</label>
-                                        <div class="form-control readonly-control">
-                                            <strong>{{ $selected?->product?->name }}</strong> · {{ $selected?->name ?: $selected?->sku }}
-                                            <span class="small text-muted">({{ $selected?->sku }})</span>
-                                            @if($selected?->attribute_summary)<span class="d-block small text-primary mt-1"><i class="bx bx-purchase-tag-alt me-1"></i>{{ $selected->attribute_summary }}</span>@endif
-                                        </div>
+                        @forelse($itemGroups as $productId => $group)
+                            @php($groupProduct = $group->first()['variant']->product)
+                            <div class="document-product-group" wire:key="note-product-{{ $productId }}">
+                                <div class="document-product-header">
+                                    <div>
+                                        <strong>{{ $groupProduct->name }}</strong>
+                                        <span class="font-monospace text-muted">{{ $groupProduct->code }}</span>
+                                        <small class="d-block text-muted">Completa únicamente las presentaciones incluidas en el remito.</small>
                                     </div>
-                                    @if($selected?->product?->tracking_type === 'serialized')
-                                        <div class="col-lg-5">
-                                            <label class="form-label">Números de serie <span class="text-danger">*</span></label>
-                                            <select multiple size="3" wire:model="items.{{ $index }}.serial_ids" class="form-select @error('items.'.$index.'.serial_ids') is-invalid @enderror">
-                                                @foreach($selected->serializedItems as $serial)<option value="{{ $serial->id }}">{{ $serial->serial_number }}</option>@endforeach
-                                            </select>
-                                            @error('items.'.$index.'.serial_ids')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                    <button type="button" wire:click="removeProduct({{ $productId }})" class="btn btn-sm btn-outline-danger" title="Quitar todas las presentaciones">
+                                        <i class="bx bx-trash"></i><span class="d-none d-sm-inline">Quitar producto</span>
+                                    </button>
+                                </div>
+                                <div class="document-variant-list">
+                                    @foreach($group as $entry)
+                                        @php($index = $entry['index'])
+                                        @php($row = $entry['row'])
+                                        @php($selected = $entry['variant'])
+                                        <div class="document-variant-row" wire:key="note-item-{{ $selected->id }}">
+                                            <div class="variant-identification">
+                                                <span class="variant-name">{{ $selected->name ?: 'Presentación estándar' }}</span>
+                                                @if($selected->attribute_summary)
+                                                    <span class="d-block small text-primary"><i class="bx bx-purchase-tag-alt me-1"></i>{{ $selected->attribute_summary }}</span>
+                                                @endif
+                                                <span class="d-block small text-muted font-monospace">{{ $selected->sku }} · Stock {{ \App\Support\Quantity::format($selected->stock ?? 0) }}</span>
+                                            </div>
+                                            @if($selected->product->tracking_type === 'serialized')
+                                                <div class="variant-serials">
+                                                    <label class="form-label">Números de serie <span class="text-danger">*</span></label>
+                                                    <select multiple size="3" wire:model="items.{{ $index }}.serial_ids" class="form-select @error('items.'.$index.'.serial_ids') is-invalid @enderror">
+                                                        @foreach($selected->serializedItems as $serial)<option value="{{ $serial->id }}">{{ $serial->serial_number }}</option>@endforeach
+                                                    </select>
+                                                    @error('items.'.$index.'.serial_ids')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                </div>
+                                                <div class="variant-quantity">
+                                                    <label class="form-label">Cantidad</label>
+                                                    <input value="{{ count($row['serial_ids'] ?? []) }}" disabled class="form-control">
+                                                </div>
+                                            @else
+                                                <div class="variant-quantity">
+                                                    <label class="form-label">Cantidad</label>
+                                                    <input type="number" min="0" step="0.1" wire:model="items.{{ $index }}.quantity" placeholder="0" class="form-control @error('items.'.$index.'.quantity') is-invalid @enderror">
+                                                    @error('items.'.$index.'.quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                                                </div>
+                                            @endif
+                                            <button type="button" wire:click="removeItem({{ $index }})" class="btn btn-sm btn-outline-danger variant-remove" title="Quitar esta presentación"><i class="bx bx-x"></i></button>
                                         </div>
-                                        <div class="col-8 col-lg-1">
-                                            <label class="form-label">Cantidad</label>
-                                            <input value="{{ count($row['serial_ids'] ?? []) }}" disabled class="form-control">
-                                        </div>
-                                    @else
-                                        <div class="col-8 col-lg-5">
-                                            <label class="form-label">Cantidad <span class="text-danger">*</span></label>
-                                            <input type="number" min="0.001" step="0.001" wire:model="items.{{ $index }}.quantity" class="form-control @error('items.'.$index.'.quantity') is-invalid @enderror">
-                                            @error('items.'.$index.'.quantity')<div class="invalid-feedback">{{ $message }}</div>@enderror
-                                        </div>
-                                    @endif
-                                    <div class="col-4 col-lg-1">
-                                        <button type="button" wire:click="removeItem({{ $index }})" class="btn btn-outline-danger w-100" title="Quitar producto"><i class="bx bx-trash"></i></button>
-                                    </div>
+                                    @endforeach
                                 </div>
                             </div>
-                        @endforeach
+                        @empty
+                            <div class="document-products-empty">
+                                <i class="bx bx-package"></i>
+                                <span>Busca y selecciona un producto para agregar todas sus presentaciones.</span>
+                            </div>
+                        @endforelse
                     </div>
 
                     <div class="row g-3 mt-1">

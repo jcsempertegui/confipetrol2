@@ -78,6 +78,33 @@ it('creates one product with multiple size variants', function () {
         ->and(Product::first()->variants->pluck('sku')->all())->toBe([strtoupper($prefix).'-01-RGD', strtoupper($prefix).'-02-RGD']);
 });
 
+it('rejects duplicate sizes selected for the same product', function () {
+    $category = Category::create(['name' => 'EPP', 'code' => 'EPP', 'status' => true]);
+    $size = ProductAttribute::create([
+        'name' => 'Talla',
+        'code' => 'epp-talla-unica',
+        'type' => 'select',
+        'scope' => 'variant',
+        'options' => ['M', 'L', 'XL'],
+        'status' => true,
+    ]);
+    $category->attributes()->attach($size, ['required' => true]);
+
+    Livewire::test(ProductsController::class)
+        ->set('category_id', $category->id)
+        ->set('name', 'Camisa RF')
+        ->set('variants.0.values.'.$size->id, 'M')
+        ->call('addVariant')
+        ->assertSee('M — ya seleccionada')
+        ->set('variants.1.values.'.$size->id, 'M')
+        ->assertHasErrors('variants.1.values.'.$size->id)
+        ->call('save')
+        ->assertHasErrors('variants.1.values.'.$size->id)
+        ->assertSee('ya fue seleccionada');
+
+    expect(Product::where('name', 'Camisa RF')->exists())->toBeFalse();
+});
+
 it('enforces globally unique serial numbers', function () {
     $category = Category::create(['name' => 'Activos', 'code' => 'ACT', 'status' => true]);
     $serial = ProductAttribute::create(['name' => 'Número de serie', 'code' => 'act-serial', 'type' => 'text', 'scope' => 'unit', 'status' => true]);

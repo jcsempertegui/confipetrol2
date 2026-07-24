@@ -67,6 +67,25 @@ class ProductsController extends Component
         $this->resetPage();
     }
 
+    public function updated(string $property): void
+    {
+        if (! preg_match('/^variants\.\d+\.values\.\d+$/', $property) || blank($this->category_id)) {
+            return;
+        }
+
+        $category = Category::with('attributes')->find($this->category_id);
+        if (! $category) {
+            return;
+        }
+
+        foreach ($this->variants as $index => $variant) {
+            foreach ($category->attributes->where('scope', 'variant') as $attribute) {
+                $this->resetValidation("variants.{$index}.values.{$attribute->id}");
+            }
+        }
+        $this->validateUniqueVariantCombinations($category);
+    }
+
     public function updatedCategoryId(): void
     {
         $this->productValues = [];
@@ -133,6 +152,7 @@ class ProductsController extends Component
                 }
             }
         }
+        $this->validateUniqueVariantCombinations($category);
         if ($this->getErrorBag()->isNotEmpty()) {
             return;
         }
@@ -351,6 +371,47 @@ class ProductsController extends Component
         };
         if (! $valid) {
             $this->addError($field, 'El valor no corresponde al tipo configurado para '.$attribute->name.'.');
+        }
+    }
+
+    private function validateUniqueVariantCombinations(Category $category): void
+    {
+        $attributes = $category->attributes->where('scope', 'variant')->values();
+        if ($attributes->isEmpty()) {
+            return;
+        }
+
+        $seen = [];
+        foreach ($this->variants as $index => $variant) {
+            $values = [];
+            $labels = [];
+            foreach ($attributes as $attribute) {
+                $value = $variant['values'][$attribute->id] ?? null;
+                if (blank($value)) {
+                    continue 2;
+                }
+
+                $normalized = preg_replace('/\s+/u', ' ', trim((string) $value));
+                $normalized = $attribute->type === 'number'
+                    ? rtrim(rtrim(number_format((float) $normalized, 6, '.', ''), '0'), '.')
+                    : mb_strtoupper($normalized);
+                $values[] = $attribute->id.'='.$normalized;
+                $labels[] = $attribute->name.': '.trim((string) $value);
+            }
+
+            $signature = implode('|', $values);
+            if (array_key_exists($signature, $seen)) {
+                $firstIndex = $seen[$signature];
+                $field = "variants.{$index}.values.{$attributes->first()->id}";
+                $this->addError(
+                    $field,
+                    implode(' · ', $labels).' ya fue seleccionada en la variante '.($firstIndex + 1).'. Cada presentación debe ser única.'
+                );
+
+                continue;
+            }
+
+            $seen[$signature] = $index;
         }
     }
 

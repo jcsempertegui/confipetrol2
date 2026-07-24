@@ -63,6 +63,52 @@ it('finds and identifies products by their variant attributes in a dispatch note
         ->assertSee('Talla: L');
 });
 
+it('adds every product size at once and saves only quantities entered in the remito', function () {
+    $this->seed(PermissionSeeder::class);
+    $role = Role::create(['name' => 'CARGA AGRUPADA REMITOS', 'guard_name' => 'web']);
+    $role->givePermissionTo('crear-remito');
+    $this->user->assignRole($role);
+
+    $size = ProductAttribute::create([
+        'name' => 'Talla',
+        'code' => 'epp-talla-carga-agrupada',
+        'type' => 'select',
+        'scope' => 'variant',
+        'options' => ['S', 'M', 'L'],
+    ]);
+    $this->bulkProduct->category->attributes()->attach($size, ['required' => true]);
+    $shirt = Product::create([
+        'category_id' => $this->bulkProduct->category_id,
+        'code' => 'EPP-CAMISA-GRUPO-RGD',
+        'name' => 'Camisa RF agrupada',
+        'tracking_type' => 'bulk',
+    ]);
+    $variants = collect(['S', 'M', 'L'])->map(function (string $value, int $index) use ($shirt, $size) {
+        $variant = $shirt->variants()->create([
+            'sku' => 'EPP-CAMISA-GRUPO-0'.($index + 1).'-RGD',
+            'name' => 'Talla '.$value,
+        ]);
+        $variant->attributeValues()->create(['product_attribute_id' => $size->id, 'value' => $value]);
+
+        return $variant;
+    });
+
+    Livewire::actingAs($this->user)->test(DispatchNotesController::class)
+        ->set('productSearch', 'Camisa RF agrupada')
+        ->assertSee('3 presentaciones')
+        ->call('addProductGroup', $shirt->id)
+        ->assertCount('items', 3)
+        ->set('counterparty', 'Proveedor textil')
+        ->set('items.1.quantity', 6)
+        ->call('save')
+        ->assertHasNoErrors();
+
+    $note = DispatchNote::query()->latest('id')->firstOrFail();
+    expect($note->items)->toHaveCount(1)
+        ->and($note->items->first()->product_variant_id)->toBe($variants[1]->id)
+        ->and((float) $note->items->first()->quantity)->toBe(6.0);
+});
+
 it('confirms entries and exits with an immutable inventory ledger', function () {
     $entry = inventoryNote('entry', $this->user);
     $entry->items()->create(['product_variant_id' => $this->bulkVariant->id, 'quantity' => 10]);
